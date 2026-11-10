@@ -31,16 +31,25 @@ public struct Session: Sendable {
     }
 }
 
+/// Whether the session may change anything in iTop (SPEC.md, Boundaries: read-only until you say so).
+public enum WriteAccess: Sendable, Equatable {
+    case off
+    /// Writes only on these tickets, given by ref ("R-079999"), for testing on a real iTop.
+    case tickets([String])
+}
+
 /// Sign in, restore after a relaunch, and sign out (PLAN.md, Task 2).
 public struct SessionService: Sendable {
     let secrets: SecretStore
     let settings: SessionSettings
+    let writeAccess: WriteAccess
     let makeClient: @Sendable (ServerAddress, Credentials) -> ITopClient
 
-    public init(secrets: SecretStore = KeychainStore(), settings: SessionSettings = SessionSettings(),
+    public init(secrets: SecretStore = KeychainStore(), settings: SessionSettings = SessionSettings(), writeAccess: WriteAccess = .off,
                 makeClient: @escaping @Sendable (ServerAddress, Credentials) -> ITopClient = { ITopClient(server: $0, credentials: $1) }) {
         self.secrets = secrets
         self.settings = settings
+        self.writeAccess = writeAccess
         self.makeClient = makeClient
     }
 
@@ -84,6 +93,13 @@ public struct SessionService: Sendable {
         let client = makeClient(address, credentials)
         guard try await client.checkCredentials() else { throw ITopError.invalidCredentials }
         let me = try await CurrentUser.load(login: credentials.user, client: client)
-        return Session(client: client, user: me)
+        guard case .tickets(let refs) = writeAccess else { return Session(client: client, user: me) }
+        // Resolve each ref to its exact object; refs that don't exist stay out of the allowlist.
+        let service = TicketService(client: client)
+        var allowed: Set<String> = []
+        for ref in refs {
+            if let t = try? await service.lookup(ref) { allowed.insert(TicketWrites.allowlistKey(for: t)) }
+        }
+        return Session(client: client.allowingWrites(only: allowed), user: me)
     }
 }
