@@ -34,7 +34,9 @@ struct TicketListView: View {
             }
             .task {
                 if model.phase != .loaded { await model.refresh() }
-                // UX-FLOWS F10: every 2 minutes while the list is open.
+                // UX-FLOWS F10: every 2 minutes while the list is open. My tickets refreshes in
+                // the workspace instead, so the menu bar count stays current with the window closed.
+                guard model.view == .team else { return }
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(120))
                     if !Task.isCancelled { await model.refresh() }

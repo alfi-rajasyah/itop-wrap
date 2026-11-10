@@ -1,0 +1,69 @@
+import Foundation
+import ITopKit
+import Observation
+
+/// Everything one signed-in session works with, shared by the main window and the menu bar
+/// (PLAN.md Task 8c): the lists, the one timer and the CMDB views. It lives as long as the
+/// session, not the window, so closing the window leaves the menu bar working.
+@MainActor @Observable
+final class Workspace {
+    let session: Session
+    let options: ListOptions
+    let mine: TicketListModel
+    let team: TicketListModel
+    let cmdb: CMDBModel
+    let orgs: OrgsModel
+    let people: PeopleModel
+    let timer: TimerModel
+    private var refreshLoop: Task<Void, Never>?
+    private var clockLoop: Task<Void, Never>?
+    /// Ticks every 15 seconds so the menu bar's timer (h:mm) stays current.
+    private(set) var clock = Date()
+
+    init(session: Session) {
+        self.session = session
+        ErrorText.host = session.client.server.baseURL.host() ?? "the server"
+        let options = ListOptions(defaults: DebugLaunch.listDefaults)
+        self.options = options
+        mine = TicketListModel(view: .mine, session: session, options: options, source: DebugLaunch.demoSource(.mine))
+        team = TicketListModel(view: .team, session: session, options: options, source: DebugLaunch.demoSource(.team))
+        cmdb = CMDBModel(session: session, source: DebugLaunch.demoCMDB())
+        orgs = OrgsModel(session: session, options: options, source: DebugLaunch.demoOrgs())
+        people = PeopleModel(session: session, options: options, source: DebugLaunch.demoPeople())
+        let demo = DebugLaunch.demoTimer()
+        let client = session.client
+        let isDemo = demo != nil
+        let canWrite: @Sendable (Ticket) -> Bool = { t in isDemo || client.canWrite(className: t.ticketClass.rawValue, key: t.key) }
+        timer = TimerModel(source: demo ?? TimerSource.live(session), store: TimerStore(defaults: DebugLaunch.listDefaults),
+                           me: session.user, canWrite: canWrite)
+        mine.timer = timer
+        team.timer = timer
+    }
+
+    /// My tickets drives the menu bar count, so it refreshes every 2 minutes (UX-FLOWS F10)
+    /// whether or not the window is open.
+    func start() {
+        guard refreshLoop == nil else { return }
+        clockLoop = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(15))
+                self?.clock = Date()
+            }
+        }
+        refreshLoop = Task { [weak self] in
+            if let self, self.mine.phase != .loaded { await self.mine.refresh() }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(120))
+                guard !Task.isCancelled, let self else { return }
+                await self.mine.refresh()
+            }
+        }
+    }
+
+    func stop() {
+        refreshLoop?.cancel()
+        refreshLoop = nil
+        clockLoop?.cancel()
+        clockLoop = nil
+    }
+}
