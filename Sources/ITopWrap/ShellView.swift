@@ -16,6 +16,7 @@ struct ShellView: View {
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var workspace = workspace
         NavigationSplitView {
             List(selection: $model.selection.deferred("sidebar")) {
                 Section("Tickets") {
@@ -54,7 +55,8 @@ struct ShellView: View {
                     }
                 } else if model.selection == .configItems {
                     if let item = cmdb.current {
-                        CIDetailView(model: cmdb, item: item, openTicket: openTicket).id(item.id)
+                        CIDetailView(model: cmdb, item: item, openTicket: openTicket,
+                                     newTicket: { workspace.requestNewTicket(NewTicketStart(orgName: $0.orgName, ciID: $0.key, ciName: $0.name)) }).id(item.id)
                     } else {
                         Text("Select a config item to see its details.")
                             .foregroundStyle(Theme.secondary)
@@ -64,7 +66,8 @@ struct ShellView: View {
                     if let org = orgs.selected {
                         OrgDetailView(model: orgs, org: org, openTicket: openTicket,
                                       openPeople: { o in people.showOrg(id: o.id, name: o.name); model.selection = .people },
-                                      openConfigItems: { o in cmdb.showOrg(id: o.id, name: o.name); model.selection = .configItems })
+                                      openConfigItems: { o in cmdb.showOrg(id: o.id, name: o.name); model.selection = .configItems },
+                                      newTicket: { o in workspace.requestNewTicket(NewTicketStart(orgID: o.id, orgName: o.name)) })
                             .id(org.id)
                     } else {
                         placeholder("Select an organization to see its open tickets.")
@@ -82,6 +85,12 @@ struct ShellView: View {
             // The minimum size goes on a column: a frame on the split view itself
             // pushes its content under the toolbar and past the bottom edge (Checkpoint A).
             .frame(minWidth: 380, minHeight: 520)
+        }
+        .sheet(item: $workspace.newTicketStart) { start in
+            NewTicketSheet(workspace: workspace, start: start) { ticket in
+                model.selection = .myTickets
+                mine.show(ticket, notice: "\(ticket.ref) is created.")
+            }
         }
         .confirmationDialog("Sign out of \(host)?", isPresented: $confirmSignOut) {
             Button("Sign out", role: .destructive) { model.signOut() }

@@ -8,22 +8,31 @@ public struct ITopClient: Sendable {
     /// When set, writes are allowed only on these objects ("UserRequest::7"), and nothing can be
     /// created: the safety net for testing writes on chosen tickets of a real iTop.
     public let writeAllowlist: Set<String>?
+    /// With an allowlist, also allow creating new tickets (UserRequest, Incident): for testing
+    /// New ticket on a real iTop without opening writes to every existing ticket.
+    public let allowsTicketCreation: Bool
     let session: URLSession
 
     /// `allowsWrites` is `false` by default: during development the app only reads.
     public init(server: ServerAddress, credentials: Credentials,
-                session: URLSession = .shared, allowsWrites: Bool = false, writeAllowlist: Set<String>? = nil) {
+                session: URLSession = .shared, allowsWrites: Bool = false, writeAllowlist: Set<String>? = nil,
+                allowsTicketCreation: Bool = false) {
         self.server = server
         self.credentials = credentials
         self.session = session
         self.allowsWrites = allowsWrites
         self.writeAllowlist = writeAllowlist
+        self.allowsTicketCreation = allowsTicketCreation
     }
 
     /// The same client with writes on, optionally limited to an allowlist.
-    public func allowingWrites(only allowlist: Set<String>?) -> ITopClient {
-        ITopClient(server: server, credentials: credentials, session: session, allowsWrites: true, writeAllowlist: allowlist)
+    public func allowingWrites(only allowlist: Set<String>?, newTickets: Bool = false) -> ITopClient {
+        ITopClient(server: server, credentials: credentials, session: session, allowsWrites: true, writeAllowlist: allowlist,
+                   allowsTicketCreation: newTickets)
     }
+
+    /// Whether New ticket would be sent.
+    public var canCreateTickets: Bool { allowsWrites && (writeAllowlist == nil || allowsTicketCreation) }
 
     /// Whether a write to this object would be sent (for enabling the composer and actions).
     public func canWrite(className: String, key: String) -> Bool {
@@ -37,10 +46,11 @@ public struct ITopClient: Sendable {
     private func permits(_ operation: RESTOperation, ticket: String?) -> Bool {
         switch operation {
         case .update(let cls, let key, _, _), .applyStimulus(let cls, let key, _, _, _): return canWrite(className: cls, key: key)
-        case .create:
+        case .create(let cls, _, _):
             guard allowsWrites else { return false }
             guard let allowlist = writeAllowlist else { return true }
-            return ticket.map(allowlist.contains) ?? false
+            if let ticket { return allowlist.contains(ticket) }
+            return allowsTicketCreation && TicketClass(rawValue: cls) != nil
         default: return true
         }
     }

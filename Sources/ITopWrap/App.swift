@@ -22,6 +22,9 @@ struct ITopWrapApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {
+                if let workspace = model.workspace {
+                    NewTicketButton(workspace: workspace)
+                }
                 OpenMainWindowButton()
             }
             CommandGroup(after: .sidebar) {
@@ -74,6 +77,20 @@ struct MenuBarPanelHost: View {
             openWindow(id: "main")
             NSApp.activate()
         }
+    }
+}
+
+struct NewTicketButton: View {
+    let workspace: Workspace
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("New Ticket…") {
+            openWindow(id: "main")
+            NSApp.activate()
+            workspace.requestNewTicket()
+        }
+        .keyboardShortcut("n", modifiers: .command)
     }
 }
 
@@ -356,6 +373,46 @@ enum DebugLaunch {
         #endif
     }
 
+    /// Demo New ticket: the wireframe's orgs, callers and services; created tickets get R-0006xx.
+    static func demoNewTickets() -> NewTicketSource? {
+        #if DEBUG
+        guard env["ITOPWRAP_DEMO"] == "1" else { return nil }
+        let orgs = [ServiceRef(id: "1", name: "Org A"), ServiceRef(id: "2", name: "Org B"), ServiceRef(id: "3", name: "Org C")]
+        let callers: [String: [ServiceRef]] = [
+            "1": [ServiceRef(id: "21", name: "Caller One"), ServiceRef(id: "23", name: "Caller Three")],
+            "2": [ServiceRef(id: "22", name: "Caller Two"), ServiceRef(id: "27", name: "Caller Seven")],
+            "3": [ServiceRef(id: "24", name: "Caller Four")],
+        ]
+        let services = [ServiceRef(id: "3", name: "Network access"), ServiceRef(id: "4", name: "Workplace"), ServiceRef(id: "5", name: "Collaboration")]
+        let subcategories: [String: [ServiceRef]] = [
+            "3": [ServiceRef(id: "12", name: "VPN"), ServiceRef(id: "13", name: "Wi-Fi")],
+            "4": [ServiceRef(id: "20", name: "Laptop"), ServiceRef(id: "21", name: "Printer")],
+            "5": [ServiceRef(id: "30", name: "Teams calls")],
+        ]
+        let counter = DemoWrites.shared
+        return NewTicketSource(
+            create: { t in
+                try? await Task.sleep(for: .milliseconds(500))
+                if t.title.localizedCaseInsensitiveContains("fail") {
+                    throw ITopError.server(code: 100, message: "Error: servicesubcategory_id: not allowed for this request type")
+                }
+                let n = await counter.nextTicketNumber()
+                let org = orgs.first { $0.id == t.orgID }?.name ?? ""
+                let caller = callers[t.orgID]?.first { $0.id == t.callerID }?.name ?? ""
+                return Ticket(key: String(n), ticketClass: t.ticketClass, ref: (t.ticketClass == .incident ? "I-" : "R-") + String(format: "%06d", n),
+                              title: t.title.trimmingCharacters(in: .whitespacesAndNewlines), status: "new", priority: 4, callerName: caller,
+                              orgName: org, teamID: "0", teamName: "", agentID: "0", agentName: "", startDate: Date(), lastUpdate: Date(), orgID: t.orgID)
+            },
+            organizations: { try? await Task.sleep(for: .milliseconds(200)); return orgs },
+            callers: { id in try? await Task.sleep(for: .milliseconds(200)); return callers[id] ?? [] },
+            services: { _ in try? await Task.sleep(for: .milliseconds(200)); return services },
+            subcategories: { id in try? await Task.sleep(for: .milliseconds(200)); return subcategories[id] ?? [] },
+            canCreate: true)
+        #else
+        return nil
+        #endif
+    }
+
     /// The wireframe's three CIs for the demo session; `nil` outside it.
     static func demoCMDB() -> CMDBSource? {
         #if DEBUG
@@ -491,6 +548,12 @@ actor DemoWrites {
     }
 
     private(set) var time: [String: Int] = [:]
+    private var lastTicket = 600
+
+    func nextTicketNumber() -> Int {
+        lastTicket += 1
+        return lastTicket
+    }
 
     func addTime(_ seconds: Int, to id: String) {
         time[id, default: 0] += seconds

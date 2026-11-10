@@ -160,6 +160,7 @@ struct OrgDetailView: View {
     var openTicket: (Ticket) -> Void
     var openPeople: (Organization) -> Void
     var openConfigItems: (Organization) -> Void
+    var newTicket: (Organization) -> Void = { _ in }
 
     var body: some View {
         ScrollView {
@@ -175,6 +176,10 @@ struct OrgDetailView: View {
                     Button { openConfigItems(org) } label: {
                         Label(model.counts.map { "Config items \($0.configItems)" } ?? "Config items", systemImage: "server.rack")
                     }
+                    Button { newTicket(org) } label: {
+                        Label("New ticket", systemImage: "square.and.pencil")
+                    }
+                    .help("New ticket for \(org.name)")
                 }
                 .buttonStyle(.link)
                 .foregroundStyle(Theme.text)

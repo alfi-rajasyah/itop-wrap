@@ -150,6 +150,11 @@ struct MenuBarPanel: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
+            Button { workspace.requestNewTicket(); openTicket(nil) } label: { Image(systemName: "square.and.pencil") }
+                .buttonStyle(.borderless)
+                .keyboardShortcut("n", modifiers: .command)
+                .help("New ticket (⌘N)")
+                .accessibilityLabel("New ticket")
             Button { Task { await mine.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .keyboardShortcut("r", modifiers: .command)
