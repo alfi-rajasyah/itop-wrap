@@ -6,13 +6,15 @@ import Observation
 struct TicketSource: Sendable {
     var load: @Sendable () async throws -> [Ticket]
     var lookup: @Sendable (String) async throws -> Ticket?
+    var detail: @Sendable (Ticket) async throws -> TicketDetail
 
     static func live(_ session: Session, view: TicketList.View) -> TicketSource {
         let service = TicketService(client: session.client)
         let me = session.user
         return TicketSource(
             load: { view == .mine ? try await service.loadMine(me: me) : try await service.loadTeam(me: me) },
-            lookup: { try await service.lookup($0) })
+            lookup: { try await service.lookup($0) },
+            detail: { try await service.detail(for: $0) })
     }
 }
 
@@ -36,7 +38,7 @@ final class TicketListModel {
     let view: TicketList.View
     let me: CurrentUser
     let server: ServerAddress
-    private let source: TicketSource
+    let source: TicketSource
 
     private(set) var phase: Phase = .loading
     private(set) var tickets: [Ticket] = []
@@ -109,6 +111,10 @@ final class TicketListModel {
 
     /// "Open in iTop on the web" for one ticket.
     func webURL(_ t: Ticket) -> URL? {
-        URL(string: server.baseURL.absoluteString + "/pages/UI.php?operation=details&class=\(t.ticketClass.rawValue)&id=\(t.key)")
+        webURL(className: t.ticketClass.rawValue, id: t.key)
+    }
+
+    func webURL(className: String, id: String) -> URL? {
+        URL(string: server.baseURL.absoluteString + "/pages/UI.php?operation=details&class=\(className)&id=\(id)")
     }
 }

@@ -231,37 +231,6 @@ struct TicketRow: View {
     }
 }
 
-/// The right-hand pane until Task 4 brings the full ticket view.
-struct TicketDetailPlaceholder: View {
-    let ticket: Ticket?
-    let webURL: URL?
-
-    var body: some View {
-        if let t = ticket {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("\(t.ref) · \(TicketGroup.statusLabel(t.status))")
-                    .font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.secondary)
-                Text(t.title).font(.system(size: 22, weight: .semibold))
-                Text("\(t.callerName) · \(t.orgName) · \(t.teamName)").foregroundStyle(Theme.secondary)
-                Text("The full ticket view, with the description and logs, comes in the next build.")
-                    .foregroundStyle(Theme.secondary).padding(.top, 8)
-                if let webURL {
-                    Link("Open in iTop on the web", destination: webURL)
-                        .foregroundStyle(Theme.text)
-                }
-                Spacer()
-            }
-            .textSelection(.enabled)
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            Text("Select a ticket to see its details.")
-                .foregroundStyle(Theme.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-    }
-}
-
 extension TicketGroup {
     /// The status as people read it, for the detail header.
     static func statusLabel(_ status: String) -> String {

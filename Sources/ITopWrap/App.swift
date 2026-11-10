@@ -118,8 +118,25 @@ enum DebugLaunch {
         ]
         let found = t("R-000512", "Teams calls drop on the Finance floor", "assigned", agent: "5", agentName: "Agent 2", team: "12", teamName: "Collaboration", hours: 6, caller: "Caller 7", org: "Org B")
         let list = view == .mine ? mine : mine + others
+        func entry(_ id: Int, _ who: String, hoursAgo: Double, _ text: String) -> LogEntry {
+            LogEntry(id: id, date: now.addingTimeInterval(-hoursAgo * 3600), author: who, text: text)
+        }
+        let details: [String: TicketDetail] = [
+            "R-000412": TicketDetail(
+                description: "Since Monday the VPN disconnects at the top of every hour, sometimes in the middle of a call. Reconnecting works straight away.\nHappens both in the office and at home. Laptop: [model], VPN client: [version].",
+                publicLog: [entry(1, "Caller 1", hoursAgo: 2.8, "The VPN disconnects at the top of every hour and I have to sign in again."),
+                            entry(2, "Demo Agent", hoursAgo: 1.3, "Thanks, checking the gateway session timeout now."),
+                            entry(3, "Caller 1", hoursAgo: 0.9, "It happened again at 11:00.")],
+                privateLog: [entry(4, "Demo Agent", hoursAgo: 1.25, "Gateway timeout looks like 60 min. Confirm with Team Network before changing.")],
+                linkedCIs: [LinkedCI(id: "55", name: "vpn-gw-01", className: "NetworkDevice")],
+                serviceName: "Network access", subcategoryName: "VPN"),
+        ]
         return TicketSource(load: { try? await Task.sleep(for: .milliseconds(300)); return list },
-                            lookup: { $0 == "R-000512" ? found : nil })
+                            lookup: { $0 == "R-000512" ? found : nil },
+                            detail: { t in
+                                try? await Task.sleep(for: .milliseconds(300))
+                                return details[t.ref] ?? TicketDetail(description: "Demo ticket without a description.", publicLog: [], privateLog: [], linkedCIs: [])
+                            })
         #else
         return nil
         #endif
