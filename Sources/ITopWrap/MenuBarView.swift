@@ -90,7 +90,9 @@ struct MenuBarPanel: View {
                     }
                     .padding(.bottom, 6)
                 }
-                .frame(maxHeight: 420)
+                // A scroll view in a menu bar panel has no height of its own and collapses to
+                // nothing, so it gets one: its rows, up to 420 points.
+                .frame(height: min(420, CGFloat(sections.count) * 30 + CGFloat(sections.reduce(0) { $0 + $1.tickets.count }) * 48 + 6))
             }
         }
     }
