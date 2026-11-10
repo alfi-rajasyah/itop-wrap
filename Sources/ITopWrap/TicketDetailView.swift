@@ -12,6 +12,8 @@ struct TicketDetailView: View {
     @State private var showPending = false
     @State private var showResolve = false
     @State private var confirmClose = false
+    @State private var headerWidth: CGFloat = 0
+    @State private var actionsWidth: CGFloat = 0
 
     init(ticket: Ticket, list: TicketListModel, openCI: @escaping (LinkedCI) -> Void) {
         self.list = list
@@ -66,8 +68,14 @@ struct TicketDetailView: View {
 
     // MARK: Header
 
+    /// Side by side when the title keeps at least 260 pt next to the actions; otherwise the
+    /// actions get their own row under the title, so neither squeezes (found 2026-11-11).
+    private var headerStacked: Bool { headerWidth > 0 && headerWidth < actionsWidth + 12 + 260 }
+
     private var header: some View {
-        HStack(alignment: .top, spacing: 12) {
+        let layout = headerStacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+                                   : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+        return layout {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Button {
@@ -107,7 +115,8 @@ struct TicketDetailView: View {
                         .accessibilityAddTraits(.updatesFrequently)
                 }
             }
-            Spacer(minLength: 0)
+            if !headerStacked { Spacer(minLength: 0) }
+            HStack(spacing: 8) {
             if let timer = list.timer { TimerButton(timer: timer, ticket: ticket, canWrite: model.canWrite) }
             primaryAction
             Menu {
@@ -140,7 +149,12 @@ struct TicketDetailView: View {
             .fixedSize()
             .help("More actions")
             .accessibilityLabel("More actions")
+            }
+            .fixedSize()
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { actionsWidth = $0 }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { headerWidth = $0 }
         .sheet(isPresented: $showAssign) {
             AssignSheet(ticket: ticket, list: list)
         }
