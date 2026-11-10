@@ -12,17 +12,29 @@ struct ShellView: View {
     @State private var orgs: OrgsModel
     @State private var people: PeopleModel
     @State private var confirmSignOut = false
+    @State private var timer: TimerModel
 
     init(session: Session) {
         self.session = session
         ErrorText.host = session.client.server.baseURL.host() ?? "the server"
         let options = ListOptions(defaults: DebugLaunch.listDefaults)
         _options = State(initialValue: options)
-        _mine = State(initialValue: TicketListModel(view: .mine, session: session, options: options, source: DebugLaunch.demoSource(.mine)))
-        _team = State(initialValue: TicketListModel(view: .team, session: session, options: options, source: DebugLaunch.demoSource(.team)))
+        let mine = TicketListModel(view: .mine, session: session, options: options, source: DebugLaunch.demoSource(.mine))
+        let team = TicketListModel(view: .team, session: session, options: options, source: DebugLaunch.demoSource(.team))
         _cmdb = State(initialValue: CMDBModel(session: session, source: DebugLaunch.demoCMDB()))
         _orgs = State(initialValue: OrgsModel(session: session, options: options, source: DebugLaunch.demoOrgs()))
         _people = State(initialValue: PeopleModel(session: session, options: options, source: DebugLaunch.demoPeople()))
+        let demo = DebugLaunch.demoTimer()
+        let client = session.client
+        let isDemo = demo != nil
+        let canWrite: @Sendable (Ticket) -> Bool = { t in isDemo || client.canWrite(className: t.ticketClass.rawValue, key: t.key) }
+        let timer = TimerModel(source: demo ?? TimerSource.live(session), store: TimerStore(defaults: DebugLaunch.listDefaults),
+                               me: session.user, canWrite: canWrite)
+        mine.timer = timer
+        team.timer = timer
+        _timer = State(initialValue: timer)
+        _mine = State(initialValue: mine)
+        _team = State(initialValue: team)
     }
 
     var body: some View {

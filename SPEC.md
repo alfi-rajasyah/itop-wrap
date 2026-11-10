@@ -136,6 +136,9 @@ From a read-only probe; redacted samples are in `Tests/ITopKitTests/Fixtures/`, 
 
 ## Open Questions (remaining)
 
-1. **TimeSpent ticket link.** Settled: TimeSpent → Activity (`activity_id`) → ticket (`obj_class`, `obj_id`). Still open: what to do when a ticket has no Activity yet. The proposal is that the app creates one, as a write, so it waits for writes to be switched on and gets tested on a ticket you choose. Earlier note: TimeSpent links to an `Activity` through `activity_id`, not to the ticket directly. Still to confirm with the second probe step: the Activity's fields (expected `obj_class`, `obj_id`), whether every ticket already has one, and whether the app has to create it before the first TimeSpent. Creating it would be a write, so it waits until you allow writes.
-2. **Double counting.** If you also run the stopwatch in iTop's web UI, time can be logged twice. Proposal: the app shows a TimeSpent already running for you on that ticket and doesn't start its own.
-3. **Long timers.** The extension auto-stops its own stopwatch after a maximum time (its docs say 4 h by default). Our decision 5 keeps counting through sleep and quit. Proposal: past 4 h the app asks "Still working on R-000412?" before saving.
+None for the timer. Answered 2026-11-11 (Task 8b):
+
+1. **A ticket with no Activity:** the app creates the Activity (`obj_class`, `obj_id`, `label`), then the TimeSpent. Both are writes linked to the ticket, so a per-ticket allowlist covers them.
+2. **Double counting with the web stopwatch:** probed. A running web stopwatch is a TimeSpent of yours with `origin` = `stopwatch`, an empty `end_date` and `duration` 0; stopping fills in `end_date` and `duration` (seconds). The app looks for one before starting and shows "Web stopwatch since …" instead of a Start button.
+3. **Long timers:** iTop's own stopwatch stops itself after a while (4 hours by default in the extension's docs). The app stops at the same point: past 4 hours it saves 4:00 and says so.
+4. **"Time for this entry" in the log composer:** later, as a follow-up to Task 8b.

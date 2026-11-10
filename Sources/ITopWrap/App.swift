@@ -271,6 +271,31 @@ enum DebugLaunch {
         #endif
     }
 
+    /// Demo time tracking: totals in memory, a web stopwatch running on R-000405.
+    ///   ITOPWRAP_DEMO_TIMEFAIL=1   saving time fails, to check Retry
+    static func demoTimer() -> TimerSource? {
+        #if DEBUG
+        guard env["ITOPWRAP_DEMO"] == "1" else { return nil }
+        let mock = DemoWrites.shared
+        let fail = env["ITOPWRAP_DEMO_TIMEFAIL"] == "1"
+        let webSince = Date().addingTimeInterval(-25 * 60)
+        return TimerSource(
+            save: { entry, t in
+                try? await Task.sleep(for: .milliseconds(400))
+                if fail { throw ITopError.server(code: 100, message: "Error: You don't have the Time Tracker profile") }
+                await mock.addTime(entry.duration, to: t.id)
+            },
+            webStopwatch: { t in t.ref == "R-000405" ? webSince : nil },
+            totals: { tickets in
+                let saved = await mock.time
+                let base = ["UserRequest::412": 4500, "UserRequest::405": 1800, "UserRequest::367": 9000]
+                return Dictionary(uniqueKeysWithValues: tickets.map { ($0.id, (base[$0.id] ?? 0) + (saved[$0.id] ?? 0)) })
+            })
+        #else
+        return nil
+        #endif
+    }
+
     /// The wireframe's three CIs for the demo session; `nil` outside it.
     static func demoCMDB() -> CMDBSource? {
         #if DEBUG
@@ -403,6 +428,12 @@ actor DemoWrites {
     func assign(_ ref: String, team: Team, agent: Agent, status: String) {
         assignments[ref] = Assignment(team: team, agent: agent, status: status, date: Date())
         statuses[ref] = nil
+    }
+
+    private(set) var time: [String: Int] = [:]
+
+    func addTime(_ seconds: Int, to id: String) {
+        time[id, default: 0] += seconds
     }
 
     func setStatus(_ ref: String, _ status: String) {

@@ -1,0 +1,48 @@
+[
+  {
+    "step": "yes",
+    "notes": [],
+    "activities_on_ticket": 1,
+    "note_on_time": "minutes are measured against this Mac's clock; iTop's server clock or timezone may differ",
+    "your_latest_timespent_on_ticket": [
+      {
+        "origin": "stopwatch",
+        "start_set": true,
+        "end_set": false,
+        "end_raw_if_odd": null,
+        "duration": "0",
+        "minutes_since_start": 1,
+        "minutes_since_end": null,
+        "fields": [
+          "duration",
+          "end_date",
+          "origin",
+          "start_date"
+        ]
+      }
+    ]
+  },
+  {
+    "step": "no",
+    "notes": [],
+    "activities_on_ticket": 1,
+    "note_on_time": "minutes are measured against this Mac's clock; iTop's server clock or timezone may differ",
+    "your_latest_timespent_on_ticket": [
+      {
+        "origin": "stopwatch",
+        "start_set": true,
+        "end_set": true,
+        "end_raw_if_odd": null,
+        "duration": "69",
+        "minutes_since_start": 2,
+        "minutes_since_end": 1,
+        "fields": [
+          "duration",
+          "end_date",
+          "origin",
+          "start_date"
+        ]
+      }
+    ]
+  }
+]

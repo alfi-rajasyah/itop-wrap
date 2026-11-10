@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Next: Task 8b, time spent timer.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b built against the mock; real check pending.
 
 ## Overview
 
@@ -257,10 +257,13 @@ Lifecycle as built (standard iTop, your iTop has some customisation): New and Es
 **Description:** Add a start/stop timer on ticket detail (with ⌘T), a total and a running marker on list rows, a "Time for this entry" field in the log composer. The Resolve sheet has no time field: resolving stops the timer and saves its time like any other stop. Only one timer runs at a time, and a running timer survives an app restart. Each stop creates one **TimeSpent** (Combodo Time Tracking) on the ticket's Activity (looked up by `obj_class` and `obj_id`), with start, end, duration in seconds, user, contact and org. If a TimeSpent is already running for you on that ticket from the web stopwatch, the app shows it instead of starting a second one. Past 4 hours it asks before saving.
 
 **Acceptance criteria:**
-- [ ] Stopping sends one correct TimeSpent `core/create` to the mock transport (real server only after you switch writes on)
-- [ ] Starting a second timer stops and saves the first
-- [ ] The start button appears only on Assigned tickets; a ticket that leaves Assigned (pending, resolved, escalated) stops its timer and saves the time
-- [ ] Quitting and relaunching keeps a running timer
+- [x] Stopping sends one correct TimeSpent `core/create` to the mock transport (real server only after you switch writes on) (tests: fields, Activity created when missing, allowlist)
+- [x] Starting a second timer stops and saves the first (TimerModel.start; "Switch timer here" on another Assigned ticket)
+- [x] The start button appears only on Assigned tickets; a ticket that leaves Assigned (pending, resolved, escalated) stops its timer and saves the time (demo: resolving R-000412 stopped its timer)
+- [x] Quitting and relaunching keeps a running timer (demo: quit for a minute, it was still running at 0:01:09)
+- [ ] Real check: one stop on a test ticket shows up in iTop's time tracking (pending)
+
+As built: stops under a minute aren't saved (likely misclicks); past 4 hours the timer saves 4:00, like iTop's stopwatch; a failed save keeps the time with Retry and Discard; a running web stopwatch on the ticket is shown instead of Start. "Time for this entry" in the composer is a follow-up.
 
 **Verification:** `swift test --filter TimerTests` (elapsed maths, single-timer rule, persistence, encoded write) · manual on a test ticket
 

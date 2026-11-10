@@ -108,6 +108,7 @@ struct TicketDetailView: View {
                 }
             }
             Spacer(minLength: 0)
+            if let timer = list.timer { TimerButton(timer: timer, ticket: ticket, canWrite: model.canWrite) }
             primaryAction
             Menu {
                 let actions = TicketLifecycle.actions(for: ticket.status)
@@ -206,6 +207,9 @@ struct TicketDetailView: View {
             item("building.2", ticket.orgName, help: "Organization")
             item("person.2", ticket.teamName.isEmpty ? "No team" : ticket.teamName, help: "Team")
             agent
+            if let spent = list.timer?.totals[ticket.id], spent > 0 {
+                item("timer", "\(TimeFormat.clock(spent)) spent", help: "Time spent")
+            }
             if case .loaded(let detail) = model.phase {
                 ForEach(detail.linkedCIs) { ci in
                     Button { openCI(ci) } label: {
