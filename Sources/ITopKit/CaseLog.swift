@@ -6,12 +6,15 @@ public struct LogEntry: Sendable, Equatable, Identifiable {
     public let date: Date?
     public let author: String
     public let text: String
+    /// The entry's HTML when iTop sent one, for showing links and images (`RichText`).
+    public let html: String?
 
-    public init(id: Int, date: Date?, author: String, text: String) {
+    public init(id: Int, date: Date?, author: String, text: String, html: String? = nil) {
         self.id = id
         self.date = date
         self.author = author
         self.text = text
+        self.html = html
     }
 }
 
@@ -27,7 +30,7 @@ public enum CaseLog {
             guard html != nil || message != nil else { return nil }
             let text = html.map(HTMLText.plain) ?? message!.trimmingCharacters(in: .whitespacesAndNewlines)
             return (index, LogEntry(id: index, date: e["date"]?.stringValue.flatMap(Ticket.parseDate),
-                                    author: e["user_login"]?.stringValue ?? "", text: text))
+                                    author: e["user_login"]?.stringValue ?? "", text: text, html: html))
         }
         return parsed.sorted { a, b in
             let da = a.1.date ?? .distantPast, db = b.1.date ?? .distantPast
@@ -51,8 +54,13 @@ public enum HTMLText {
         s.replace(/(?i)<\/?(div|tr|section|article|header|footer)\b[^>]*>/, with: "\n")
         s.replace(/(?i)<\/?(td|th)\b[^>]*>/, with: " ")
         s.replace(/<[^>]*>/, with: "")
-        s = decodeEntities(s)
-        s = s.replacingOccurrences(of: "\u{00A0}", with: " ")
+        return normalize(decodeEntities(s))
+    }
+
+    /// Whitespace clean-up shared with `RichText`, so both read the same: non-breaking spaces
+    /// become spaces, lines are trimmed, at most one blank line in a row, no outer whitespace.
+    static func normalize(_ text: String) -> String {
+        var s = text.replacingOccurrences(of: "\u{00A0}", with: " ")
         let lines = s.components(separatedBy: "\n").map { line in
             line.replacing(/[ \t]+$/, with: "").replacing(/^[ \t]+/, with: "")
         }

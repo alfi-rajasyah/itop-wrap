@@ -185,15 +185,17 @@ Built 2026-11-10 on `task-5b-orgs-people`: 102 tests; click-through in the debug
 **First, a read-only probe:** on one ticket that has a pasted image, check whether iTop's image links (`ajax.document.php?operation=download_inlineimage…`) accept the REST login, or need the web login (a session cookie). The approach depends on the answer.
 
 **Acceptance criteria:**
-- [ ] Images stored in your iTop show inline, sized to the pane, in the description and in log entries
-- [ ] No request goes to any host other than your iTop server unless you click "Open in browser"
-- [ ] Links in descriptions and log entries are clickable and open in your browser
-- [ ] The ticket's attachments are listed with name and size; each downloads on click
-- [ ] An image that fails to load shows "Couldn't load this image" plus "Open in iTop on the web"
+- [ ] Images stored in your iTop show inline, sized to the pane, in the description and in log entries (demo works; your check on real tickets)
+- [x] No request goes to any host other than your iTop server unless you click "Open in browser" (images from other hosts are only a placeholder; tested)
+- [x] Links in descriptions and log entries are clickable and open in your browser (web and email links only; `javascript:` and `file:` stay plain text)
+- [ ] The ticket's attachments are listed by name; each downloads on click into a Save panel, which shows the size once saved (your check: the Save panel can't be driven in the background). iTop can't send a size without the whole file, so the list has names only
+- [x] An image that fails to load shows "Couldn't load this image" plus "Open in iTop on the web"
+
+Probe result (2026-11-11): your iTop answers the web image links with 403 to HTTP Basic auth, and serves `InlineImage` contents through REST, so images load through REST only. Built on `task-5c-images-links`: 117 tests.
 
 **Verification:** `swift test --filter RichTextTests` (image and link extraction, host check) · manual check on a real ticket with a pasted image and an attachment
 
-**Dependencies:** 4 · **Files:** `Sources/ITopKit/HTMLText.swift` (images and links as parts, not flattened), `InlineImageLoader.swift`, `Sources/ITopWrap/RichTextView.swift`, `TicketDetailView.swift` · **Scope:** M
+**Dependencies:** 4 · **Files:** `Sources/ITopKit/RichText.swift` (with `InlineImageLoader`, attachments), `CaseLog.swift` (shared `normalize`, entry HTML kept), `Sources/ITopWrap/RichTextView.swift`, `TicketDetailView.swift`, `scripts/probe-images.py`, `Tests/ITopKitTests/RichTextTests.swift` · **Scope:** M
 
 ### Checkpoint B: Read-only parity
 - [ ] antislop Delivery Gate PASS on list, detail and CMDB, including empty, loading and error states

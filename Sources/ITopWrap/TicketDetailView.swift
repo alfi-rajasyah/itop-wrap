@@ -183,10 +183,14 @@ struct TicketDetailView: View {
     private func description(_ detail: TicketDetail) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Description").font(.system(size: 12, weight: .semibold))
-            Text(detail.description.isEmpty ? "No description." : detail.description)
-                .foregroundStyle(detail.description.isEmpty ? Theme.secondary : Theme.text)
-                .fixedSize(horizontal: false, vertical: true)
-                .textSelection(.enabled)
+            if detail.description.isEmpty && !detail.descriptionHTML.contains("<img") {
+                Text("No description.").foregroundStyle(Theme.secondary)
+            } else {
+                RichTextView(html: detail.descriptionHTML, plain: detail.description, base: list.server.baseURL,
+                             source: list.source, ticketURL: list.webURL(ticket))
+            }
+            AttachmentsView(ticket: ticket, source: list.source)
+                .padding(.top, 4)
         }
     }
 
@@ -215,9 +219,8 @@ struct TicketDetailView: View {
                     }
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.secondary)
-                    Text(e.text)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
+                    RichTextView(html: e.html, plain: e.text, base: list.server.baseURL,
+                                 source: list.source, ticketURL: list.webURL(ticket))
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)

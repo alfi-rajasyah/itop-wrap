@@ -147,19 +147,43 @@ enum DebugLaunch {
                             entry(3, "Caller 1", hoursAgo: 0.9, "It happened again at 11:00.")],
                 privateLog: [entry(4, "Demo Agent", hoursAgo: 1.25, "Gateway timeout looks like 60 min. Confirm with Team Network before changing.")],
                 linkedCIs: [LinkedCI(id: "55", name: "vpn-gw-01", className: "NetworkDevice")],
-                serviceName: "Network access", subcategoryName: "VPN"),
+                serviceName: "Network access", subcategoryName: "VPN",
+                descriptionHTML: """
+                <p>Since Monday the VPN disconnects at the top of every hour, sometimes in the middle of a call. Reconnecting works straight away.<br>Happens both in the office and at home. Laptop: [model], VPN client: [version].</p>
+                <p>The error the client shows (see the <a href="https://kb.example.com/vpn-timeouts">VPN timeout article</a>):</p>
+                <p><img src="pages/ajax.document.php?operation=download_inlineimage&amp;id=900&amp;s=demo" data-img-id="900"></p>
+                <p>A screenshot the caller linked from elsewhere:</p>
+                <p><img src="https://images.example.net/screenshot.png"></p>
+                """),
         ]
         @Sendable func list(_ scope: TicketScope) -> [Ticket] {
             let all = base + (scope.includeClosed ? closed : [])
             guard let days = scope.openedWithinDays else { return all }
             return all.filter { ($0.startDate ?? now) >= now.addingTimeInterval(-Double(days) * 86400) }
         }
+        // A drawn PNG stands in for a pasted iTop image.
+        let demoPNG: Data = {
+            let img = NSImage(size: NSSize(width: 520, height: 180))
+            img.lockFocus()
+            NSColor(calibratedWhite: 0.92, alpha: 1).setFill(); NSRect(x: 0, y: 0, width: 520, height: 180).fill()
+            NSColor(calibratedRed: 0.77, green: 0.16, blue: 0.11, alpha: 1).setFill(); NSRect(x: 24, y: 120, width: 200, height: 28).fill()
+            ("VPN disconnected: session timeout (60 min)" as NSString).draw(at: NSPoint(x: 24, y: 70), withAttributes: [.font: NSFont.systemFont(ofSize: 18)])
+            img.unlockFocus()
+            return NSBitmapImageRep(data: img.tiffRepresentation ?? Data())?.representation(using: .png, properties: [:]) ?? Data()
+        }()
         return TicketSource(load: { scope in try? await Task.sleep(for: .milliseconds(300)); return list(scope) },
                             lookup: { $0 == "R-000512" ? found : nil },
                             detail: { t in
                                 try? await Task.sleep(for: .milliseconds(300))
                                 return details[t.ref] ?? TicketDetail(description: "Demo ticket without a description.", publicLog: [], privateLog: [], linkedCIs: [])
-                            })
+                            },
+                            image: { id in
+                                try? await Task.sleep(for: .milliseconds(400))
+                                guard id == "900" else { throw InlineImageLoader.Failure.notFound }
+                                return InlineImageLoader.Image(data: demoPNG, mimetype: "image/png")
+                            },
+                            attachments: { t in t.ref == "R-000412" ? [AttachmentRef(id: "1", name: "vpn-client.log"), AttachmentRef(id: "2", name: "gateway-config.txt")] : [] },
+                            download: { a in AttachmentFile(data: Data("Demo attachment \(a.name)\n".utf8), filename: a.name, mimetype: "text/plain") })
         #else
         return nil
         #endif
