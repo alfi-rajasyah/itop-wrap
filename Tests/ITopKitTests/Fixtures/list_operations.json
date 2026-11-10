@@ -1,0 +1,18 @@
+{
+  "code": 0,
+  "operations": [
+    "teemip/get_webservices_version",
+    "teemip/get_nb_of_registered_ips_in_subnet",
+    "teemip/pick_ip_address_in_subnet",
+    "teemip/pick_ip_address_in_range",
+    "teemip/pick_subnet_in_block",
+    "core/create",
+    "core/update",
+    "core/apply_stimulus",
+    "core/get",
+    "core/delete",
+    "core/get_related",
+    "core/check_credentials"
+  ],
+  "version": "1.4"
+}

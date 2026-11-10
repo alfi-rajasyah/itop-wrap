@@ -1,0 +1,80 @@
+{
+  "code": 0,
+  "message": "[text]",
+  "objects": {
+    "UserLocal::1001": {
+      "class": "UserLocal",
+      "code": 0,
+      "fields": {
+        "allowed_org_list": [
+          {
+            "allowed_org_id": "1004",
+            "allowed_org_id_friendlyname": "[text]",
+            "allowed_org_id_obsolescence_flag": "",
+            "allowed_org_name": "[text]",
+            "friendlyname": "[text]",
+            "reason": ""
+          },
+          {
+            "allowed_org_id": "1005",
+            "allowed_org_id_friendlyname": "[text]",
+            "allowed_org_id_obsolescence_flag": "",
+            "allowed_org_name": "[text]",
+            "friendlyname": "[text]",
+            "reason": ""
+          },
+          {
+            "allowed_org_id": "1006",
+            "allowed_org_id_friendlyname": "[text]",
+            "allowed_org_id_obsolescence_flag": "",
+            "allowed_org_name": "[text]",
+            "friendlyname": "[text]",
+            "reason": ""
+          }
+        ],
+        "contactid": "1002",
+        "contactid_friendlyname": "[text]",
+        "contactid_obsolescence_flag": "",
+        "email": "[text]",
+        "finalclass": "UserLocal",
+        "first_name": "[text]",
+        "friendlyname": "[text]",
+        "language": "[text]",
+        "last_name": "[text]",
+        "log": {
+          "entries": []
+        },
+        "login": "[text]",
+        "org_id": "1003",
+        "org_id_friendlyname": "[text]",
+        "org_id_obsolescence_flag": "",
+        "profile_list": [
+          {
+            "friendlyname": "[text]",
+            "profile": "[text]",
+            "profileid": "1",
+            "profileid_friendlyname": "[text]",
+            "reason": ""
+          },
+          {
+            "friendlyname": "[text]",
+            "profile": "[text]",
+            "profileid": "45",
+            "profileid_friendlyname": "[text]",
+            "reason": ""
+          },
+          {
+            "friendlyname": "[text]",
+            "profile": "[text]",
+            "profileid": "9",
+            "profileid_friendlyname": "[text]",
+            "reason": ""
+          }
+        ],
+        "status": "enabled"
+      },
+      "key": "1001",
+      "message": ""
+    }
+  }
+}

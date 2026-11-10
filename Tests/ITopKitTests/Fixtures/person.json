@@ -1,0 +1,279 @@
+{
+  "code": 0,
+  "message": "[text]",
+  "objects": {
+    "Person::1002": {
+      "class": "Person",
+      "code": 0,
+      "fields": {
+        "cis_list": [],
+        "email": "[text]",
+        "employee_number": "",
+        "finalclass": "Person",
+        "first_name": "[text]",
+        "friendlyname": "[text]",
+        "function": "[text]",
+        "location_id": "1007",
+        "location_id_friendlyname": "[text]",
+        "location_id_obsolescence_flag": "",
+        "location_name": "[text]",
+        "manager_id": "1008",
+        "manager_id_friendlyname": "[text]",
+        "manager_id_obsolescence_flag": "",
+        "manager_name": "[text]",
+        "mobile_phone": "",
+        "name": "[text]",
+        "notify": "[text]",
+        "obsolescence_date": "",
+        "obsolescence_flag": false,
+        "org_id": "1003",
+        "org_id_friendlyname": "[text]",
+        "org_id_obsolescence_flag": "",
+        "org_name": "[text]",
+        "phone": "[number]",
+        "picture": {
+          "data": "[text]",
+          "downloads_count": 0,
+          "filename": "[text]",
+          "mimetype": "[text]"
+        },
+        "status": "active",
+        "team_list": [
+          {
+            "friendlyname": "[text]",
+            "role_id": "1010",
+            "role_id_friendlyname": "[text]",
+            "role_name": "[text]",
+            "team_id": "1009",
+            "team_id_friendlyname": "[text]",
+            "team_id_obsolescence_flag": "",
+            "team_name": "[text]"
+          }
+        ],
+        "tickets_list": [
+          {
+            "agent_id": "1012",
+            "agent_id_friendlyname": "[text]",
+            "agent_id_obsolescence_flag": "",
+            "agent_name": "[text]",
+            "archive_date": "",
+            "archive_flag": false,
+            "close_date": "2025-10-08 15:15:57",
+            "contacts_list": [],
+            "description": "<p>[text]<br>[text]<a>[text]</a></p>",
+            "end_date": "2025-09-30 19:00:00",
+            "finalclass": "NormalChange",
+            "friendlyname": "[text]",
+            "functionalcis_list": [],
+            "last_update": "2025-10-08 15:15:57",
+            "operational_status": "closed",
+            "org_id": "1003",
+            "org_id_friendlyname": "[text]",
+            "org_id_obsolescence_flag": "",
+            "org_name": "[text]",
+            "private_log": {
+              "entries": []
+            },
+            "ref": "[text]",
+            "start_date": "2025-09-30 17:00:00",
+            "team_email": "[text]",
+            "team_id": "1011",
+            "team_id_friendlyname": "[text]",
+            "team_id_obsolescence_flag": "",
+            "team_name": "[text]",
+            "title": "[text]",
+            "workorders_list": []
+          },
+          {
+            "agent_id": "1002",
+            "agent_id_friendlyname": "[text]",
+            "agent_id_obsolescence_flag": "",
+            "agent_name": "[text]",
+            "archive_date": "",
+            "archive_flag": false,
+            "close_date": "2024-11-25 16:38:06",
+            "contacts_list": [],
+            "description": "<p>[text]</p>\n",
+            "end_date": "",
+            "finalclass": "UserRequest",
+            "friendlyname": "[text]",
+            "functionalcis_list": [],
+            "last_update": "2024-11-25 16:38:06",
+            "operational_status": "closed",
+            "org_id": "1003",
+            "org_id_friendlyname": "[text]",
+            "org_id_obsolescence_flag": "",
+            "org_name": "[text]",
+            "private_log": {
+              "entries": []
+            },
+            "ref": "[text]",
+            "start_date": "2024-11-18 09:26:32",
+            "team_email": "[text]",
+            "team_id": "1009",
+            "team_id_friendlyname": "[text]",
+            "team_id_obsolescence_flag": "",
+            "team_name": "[text]",
+            "title": "[text]",
+            "workorders_list": []
+          },
+          {
+            "agent_id": "1002",
+            "agent_id_friendlyname": "[text]",
+            "agent_id_obsolescence_flag": "",
+            "agent_name": "[text]",
+            "archive_date": "",
+            "archive_flag": false,
+            "close_date": "2024-11-25 16:27:18",
+            "contacts_list": [],
+            "description": "<p>[text]</p>\n",
+            "end_date": "",
+            "finalclass": "UserRequest",
+            "friendlyname": "[text]",
+            "functionalcis_list": [],
+            "last_update": "2024-11-25 16:27:18",
+            "operational_status": "closed",
+            "org_id": "1003",
+            "org_id_friendlyname": "[text]",
+            "org_id_obsolescence_flag": "",
+            "org_name": "[text]",
+            "private_log": {
+              "entries": []
+            },
+            "ref": "[text]",
+            "start_date": "2024-11-19 10:36:01",
+            "team_email": "[text]",
+            "team_id": "1009",
+            "team_id_friendlyname": "[text]",
+            "team_id_obsolescence_flag": "",
+            "team_name": "[text]",
+            "title": "[text]",
+            "workorders_list": []
+          }
+        ],
+        "user_list": [
+          {
+            "allowed_org_list": [
+              {
+                "allowed_org_id": "1004",
+                "allowed_org_id_friendlyname": "[text]",
+                "allowed_org_id_obsolescence_flag": "",
+                "allowed_org_name": "[text]",
+                "friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "allowed_org_id": "1005",
+                "allowed_org_id_friendlyname": "[text]",
+                "allowed_org_id_obsolescence_flag": "",
+                "allowed_org_name": "[text]",
+                "friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "allowed_org_id": "1006",
+                "allowed_org_id_friendlyname": "[text]",
+                "allowed_org_id_obsolescence_flag": "",
+                "allowed_org_name": "[text]",
+                "friendlyname": "[text]",
+                "reason": ""
+              }
+            ],
+            "finalclass": "UserLocal",
+            "friendlyname": "[text]",
+            "language": "[text]",
+            "log": {
+              "entries": []
+            },
+            "login": "[text]",
+            "profile_list": [
+              {
+                "friendlyname": "[text]",
+                "profile": "[text]",
+                "profileid": "1",
+                "profileid_friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "friendlyname": "[text]",
+                "profile": "[text]",
+                "profileid": "45",
+                "profileid_friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "friendlyname": "[text]",
+                "profile": "[text]",
+                "profileid": "9",
+                "profileid_friendlyname": "[text]",
+                "reason": ""
+              }
+            ],
+            "status": "enabled"
+          },
+          {
+            "allowed_org_list": [
+              {
+                "allowed_org_id": "1004",
+                "allowed_org_id_friendlyname": "[text]",
+                "allowed_org_id_obsolescence_flag": "",
+                "allowed_org_name": "[text]",
+                "friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "allowed_org_id": "1005",
+                "allowed_org_id_friendlyname": "[text]",
+                "allowed_org_id_obsolescence_flag": "",
+                "allowed_org_name": "[text]",
+                "friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "allowed_org_id": "1006",
+                "allowed_org_id_friendlyname": "[text]",
+                "allowed_org_id_obsolescence_flag": "",
+                "allowed_org_name": "[text]",
+                "friendlyname": "[text]",
+                "reason": ""
+              }
+            ],
+            "finalclass": "UserExternal",
+            "friendlyname": "[text]",
+            "language": "[text]",
+            "log": {
+              "entries": []
+            },
+            "login": "[text]",
+            "profile_list": [
+              {
+                "friendlyname": "[text]",
+                "profile": "[text]",
+                "profileid": "1",
+                "profileid_friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "friendlyname": "[text]",
+                "profile": "[text]",
+                "profileid": "45",
+                "profileid_friendlyname": "[text]",
+                "reason": ""
+              },
+              {
+                "friendlyname": "[text]",
+                "profile": "[text]",
+                "profileid": "9",
+                "profileid_friendlyname": "[text]",
+                "reason": ""
+              }
+            ],
+            "status": "enabled"
+          }
+        ]
+      },
+      "key": "1002",
+      "message": ""
+    }
+  }
+}

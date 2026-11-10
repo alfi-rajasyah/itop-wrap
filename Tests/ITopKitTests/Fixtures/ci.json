@@ -1,0 +1,45 @@
+{
+  "code": 0,
+  "message": "[text]",
+  "objects": {
+    "Server::1027": {
+      "class": "Server",
+      "code": 0,
+      "fields": {
+        "applicationsolution_list": [],
+        "business_criticity": "[text]",
+        "contacts_list": [],
+        "description": "[text]",
+        "documents_list": [],
+        "finalclass": "Server",
+        "friendlyname": "[text]",
+        "move2production": "",
+        "name": "[text]",
+        "obsolescence_date": "",
+        "obsolescence_flag": false,
+        "org_id": "1028",
+        "org_id_friendlyname": "[text]",
+        "org_id_obsolescence_flag": "",
+        "organization_name": "[text]",
+        "providercontracts_list": [],
+        "services_list": [],
+        "softwares_list": [],
+        "tickets_list": [
+          {
+            "friendlyname": "[text]",
+            "impact": "",
+            "impact_code": "[text]",
+            "ticket_id": "1029",
+            "ticket_id_archive_flag": "",
+            "ticket_id_finalclass_recall": "[text]",
+            "ticket_id_friendlyname": "[text]",
+            "ticket_ref": "[text]",
+            "ticket_title": "[text]"
+          }
+        ]
+      },
+      "key": "1027",
+      "message": ""
+    }
+  }
+}

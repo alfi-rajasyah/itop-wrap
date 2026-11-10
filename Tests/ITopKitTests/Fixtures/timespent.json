@@ -1,0 +1,37 @@
+{
+  "code": 0,
+  "message": "[text]",
+  "objects": {
+    "TimeSpent::1024": {
+      "class": "TimeSpent",
+      "code": 0,
+      "fields": {
+        "activity_id": "1025",
+        "activity_id_friendlyname": "[text]",
+        "activity_label": "[text]",
+        "archive_date": "",
+        "archive_flag": false,
+        "contact_id": "1002",
+        "contact_id_finalclass_recall": "[text]",
+        "contact_id_friendlyname": "[text]",
+        "contact_id_obsolescence_flag": "",
+        "description": "",
+        "duration": "5400",
+        "end_date": "2024-11-18 11:00:00",
+        "finalclass": "TimeSpent",
+        "friendlyname": "[text]",
+        "org_id": "1003",
+        "org_id_friendlyname": "[text]",
+        "org_id_obsolescence_flag": "",
+        "origin": "calendar",
+        "start_date": "2024-11-18 09:30:00",
+        "title": "[text]",
+        "user_id": "1001",
+        "user_id_finalclass_recall": "[text]",
+        "user_id_friendlyname": "[text]"
+      },
+      "key": "1024",
+      "message": ""
+    }
+  }
+}

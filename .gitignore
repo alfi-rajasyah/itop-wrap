@@ -1,0 +1,18 @@
+# SwiftPM and Xcode build output
+.build/
+.swiftpm/
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+
+# Never commit credentials or raw iTop responses (SPEC.md, Boundaries)
+*.env
+.env*
+raw-responses/
