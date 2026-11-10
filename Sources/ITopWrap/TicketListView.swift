@@ -4,12 +4,19 @@ import SwiftUI
 /// My tickets / Team tickets (DESIGN.md: Ticket list; wireframe Main.dc.html).
 struct TicketListView: View {
     @Bindable var model: TicketListModel
+    /// Opens the Organizations view; `nil` hides the org filter (Team tickets).
+    var openOrg: ((String, String) -> Void)? = nil
 
     var body: some View {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) { footer }
             .searchable(text: $model.query, placement: .toolbar, prompt: "R-000412 or VPN")
             .task(id: model.query) { await model.searchChanged() }
+            .onChange(of: model.options.scope) { model.page = 1; Task { await model.refresh() } }
+            .onChange(of: model.query) { model.page = 1 }
+            .onChange(of: model.orgFilter) { model.page = 1 }
+            .onChange(of: model.options.sort) { model.page = 1 }
+            .onChange(of: model.options.pageSize) { model.page = 1 }
             .toolbar {
                 ToolbarItem {
                     Button { Task { await model.refresh() } } label: {
@@ -44,7 +51,7 @@ struct TicketListView: View {
         case .loaded:
             if model.hasNoTeams {
                 notice("You're not in any iTop team, so there are no team tickets to show.", retry: false)
-            } else if model.tickets.isEmpty && !model.isSearching {
+            } else if model.tickets.isEmpty && !model.isSearching && model.options.scope == .open {
                 notice(model.view == .mine ? "Nothing waiting on you. New assignments show up here." : "Your teams have no open tickets.", retry: false)
             } else {
                 list
@@ -53,14 +60,30 @@ struct TicketListView: View {
     }
 
     private var list: some View {
-        List(selection: $model.selection) {
+        List(selection: $model.selection.deferred) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
+                    ListViewMenu(options: model.options)
+                }
+                ListViewSummary(options: model.options)
+            }
+            .listRowSeparator(.hidden)
+            if !model.orgFilter.isEmpty && model.visibleSections.isEmpty && !model.isSearching {
+                orgNoMatch.listRowSeparator(.hidden)
+            }
             if let error = model.refreshError {
                 Text("Couldn't refresh: \(error)")
                     .font(.system(size: 12)).foregroundStyle(Theme.warning)
                     .listRowSeparator(.hidden)
             }
             lookupSection
-            let sections = model.visibleSections
+            let paged = model.currentPage
+            let sections = paged.sections
+            if !model.isSearching && sections.isEmpty && model.orgFilter.isEmpty {
+                Text("No tickets in this range. Try a longer range in the date menu.")
+                    .foregroundStyle(Theme.secondary).listRowSeparator(.hidden)
+            }
             if model.isSearching && sections.isEmpty && model.lookup == .none && !isLookupPending {
                 Text("No tickets in your list match “\(model.query.trimmingCharacters(in: .whitespaces))”.")
                     .foregroundStyle(Theme.secondary)
@@ -76,7 +99,7 @@ struct TicketListView: View {
                     HStack {
                         Text(section.group.title)
                         Spacer()
-                        Text("\(section.tickets.count)").monospacedDigit()
+                        Text("\(paged.groupTotal(section.group))").monospacedDigit()
                     }
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
@@ -90,6 +113,42 @@ struct TicketListView: View {
     private var isLookupPending: Bool {
         if case .searching = model.lookup { return true }
         return false
+    }
+
+    /// A building-icon menu: multi-select, "All organizations" resets, darker border when on (DESIGN.md).
+    private var orgFilterMenu: some View {
+        Menu {
+            Button { model.orgFilter = [] } label: {
+                if model.orgFilter.isEmpty { Label("All organizations", systemImage: "checkmark") } else { Text("All organizations") }
+            }
+            Divider()
+            ForEach(model.orgChoices, id: \.self) { name in
+                Button { model.toggleOrg(name) } label: {
+                    if model.orgFilter.contains(name) { Label(name, systemImage: "checkmark") } else { Text(name) }
+                }
+            }
+        } label: {
+            FilterChip(text: model.orgFilter.isEmpty ? "All organizations" : model.orgFilter.sorted().joined(separator: ", "),
+                       symbol: "building.2", on: !model.orgFilter.isEmpty)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.visible)
+        .fixedSize()
+        .help("Filter by organization")
+        .accessibilityLabel("Filter by organization: \(model.orgFilter.isEmpty ? "all" : model.orgFilter.sorted().joined(separator: ", "))")
+    }
+
+    @ViewBuilder
+    private var orgNoMatch: some View {
+        let names = model.orgFilter.sorted()
+        VStack(alignment: .leading, spacing: 6) {
+            Text("None of your tickets are for \(ListFormatter.localizedString(byJoining: names)).").foregroundStyle(Theme.secondary)
+            if names.count == 1, let id = model.orgID(named: names[0]), let openOrg {
+                Button("See all of its tickets") { openOrg(id, names[0]) }
+                    .buttonStyle(.link).foregroundStyle(Theme.text)
+            }
+        }
     }
 
     /// The found ticket, as the list's only extra section.
@@ -140,9 +199,12 @@ struct TicketListView: View {
 
     private var footer: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            HStack(spacing: 6) {
-                if model.refreshing && model.phase == .loaded { ProgressView().controlSize(.mini) }
-                Text(updatedText(now: context.date))
+            VStack(spacing: 4) {
+                if model.phase == .loaded { Pager(page: model.currentPage, current: $model.page) }
+                HStack(spacing: 6) {
+                    if model.refreshing && model.phase == .loaded { ProgressView().controlSize(.mini) }
+                    Text(updatedText(now: context.date))
+                }
             }
             .font(.system(size: 11))
             .foregroundStyle(Theme.secondary)

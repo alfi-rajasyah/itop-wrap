@@ -106,6 +106,17 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 - **Secondary:** People and Config items links with their counts, and a New ticket button prefilled with the org.
 - **Org filter:** a building-icon menu above My tickets and next to the menu bar's search. It's multi-select with "All organizations" to reset, and the button shows the chosen org(s) with a darker border when a filter is on. Empty sections hide while filtering. If none of your tickets match, it says so and links to the full org view.
 
+## Date range and sorting (all ticket lists)
+
+- **Range menu** (calendar icon) above My tickets, Team tickets, an organization's tickets and a person's tickets: "Open tickets" by default; "Opened in the last 7, 30 or 90 days" or "Any time"; and "Include resolved and closed", which can cover any time ("All tickets, any time"). Resolved and Closed get their own groups after the open ones. The label says what's shown: "Open tickets", "Open, last 30 days", "All, last 30 days".
+- **Show menu** (numbered-list icon): 10, 20 (default), 30, 50 or 100 per page, or All. Paging happens in the app after grouping and sorting, so page 1 holds the most urgent tickets and the sort covers everything. A pager sits under the list ("‹ 21–40 of 556 ›") and goes back to page 1 when the range, sort, filter or search changes. Group headers count the whole group, not just the page.
+- **People search** asks iTop for at most 100 people and says so when there are more: "Showing 100 of 256 people. Type more of the name to narrow it down."
+- **Sort menu** (arrows icon): inside each status group, "Priority, then oldest" (default), "Last update, newest first", "Opened, newest first" or "Opened, oldest first". Groups never move.
+- **All in one "View" menu** (decided 2026-11-11, after the separate buttons took three lines): sections "Show tickets opened" (range plus the resolved-and-closed switch), "Sort inside each status group" and "Per page", with "Back to default view" when anything's changed. Above the list sit just two buttons: the org filter (My tickets) and View. When the view isn't the default, View's border goes dark and a quiet line under it says what's different ("All tickets, any time · Last update, newest first").
+- Filter buttons are neutral: grey icon, grey border, dark border when on. Never the accent colour.
+- One setting for every list, remembered between launches.
+- Org counts in the Organizations list stay open-ticket counts. "Needs you" only ever counts open tickets.
+
 ## Screens and focal points (one per screen)
 
 | Screen | Focal point | Layout |

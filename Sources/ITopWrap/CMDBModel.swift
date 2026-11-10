@@ -5,10 +5,12 @@ import Observation
 struct CMDBSource: Sendable {
     var search: @Sendable (String) async throws -> [ConfigItem]
     var detail: @Sendable (ConfigItem) async throws -> ConfigItemDetail
+    var inOrg: @Sendable (String) async throws -> [ConfigItem]
 
     static func live(_ session: Session) -> CMDBSource {
         let service = CMDBService(client: session.client)
-        return CMDBSource(search: { try await service.search($0) }, detail: { try await service.detail($0) })
+        return CMDBSource(search: { try await service.search($0) }, detail: { try await service.detail($0) },
+                          inOrg: { try await service.items(inOrg: $0) })
     }
 }
 
@@ -55,8 +57,30 @@ final class CMDBModel {
     /// The query the current results belong to, so coming back to the section doesn't search again.
     private var searched: String?
 
+    /// Set by the org view's Config items link; typing a search clears it.
+    private(set) var scope: (id: String, name: String)?
+
+    func showOrg(id: String, name: String) {
+        scope = (id, name)
+        query = ""
+        searched = nil
+    }
+
+    func clearScope() {
+        scope = nil
+        results = .idle
+        searched = nil
+    }
+
     func search() async {
         let q = query.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty, scope != nil { scope = nil }
+        if let scope {
+            if searched == "org:\(scope.id)", case .loaded = results { return }
+            results = .searching
+            do { results = .loaded(try await source.inOrg(scope.id)); searched = "org:\(scope.id)" } catch { results = .failed(error.localizedDescription) }
+            return
+        }
         guard q.count >= 2 else { results = .idle; searched = nil; return }
         if q == searched, case .loaded = results { return }
         let previous = results

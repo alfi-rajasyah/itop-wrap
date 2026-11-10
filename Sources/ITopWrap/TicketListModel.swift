@@ -4,7 +4,7 @@ import Observation
 
 /// Where a list gets its tickets: iTop in the app, canned tickets in the debug demo.
 struct TicketSource: Sendable {
-    var load: @Sendable () async throws -> [Ticket]
+    var load: @Sendable (TicketScope) async throws -> [Ticket]
     var lookup: @Sendable (String) async throws -> Ticket?
     var detail: @Sendable (Ticket) async throws -> TicketDetail
 
@@ -12,7 +12,7 @@ struct TicketSource: Sendable {
         let service = TicketService(client: session.client)
         let me = session.user
         return TicketSource(
-            load: { view == .mine ? try await service.loadMine(me: me) : try await service.loadTeam(me: me) },
+            load: { scope in view == .mine ? try await service.loadMine(me: me, scope: scope) : try await service.loadTeam(me: me, scope: scope) },
             lookup: { try await service.lookup($0) },
             detail: { try await service.detail(for: $0) })
     }
@@ -39,27 +39,48 @@ final class TicketListModel {
     let me: CurrentUser
     let server: ServerAddress
     let source: TicketSource
+    let options: ListOptions
 
     private(set) var phase: Phase = .loading
     private(set) var tickets: [Ticket] = []
     private(set) var updatedAt: Date?
     private(set) var refreshing = false
+    private var refreshAgain = false
     private(set) var refreshError: String?
     private(set) var lookup: Lookup = .none
     var query = ""
     var selection: Ticket.ID?
+    /// The org filter (DESIGN.md: Org filter); empty means all organizations.
+    var orgFilter: Set<String> = []
+    /// The page shown; back to 1 whenever what's listed changes.
+    var page = 1
 
-    init(view: TicketList.View, session: Session, source: TicketSource? = nil) {
+    init(view: TicketList.View, session: Session, options: ListOptions, source: TicketSource? = nil) {
         self.view = view
+        self.options = options
         me = session.user
         server = session.client.server
         self.source = source ?? .live(session, view: view)
     }
 
+    /// Only open tickets can need you; resolved and closed ones in the range don't count.
     var needCount: Int { tickets.filter { TicketList.needsYou($0, me: me) }.count }
 
     var visibleSections: [TicketSection] {
-        TicketList.groups(TicketSearch.filter(tickets, query: query), me: me, view: view)
+        TicketList.groups(TicketSearch.filter(TicketSearch.filter(tickets, orgs: orgFilter), query: query), me: me, view: view, sort: options.sort)
+    }
+
+    var currentPage: TicketPage { TicketPage(visibleSections, size: options.pageSize, page: page) }
+
+    var orgChoices: [String] { TicketSearch.orgs(in: tickets) }
+
+    /// The org id behind a name, from any ticket for it, for "See all of its tickets".
+    func orgID(named name: String) -> String? {
+        tickets.first { $0.orgName == name && $0.orgID != "0" }?.orgID
+    }
+
+    func toggleOrg(_ name: String) {
+        if orgFilter.contains(name) { orgFilter.remove(name) } else { orgFilter.insert(name) }
     }
 
     var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -74,11 +95,15 @@ final class TicketListModel {
 
     /// First load shows a spinner; later loads keep the list on screen.
     func refresh() async {
-        if refreshing { return }
+        // A range change during a refresh runs right after it, instead of being dropped.
+        if refreshing { refreshAgain = true; return }
         refreshing = true
-        defer { refreshing = false }
+        defer {
+            refreshing = false
+            if refreshAgain { refreshAgain = false; Task { await refresh() } }
+        }
         do {
-            tickets = try await source.load()
+            tickets = try await source.load(options.scope)
             updatedAt = Date()
             phase = .loaded
             refreshError = nil

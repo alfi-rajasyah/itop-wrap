@@ -7,9 +7,22 @@ struct CMDBListView: View {
     @Bindable var model: CMDBModel
 
     var body: some View {
-        content
-            .searchable(text: $model.query, placement: .toolbar, prompt: "Search config items")
-            .task(id: model.query) { await model.search() }
+        VStack(spacing: 0) {
+            if let scope = model.scope {
+                HStack {
+                    Label("Config items in \(scope.name)", systemImage: "building.2").font(.system(size: 12))
+                    Spacer()
+                    Button { model.clearScope() } label: { Image(systemName: "xmark.circle.fill") }
+                        .buttonStyle(.plain).foregroundStyle(Theme.secondary)
+                        .help("Show search instead").accessibilityLabel("Clear organization")
+                }
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.bar)
+            }
+            content
+        }
+        .searchable(text: $model.query, placement: .toolbar, prompt: "Search config items")
+        .task(id: model.query + (model.scope?.id ?? "")) { await model.search() }
     }
 
     @ViewBuilder
@@ -28,7 +41,7 @@ struct CMDBListView: View {
         case .loaded(let items) where items.isEmpty:
             message("No config items match “\(model.query.trimmingCharacters(in: .whitespaces))”.")
         case .loaded(let items):
-            List(selection: $model.selectedID) {
+            List(selection: $model.selectedID.deferred) {
                 Section {
                     ForEach(items) { item in
                         VStack(alignment: .leading, spacing: 3) {

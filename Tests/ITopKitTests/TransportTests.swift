@@ -221,3 +221,44 @@ struct ReadOnlyGuardTests {
         #expect((json["fields"] as? [String: Any])?["title"] as? String == "x")
     }
 }
+
+// MARK: - Debug trace
+
+@Suite("Debug trace")
+struct TraceTests {
+    @Test("A trace line shows the operation, class, query and what iTop found, never the credentials")
+    func line() throws {
+        let body = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"code":0,"message":"Found: 7","objects":{"UserRequest::1":{"class":"UserRequest","key":"1","fields":{"title":"Secret title"}}}}"#.utf8))
+        let line = ITopClient.traceLine(.get(className: "UserRequest", key: "SELECT UserRequest WHERE org_id = 5", outputFields: ["ref"]),
+                                        response: ITopResponse(body: body))
+        #expect(line == "[iTop] core/get UserRequest | SELECT UserRequest WHERE org_id = 5 | code 0 | 1 objects | Found: 7")
+        #expect(!line.contains("Secret"))
+    }
+
+    @Test("check_credentials never shows the user or password")
+    func credentials() throws {
+        let body = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"code":0,"message":"","authorized":true}"#.utf8))
+        let line = ITopClient.traceLine(.checkCredentials(user: "agent", password: "s3cret"), response: ITopResponse(body: body))
+        #expect(!line.contains("s3cret") && !line.contains("agent"))
+    }
+}
+
+@Suite("Found count")
+struct FoundCountTests {
+    @Test("iTop's \"Found: N\" message gives the total even when fewer objects came back", arguments: [
+        ("Found: 256", 256), ("Found: 0", 0), ("", nil), ("Scope: 1; Found: Server=4, VirtualMachine=3", nil),
+    ] as [(String, Int?)])
+    func found(message: String, expected: Int?) throws {
+        let body = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"code":0,"message":"\#(message)"}"#.utf8))
+        #expect(ITopResponse(body: body).found == expected)
+    }
+
+    @Test("People search reports how many matched in total")
+    func peopleTotal() async throws {
+        let stub = StubServer(.json(#"{"code":0,"message":"Found: 256","objects":{"Person::1":{"class":"Person","key":"1","fields":{"name":"Rajasyah","first_name":"Alfi"}}}}"#))
+        let client = ITopClient(server: try ServerAddress("itop.example.com"), credentials: Credentials(user: "a", password: "p"), session: stub.session)
+        let page = try await OrgService(client: client).peoplePage(matching: "alfi")
+        #expect(page.people.count == 1)
+        #expect(page.total == 256)
+    }
+}

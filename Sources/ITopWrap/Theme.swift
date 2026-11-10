@@ -39,3 +39,18 @@ struct PrimaryButtonStyle: ButtonStyle {
             .contentShape(RoundedRectangle(cornerRadius: 7))
     }
 }
+
+extension Binding where Value: Equatable {
+    /// A List selection that's applied after the click has been handled.
+    ///
+    /// Selecting a row here swaps out another column straight away (the sidebar replaces the
+    /// middle list; a row rebuilds the detail pane). Done inside AppKit's selection callback,
+    /// that makes it log "Application performed a reentrant operation in its NSTableView
+    /// delegate", which it says will become an assert. Deferring one run-loop turn avoids it.
+    @MainActor var deferred: Binding<Value> {
+        let base = self
+        return Binding(get: { base.wrappedValue }, set: { new in
+            DispatchQueue.main.async { if base.wrappedValue != new { base.wrappedValue = new } }
+        })
+    }
+}
