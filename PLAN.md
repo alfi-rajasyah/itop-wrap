@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Next: Task 8c, menu bar.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c checked on your real iTop (read-only).
 
 ## Overview
 
@@ -274,9 +274,11 @@ As built: stops under a minute aren't saved (likely misclicks); past 4 hours the
 **Description:** Add a `MenuBarExtra` with a monochrome Stacked stubs icon, the Needs you count and the running timer. Its panel shows the running timer with stop, search, tickets grouped by status (Assigned, Pending, Escalated TTO, Escalated TTR) with per-row start/stop, plus New ticket, Refresh and Open main window. It shares one timer model with the main window, and stays running when the window is closed.
 
 **Acceptance criteria:**
-- [ ] Starting or stopping a timer in the menu bar is reflected in the main window at once, and the other way round
-- [ ] The count matches My tickets' Needs you count
-- [ ] Closing the main window leaves the menu bar item working; ⌘O reopens the window
+- [x] Starting or stopping a timer in the menu bar is reflected in the main window at once, and the other way round (one TimerModel in the session's Workspace, shared by both)
+- [x] The count matches My tickets' Needs you count (checked on your real iTop: 5 and 5)
+- [x] Closing the main window leaves the menu bar item working; ⌘O reopens the window (signed in, the app keeps running without windows)
+
+As built: the Stacked stubs icon is drawn in code as a template image (your choice, 2026-11-11); My tickets refreshes every 2 minutes in the session, window open or not; the panel's ticket list sizes to its rows, up to 420 points. Not yet in the panel: New ticket (arrives with Task 9) and Assign to me on rows (UX-FLOWS U2, proposed).
 
 **Verification:** `swift test --filter TimerTests` (shared model) · manual with the window open and closed · VoiceOver reads the item as "iTop Wrap: 2 tickets need you, timer 0:12 on R-000412"
 
