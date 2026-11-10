@@ -11,6 +11,10 @@ enum Theme {
     static let primaryFill = dynamic(light: 0x1D1D1F, dark: 0xF2F2F7)
     static let onPrimary = dynamic(light: 0xFFFFFF, dark: 0x1D1D1F)
     static let chip = dynamic(light: 0xEEEEF1, dark: 0x333336)
+    /// Teal: only ever "this ticket needs you" (DESIGN.md).
+    static let accent = dynamic(light: 0x0F6E56, dark: 0x5DCAA5)
+    static let accentTint = dynamic(light: 0xE1F5EE, dark: 0x085041)
+    static let accentText = dynamic(light: 0x0F6E56, dark: 0x9FE1CB)
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in

@@ -5,14 +5,22 @@ import SwiftUI
 struct ShellView: View {
     @Environment(SessionModel.self) private var model
     let session: Session
+    @State private var mine: TicketListModel
+    @State private var team: TicketListModel
     @State private var confirmSignOut = false
+
+    init(session: Session) {
+        self.session = session
+        _mine = State(initialValue: TicketListModel(view: .mine, session: session, source: DebugLaunch.demoSource(.mine)))
+        _team = State(initialValue: TicketListModel(view: .team, session: session, source: DebugLaunch.demoSource(.team)))
+    }
 
     var body: some View {
         @Bindable var model = model
         NavigationSplitView {
             List(selection: $model.selection) {
                 Section("Tickets") {
-                    row(.myTickets)
+                    row(.myTickets, count: mine.needCount)
                     row(.teamTickets)
                 }
                 Section("CMDB") {
@@ -23,12 +31,27 @@ struct ShellView: View {
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
             .safeAreaInset(edge: .bottom) { account }
+        } content: {
+            Group {
+                switch model.selection {
+                case .myTickets: TicketListView(model: mine)
+                case .teamTickets: TicketListView(model: team)
+                default: SectionPlaceholder(item: model.selection, session: session)
+                }
+            }
+            .navigationTitle(model.selection.title)
+            .navigationSplitViewColumnWidth(min: 300, ideal: 360, max: 460)
         } detail: {
-            SectionPlaceholder(item: model.selection, session: session)
-                .navigationTitle(model.selection.title)
-                // The minimum size goes on the content: a frame on the split view itself
-                // pushes its content under the toolbar and past the bottom edge (seen in Checkpoint A).
-                .frame(minWidth: 620, minHeight: 520)
+            Group {
+                if let list = currentList {
+                    TicketDetailPlaceholder(ticket: list.ticket(list.selection), webURL: list.ticket(list.selection).flatMap(list.webURL))
+                } else {
+                    Color.clear
+                }
+            }
+            // The minimum size goes on a column: a frame on the split view itself
+            // pushes its content under the toolbar and past the bottom edge (Checkpoint A).
+            .frame(minWidth: 380, minHeight: 520)
         }
         .confirmationDialog("Sign out of \(host)?", isPresented: $confirmSignOut) {
             Button("Sign out", role: .destructive) { model.signOut() }
@@ -37,10 +60,31 @@ struct ShellView: View {
         }
     }
 
+    private var currentList: TicketListModel? {
+        switch model.selection {
+        case .myTickets: mine
+        case .teamTickets: team
+        default: nil
+        }
+    }
+
     private var host: String { session.client.server.baseURL.host() ?? "iTop" }
 
-    private func row(_ item: SidebarItem) -> some View {
-        Label(item.title, systemImage: item.symbol).tag(item)
+    private func row(_ item: SidebarItem, count: Int = 0) -> some View {
+        HStack {
+            Label(item.title, systemImage: item.symbol)
+            Spacer()
+            if count > 0 {
+                Text("\(count)")
+                    .font(.system(size: 11, weight: .semibold)).monospacedDigit()
+                    .padding(.horizontal, 7).padding(.vertical, 1)
+                    .foregroundStyle(Theme.accentText)
+                    .background(Theme.accentTint, in: Capsule())
+                    .accessibilityLabel("\(count) need you")
+                    .help("\(count) need you")
+            }
+        }
+        .tag(item)
     }
 
     private var account: some View {

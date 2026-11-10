@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0, 1 and 2 done; Checkpoint A passed (2026-11-10).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 3 done; Checkpoint A passed (2026-11-10).
 
 ## Overview
 
@@ -109,14 +109,17 @@ Done 2026-11-10: `swift test` 20/20 passing, no warnings.
 **Description:** Run `core/get` on `UserRequest` and `Incident`, filtered to open statuses and to `agent_id = me` (or `team_id IN myTeams`). Show a sortable table with ref, title, status, priority, caller and last update, plus search by ref or title and a refresh button.
 
 **Acceptance criteria:**
-- [ ] The list matches the web UI's "My open requests" for your account
-- [ ] Search narrows the list; refresh reloads it
-- [ ] A full ref not in the list is fetched with `core/get` and offered as "Open R-…"; a ref you have no rights to, or that doesn't exist, says so
-- [ ] Empty, loading and error states are shown
+- [x] The list matches the web UI's "My open requests" for your account (confirmed by you against the real server)
+- [x] Search narrows the list; refresh (⌘R, and every 2 minutes) reloads it
+- [x] A full ref not in the list is fetched with `core/get` and shown as "Search result: not in your queue"; a ref you can't see or that doesn't exist says so
+- [x] Empty, loading and error states are shown
+- [x] Grouped by status as in DESIGN.md (not the plan's original sortable table), with the teal "needs you" rule and the sidebar count
+
+Done 2026-11-10 on `task-3-ticket-lists`: 47 tests; click-through in the debug demo. Not in this task: org filter (5b), time spent (8b), Assign to me (7), the full detail view (4).
 
 **Verification:** `swift test --filter TicketQueryTests` (OQL builder and decoding) · manual comparison with the web UI
 
-**Dependencies:** 2 · **Files:** `Sources/ITopKit/Ticket.swift`, `TicketQueries.swift`, `Sources/ITopWrap/TicketListView.swift`, `TicketListModel.swift` · **Scope:** M
+**Dependencies:** 2 · **Files:** `Sources/ITopKit/Ticket.swift`, `TicketQueries.swift`, `Sources/ITopWrap/TicketListView.swift`, `TicketListModel.swift`, `ShellView.swift` (now three columns), `Tests/ITopKitTests/TicketQueryTests.swift` · **Scope:** M
 
 ## Task 4: Ticket detail
 
