@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 built against the mock; its real check waits on a test ticket you name (ITOPWRAP_WRITE_TICKETS).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Next: Task 7, reassign.
 
 ## Overview
 
@@ -212,7 +212,7 @@ Probe result (2026-11-11): your iTop answers the web image links with 403 to HTT
 **Description:** On ticket detail, a composer for public or private log entries, saved with `core/update` on `public_log` / `private_log` plus a `comment`.
 
 **Acceptance criteria:**
-- [ ] The entry appears in the web UI history with your name (real check pending, on a test ticket you name)
+- [x] The entry appears in the web UI history with your name (checked 2026-11-11: one private entry on a test ticket, the only write sent)
 - [x] Failures show an error and keep the draft (demo mock: an entry containing "fail" is rejected)
 - [x] Writes are off unless switched on per ticket: `ITOPWRAP_WRITE_TICKETS=R-…` (debug builds) resolves refs to keys, and the client refuses any write to another ticket before sending
 
