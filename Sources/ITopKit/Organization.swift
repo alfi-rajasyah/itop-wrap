@@ -72,8 +72,8 @@ public enum OrgQueries {
     public static let organizations = "SELECT Organization WHERE status = 'active'"
     static let open = TicketQueries.open
 
-    public static func openTickets(_ cls: TicketClass, orgID: String) -> String? {
-        Int(orgID).map { "SELECT \(cls.rawValue) WHERE \(open) AND org_id = \($0)" }
+    public static func openTickets(_ cls: TicketClass, orgID: String, scope: TicketScope = .open) -> String? {
+        Int(orgID).map { "SELECT \(cls.rawValue) WHERE \(scope.clause) AND org_id = \($0)" }
     }
 
     public static func people(orgID: String) -> String? {
@@ -95,12 +95,12 @@ public enum OrgQueries {
         return "SELECT Person WHERE " + clauses.joined(separator: " AND ")
     }
 
-    public static func assignedTo(_ cls: TicketClass, personID: String) -> String? {
-        Int(personID).map { "SELECT \(cls.rawValue) WHERE \(open) AND agent_id = \($0)" }
+    public static func assignedTo(_ cls: TicketClass, personID: String, scope: TicketScope = .open) -> String? {
+        Int(personID).map { "SELECT \(cls.rawValue) WHERE \(scope.clause) AND agent_id = \($0)" }
     }
 
-    public static func reportedBy(_ cls: TicketClass, personID: String) -> String? {
-        Int(personID).map { "SELECT \(cls.rawValue) WHERE \(open) AND caller_id = \($0)" }
+    public static func reportedBy(_ cls: TicketClass, personID: String, scope: TicketScope = .open) -> String? {
+        Int(personID).map { "SELECT \(cls.rawValue) WHERE \(scope.clause) AND caller_id = \($0)" }
     }
 }
 
@@ -130,8 +130,8 @@ public struct OrgService: Sendable {
     }
 
     /// An org's open tickets from every agent.
-    public func openTickets(orgID: String) async throws -> [Ticket] {
-        try await tickets(TicketClass.allCases.compactMap { cls in OrgQueries.openTickets(cls, orgID: orgID).map { (cls, $0) } })
+    public func openTickets(orgID: String, scope: TicketScope = .open) async throws -> [Ticket] {
+        try await tickets(TicketClass.allCases.compactMap { cls in OrgQueries.openTickets(cls, orgID: orgID, scope: scope).map { (cls, $0) } })
     }
 
     /// How many people and CIs an org has, for the org header's links.
@@ -152,12 +152,12 @@ public struct OrgService: Sendable {
         return try await people(oql)
     }
 
-    public func tickets(assignedTo personID: String) async throws -> [Ticket] {
-        try await tickets(TicketClass.allCases.compactMap { cls in OrgQueries.assignedTo(cls, personID: personID).map { (cls, $0) } })
+    public func tickets(assignedTo personID: String, scope: TicketScope = .open) async throws -> [Ticket] {
+        try await tickets(TicketClass.allCases.compactMap { cls in OrgQueries.assignedTo(cls, personID: personID, scope: scope).map { (cls, $0) } })
     }
 
-    public func tickets(reportedBy personID: String) async throws -> [Ticket] {
-        try await tickets(TicketClass.allCases.compactMap { cls in OrgQueries.reportedBy(cls, personID: personID).map { (cls, $0) } })
+    public func tickets(reportedBy personID: String, scope: TicketScope = .open) async throws -> [Ticket] {
+        try await tickets(TicketClass.allCases.compactMap { cls in OrgQueries.reportedBy(cls, personID: personID, scope: scope).map { (cls, $0) } })
     }
 
     static let peopleLimit = 100

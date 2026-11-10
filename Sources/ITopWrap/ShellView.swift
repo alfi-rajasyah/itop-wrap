@@ -5,6 +5,7 @@ import SwiftUI
 struct ShellView: View {
     @Environment(SessionModel.self) private var model
     let session: Session
+    @State private var options: ListOptions
     @State private var mine: TicketListModel
     @State private var team: TicketListModel
     @State private var cmdb: CMDBModel
@@ -14,11 +15,13 @@ struct ShellView: View {
 
     init(session: Session) {
         self.session = session
-        _mine = State(initialValue: TicketListModel(view: .mine, session: session, source: DebugLaunch.demoSource(.mine)))
-        _team = State(initialValue: TicketListModel(view: .team, session: session, source: DebugLaunch.demoSource(.team)))
+        let options = ListOptions()
+        _options = State(initialValue: options)
+        _mine = State(initialValue: TicketListModel(view: .mine, session: session, options: options, source: DebugLaunch.demoSource(.mine)))
+        _team = State(initialValue: TicketListModel(view: .team, session: session, options: options, source: DebugLaunch.demoSource(.team)))
         _cmdb = State(initialValue: CMDBModel(session: session, source: DebugLaunch.demoCMDB()))
-        _orgs = State(initialValue: OrgsModel(session: session, source: DebugLaunch.demoOrgs()))
-        _people = State(initialValue: PeopleModel(session: session, source: DebugLaunch.demoPeople()))
+        _orgs = State(initialValue: OrgsModel(session: session, options: options, source: DebugLaunch.demoOrgs()))
+        _people = State(initialValue: PeopleModel(session: session, options: options, source: DebugLaunch.demoPeople()))
     }
 
     var body: some View {

@@ -118,7 +118,11 @@ enum DebugLaunch {
             t("R-000436", "New phone for the reception desk", "new", agent: "0", team: "11", teamName: "Service desk", prio: 4, hours: 0.7, caller: "Caller 11", org: "Org B"),
         ]
         let found = t("R-000512", "Teams calls drop on the Finance floor", "assigned", agent: "5", agentName: "Agent 2", team: "12", teamName: "Collaboration", hours: 6, caller: "Caller 7", org: "Org B")
-        let list = view == .mine ? mine : mine + others
+        let closed = [
+            t("R-000355", "Monitor arm for desk 14", "resolved", agent: "2", team: "11", teamName: "Service desk", prio: 4, hours: 200, caller: "Caller 12"),
+            t("R-000349", "Guest Wi-Fi password for the event", "closed", agent: "2", prio: 3, hours: 420, caller: "Caller 13", org: "Org B"),
+        ]
+        let base = view == .mine ? mine : mine + others
         func entry(_ id: Int, _ who: String, hoursAgo: Double, _ text: String) -> LogEntry {
             LogEntry(id: id, date: now.addingTimeInterval(-hoursAgo * 3600), author: who, text: text)
         }
@@ -132,7 +136,12 @@ enum DebugLaunch {
                 linkedCIs: [LinkedCI(id: "55", name: "vpn-gw-01", className: "NetworkDevice")],
                 serviceName: "Network access", subcategoryName: "VPN"),
         ]
-        return TicketSource(load: { try? await Task.sleep(for: .milliseconds(300)); return list },
+        @Sendable func list(_ scope: TicketScope) -> [Ticket] {
+            let all = base + (scope.includeClosed ? closed : [])
+            guard let days = scope.openedWithinDays else { return all }
+            return all.filter { ($0.startDate ?? now) >= now.addingTimeInterval(-Double(days) * 86400) }
+        }
+        return TicketSource(load: { scope in try? await Task.sleep(for: .milliseconds(300)); return list(scope) },
                             lookup: { $0 == "R-000512" ? found : nil },
                             detail: { t in
                                 try? await Task.sleep(for: .milliseconds(300))
@@ -196,12 +205,12 @@ enum DebugLaunch {
         let ids = ["Org A": "1", "Org B": "2", "Org C": "3"]
         return OrgSource(
             list: {
-                let all = try await tickets.load()
+                let all = try await tickets.load(.open)
                 return ids.sorted { $0.key < $1.key }.map { name, id in
                     Organization(id: id, name: name, code: String(name.suffix(1)), openCount: all.filter { $0.orgName == name }.count)
                 }
             },
-            tickets: { id in try await tickets.load().filter { ids[$0.orgName] == id } },
+            tickets: { id, scope in try await tickets.load(scope).filter { ids[$0.orgName] == id } },
             counts: { id in (id == "1" ? 6 : 3, id == "1" ? 3 : 0) })
         #else
         return nil
@@ -225,8 +234,8 @@ enum DebugLaunch {
         return PeopleSource(
             search: { q in people.filter { p in q.split(separator: " ").allSatisfy { p.displayName.localizedCaseInsensitiveContains($0) } } },
             inOrg: { id in people.filter { $0.orgID == id } },
-            assigned: { id in try await tickets.load().filter { $0.agentID == id } },
-            reported: { id in try await tickets.load().filter { $0.callerName == callerOf[id] } })
+            assigned: { id, scope in try await tickets.load(scope).filter { $0.agentID == id } },
+            reported: { id, scope in try await tickets.load(scope).filter { $0.callerName == callerOf[id] } })
         #else
         return nil
         #endif

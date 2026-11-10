@@ -9,12 +9,13 @@ struct TicketTable: View {
     let me: CurrentUser
     /// The last column: the assignee on org lists and "Reported by them", the caller on "Assigned to them".
     var lastColumn: LastColumn = .assignee
+    var sort: TicketSort = .priority
     var openTicket: (Ticket) -> Void
 
     enum LastColumn { case assignee, caller }
 
     var body: some View {
-        let sections = TicketList.groups(tickets, me: me, view: .team)
+        let sections = TicketList.groups(tickets, me: me, view: .team, sort: sort)
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 Text("Ref").frame(width: 96, alignment: .leading)
@@ -167,7 +168,11 @@ struct OrgDetailView: View {
                 }
                 .buttonStyle(.link)
                 .foregroundStyle(Theme.text)
-                Text("Open tickets").font(.system(size: 14, weight: .semibold))
+                HStack {
+                    Text(model.options.includeClosed ? "Tickets" : "Open tickets").font(.system(size: 14, weight: .semibold))
+                    Spacer()
+                    HStack(spacing: 6) { ListOptionsMenus(options: model.options) }
+                }
                 switch model.tickets {
                 case .idle, .loading:
                     HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Loading \(org.name)'s tickets").foregroundStyle(Theme.secondary) }
@@ -177,9 +182,10 @@ struct OrgDetailView: View {
                         Button("Retry") { Task { await model.loadSelected() } }
                     }
                 case .loaded(let tickets) where tickets.isEmpty:
-                    Text("\(org.name) has no open tickets.").foregroundStyle(Theme.secondary)
+                    Text(model.options.scope == .open ? "\(org.name) has no open tickets." : "\(org.name) has no tickets in this range.")
+                        .foregroundStyle(Theme.secondary)
                 case .loaded(let tickets):
-                    TicketTable(tickets: tickets, me: model.me, openTicket: openTicket)
+                    TicketTable(tickets: tickets, me: model.me, sort: model.options.sort, openTicket: openTicket)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 18)
@@ -187,6 +193,7 @@ struct OrgDetailView: View {
         }
         .font(.system(size: 13))
         .task(id: org.id) { await model.loadSelected() }
+        .onChange(of: model.options.scope) { Task { await model.loadSelected() } }
     }
 }
 
@@ -288,11 +295,15 @@ struct PersonDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Theme.chip.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
 
-                Picker("Tickets", selection: $model.tab) {
-                    Text("Assigned to them\(count(model.assigned))").tag(PeopleModel.Tab.assigned)
-                    Text("Reported by them\(count(model.reported))").tag(PeopleModel.Tab.reported)
+                HStack {
+                    Picker("Tickets", selection: $model.tab) {
+                        Text("Assigned to them\(count(model.assigned))").tag(PeopleModel.Tab.assigned)
+                        Text("Reported by them\(count(model.reported))").tag(PeopleModel.Tab.reported)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    Spacer()
+                    HStack(spacing: 6) { ListOptionsMenus(options: model.options) }
                 }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
 
                 let current = model.tab == .assigned ? model.assigned : model.reported
                 switch current {
@@ -301,10 +312,12 @@ struct PersonDetailView: View {
                 case .failed(let error):
                     Text("Couldn't load the tickets. \(error)").foregroundStyle(Theme.warning)
                 case .loaded(let tickets) where tickets.isEmpty:
-                    Text(model.tab == .assigned ? "No open tickets assigned to \(person.displayName)." : "No open tickets reported by \(person.displayName).")
+                    let kind = model.options.scope == .open ? "open tickets" : "tickets in this range"
+                    Text(model.tab == .assigned ? "No \(kind) assigned to \(person.displayName)." : "No \(kind) reported by \(person.displayName).")
                         .foregroundStyle(Theme.secondary)
                 case .loaded(let tickets):
-                    TicketTable(tickets: tickets, me: model.me, lastColumn: model.tab == .assigned ? .caller : .assignee, openTicket: openTicket)
+                    TicketTable(tickets: tickets, me: model.me, lastColumn: model.tab == .assigned ? .caller : .assignee,
+                                sort: model.options.sort, openTicket: openTicket)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 18)
@@ -312,6 +325,7 @@ struct PersonDetailView: View {
         }
         .font(.system(size: 13))
         .task(id: person.id) { await model.loadSelected() }
+        .onChange(of: model.options.scope) { Task { await model.loadSelected(keepTab: true) } }
     }
 
     private func label(_ text: String) -> some View { Text(text).foregroundStyle(Theme.secondary) }

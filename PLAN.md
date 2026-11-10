@@ -164,7 +164,10 @@ Built 2026-11-10 on `task-5-cmdb`: 73 tests; click-through in the debug demo.
 - [x] People: search by name (each word in the first or last name), "People in Org A" from the org view, details with org link, email and phone, teams for agents, and "Assigned to them" / "Reported by them" tabs
 - Changed: open-ticket counts per person aren't in the People list (two queries per person); they're on the detail tabs. Org counts load every open ticket you can see with only its org id. "New ticket" waits for Task 9; the menu bar's org filter for Task 8c.
 
-Built 2026-11-10 on `task-5b-orgs-people`: 85 tests; click-through in the debug demo.
+- [x] Added after your review: a date range menu (open by default, opened in the last 7/30/90 days, include resolved and closed) and a sort menu (priority, last update, newest, oldest) on all four ticket lists, one setting remembered between launches
+- [ ] With the range menu, an organization's and a person's lists match the web UI, including resolved and closed tickets (your check; the "only 5 tickets" you saw was the open-only view)
+
+Built 2026-11-10 on `task-5b-orgs-people`: 93 tests; click-through in the debug demo.
 
 **Verification:** `swift test --filter OrgQueryTests` · manual comparison with the web UI
 

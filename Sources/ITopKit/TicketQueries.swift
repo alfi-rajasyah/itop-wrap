@@ -1,20 +1,70 @@
 import Foundation
 
+/// Which tickets a list covers over time: open ones by default, optionally only those opened
+/// recently, and optionally resolved and closed ones too. Including resolved and closed always
+/// keeps a date range (30 days by default): iTop's OQL can't order results, so an unbounded
+/// history couldn't be cut to the most recent ones.
+public struct TicketScope: Sendable, Equatable, Hashable {
+    public let includeClosed: Bool
+    public let openedWithinDays: Int?
+
+    public init(includeClosed: Bool, openedWithinDays: Int?) {
+        self.includeClosed = includeClosed
+        self.openedWithinDays = includeClosed ? (openedWithinDays ?? 30) : openedWithinDays
+    }
+
+    public static let open = TicketScope(includeClosed: false, openedWithinDays: nil)
+
+    /// The OQL condition. The date test runs on the server's clock, so time zones don't matter.
+    public var clause: String {
+        var parts: [String] = []
+        if !includeClosed { parts.append(TicketQueries.open) }
+        if let days = openedWithinDays { parts.append("start_date >= DATE_SUB(NOW(), INTERVAL \(days) DAY)") }
+        return parts.joined(separator: " AND ")
+    }
+}
+
+/// The order inside each status group (the sort menu).
+public enum TicketSort: String, Sendable, CaseIterable, Identifiable {
+    case priority, lastUpdate, newest, oldest
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .priority: "Priority, then oldest"
+        case .lastUpdate: "Last update, newest first"
+        case .newest: "Opened, newest first"
+        case .oldest: "Opened, oldest first"
+        }
+    }
+
+    func before(_ a: Ticket, _ b: Ticket) -> Bool {
+        let past = Date.distantPast, future = Date.distantFuture
+        switch self {
+        case .priority: return (a.priority, a.startDate ?? future, a.ref) < (b.priority, b.startDate ?? future, b.ref)
+        case .lastUpdate: return (a.lastUpdate ?? past, b.ref) > (b.lastUpdate ?? past, a.ref)
+        case .newest: return (a.startDate ?? past, b.ref) > (b.startDate ?? past, a.ref)
+        case .oldest: return (a.startDate ?? future, a.ref) < (b.startDate ?? future, b.ref)
+        }
+    }
+}
+
 /// The OQL behind each list (PLAN.md Task 3; the "needs you" rule from DESIGN.md).
 public enum TicketQueries {
     static let open = "status NOT IN ('resolved','closed')"
 
-    /// Open tickets assigned to me, plus unassigned Escalated TTO tickets in my teams.
-    public static func mine(_ cls: TicketClass, me: CurrentUser) -> String {
+    /// Tickets assigned to me, plus unassigned Escalated TTO tickets in my teams.
+    public static func mine(_ cls: TicketClass, me: CurrentUser, scope: TicketScope = .open) -> String {
         let assigned = "agent_id = \(me.contactID)"
-        guard !me.teams.isEmpty else { return "SELECT \(cls.rawValue) WHERE \(open) AND \(assigned)" }
-        return "SELECT \(cls.rawValue) WHERE \(open) AND (\(assigned) OR (status = 'escalated_tto' AND agent_id = 0 AND team_id IN (\(teamIDs(me)))))"
+        guard !me.teams.isEmpty else { return "SELECT \(cls.rawValue) WHERE \(scope.clause) AND \(assigned)" }
+        return "SELECT \(cls.rawValue) WHERE \(scope.clause) AND (\(assigned) OR (status = 'escalated_tto' AND agent_id = 0 AND team_id IN (\(teamIDs(me)))))"
     }
 
-    /// Everything open in my teams, or `nil` when I'm in no team.
-    public static func team(_ cls: TicketClass, me: CurrentUser) -> String? {
+    /// Everything in my teams, or `nil` when I'm in no team.
+    public static func team(_ cls: TicketClass, me: CurrentUser, scope: TicketScope = .open) -> String? {
         guard !me.teams.isEmpty else { return nil }
-        return "SELECT \(cls.rawValue) WHERE \(open) AND team_id IN (\(teamIDs(me)))"
+        return "SELECT \(cls.rawValue) WHERE \(scope.clause) AND team_id IN (\(teamIDs(me)))"
     }
 
     /// For a full ref like "R-000512", the class and the query that finds it; otherwise `nil`.
@@ -38,12 +88,12 @@ public struct TicketService: Sendable {
         self.client = client
     }
 
-    public func loadMine(me: CurrentUser) async throws -> [Ticket] {
-        try await load(TicketClass.allCases.map { ($0, TicketQueries.mine($0, me: me)) })
+    public func loadMine(me: CurrentUser, scope: TicketScope = .open) async throws -> [Ticket] {
+        try await load(TicketClass.allCases.map { ($0, TicketQueries.mine($0, me: me, scope: scope)) })
     }
 
-    public func loadTeam(me: CurrentUser) async throws -> [Ticket] {
-        try await load(TicketClass.allCases.compactMap { cls in TicketQueries.team(cls, me: me).map { (cls, $0) } })
+    public func loadTeam(me: CurrentUser, scope: TicketScope = .open) async throws -> [Ticket] {
+        try await load(TicketClass.allCases.compactMap { cls in TicketQueries.team(cls, me: me, scope: scope).map { (cls, $0) } })
     }
 
     /// A ticket by full ref, for search; `nil` if it doesn't exist or this account can't see it.
@@ -66,7 +116,7 @@ public struct TicketService: Sendable {
 }
 
 public enum TicketGroup: String, Sendable, CaseIterable {
-    case escalatedTTR, escalatedTTO, new, assigned, pending, other
+    case escalatedTTR, escalatedTTO, new, assigned, pending, other, resolved, closed
 
     public var title: String {
         switch self {
@@ -75,7 +125,9 @@ public enum TicketGroup: String, Sendable, CaseIterable {
         case .new: "New"
         case .assigned: "Assigned"
         case .pending: "Pending"
-        case .other: "Other open"
+        case .other: "Other"
+        case .resolved: "Resolved"
+        case .closed: "Closed"
         }
     }
 
@@ -86,6 +138,8 @@ public enum TicketGroup: String, Sendable, CaseIterable {
         case "new": .new
         case "assigned": .assigned
         case "pending": .pending
+        case "resolved": .resolved
+        case "closed": .closed
         default: .other
         }
     }
@@ -111,16 +165,14 @@ public enum TicketList {
 
     /// Sections in DESIGN.md order, escalated first; empty ones are left out.
     /// Inside a section: priority 1 first, then the oldest.
-    public static func groups(_ tickets: [Ticket], me: CurrentUser, view: View) -> [TicketSection] {
+    public static func groups(_ tickets: [Ticket], me: CurrentUser, view: View, sort: TicketSort = .priority) -> [TicketSection] {
         let order: [TicketGroup] = view == .team
-            ? [.escalatedTTR, .escalatedTTO, .new, .assigned, .pending, .other]
-            : [.escalatedTTR, .escalatedTTO, .assigned, .new, .pending, .other]
+            ? [.escalatedTTR, .escalatedTTO, .new, .assigned, .pending, .other, .resolved, .closed]
+            : [.escalatedTTR, .escalatedTTO, .assigned, .new, .pending, .other, .resolved, .closed]
         let byGroup = Dictionary(grouping: tickets) { TicketGroup.of($0.status) }
         return order.compactMap { g in
             guard let list = byGroup[g], !list.isEmpty else { return nil }
-            return TicketSection(group: g, tickets: list.sorted {
-                ($0.priority, $0.startDate ?? .distantFuture, $0.ref) < ($1.priority, $1.startDate ?? .distantFuture, $1.ref)
-            })
+            return TicketSection(group: g, tickets: list.sorted(by: sort.before))
         }
     }
 }

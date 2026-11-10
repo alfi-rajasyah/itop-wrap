@@ -106,6 +106,13 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 - **Secondary:** People and Config items links with their counts, and a New ticket button prefilled with the org.
 - **Org filter:** a building-icon menu above My tickets and next to the menu bar's search. It's multi-select with "All organizations" to reset, and the button shows the chosen org(s) with a darker border when a filter is on. Empty sections hide while filtering. If none of your tickets match, it says so and links to the full org view.
 
+## Date range and sorting (all ticket lists)
+
+- **Range menu** (calendar icon) above My tickets, Team tickets, an organization's tickets and a person's tickets: "Open tickets" by default; "Opened in the last 7, 30 or 90 days"; and "Include resolved and closed". With resolved and closed included there's always a range (30 days by default, "Any time" is off), because iTop's OQL can't order results and an unbounded history can't be cut to the newest. Resolved and Closed get their own groups after the open ones. The label says what's shown: "Open tickets", "Open, last 30 days", "All, last 30 days".
+- **Sort menu** (arrows icon): inside each status group, "Priority, then oldest" (default), "Last update, newest first", "Opened, newest first" or "Opened, oldest first". Groups never move.
+- One setting for every list, remembered between launches. A chip's border goes dark when it's off the default, like the org filter.
+- Org counts in the Organizations list stay open-ticket counts. "Needs you" only ever counts open tickets.
+
 ## Screens and focal points (one per screen)
 
 | Screen | Focal point | Layout |

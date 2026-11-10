@@ -12,6 +12,7 @@ struct TicketListView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { footer }
             .searchable(text: $model.query, placement: .toolbar, prompt: "R-000412 or VPN")
             .task(id: model.query) { await model.searchChanged() }
+            .onChange(of: model.options.scope) { Task { await model.refresh() } }
             .toolbar {
                 ToolbarItem {
                     Button { Task { await model.refresh() } } label: {
@@ -46,7 +47,7 @@ struct TicketListView: View {
         case .loaded:
             if model.hasNoTeams {
                 notice("You're not in any iTop team, so there are no team tickets to show.", retry: false)
-            } else if model.tickets.isEmpty && !model.isSearching {
+            } else if model.tickets.isEmpty && !model.isSearching && model.options.scope == .open {
                 notice(model.view == .mine ? "Nothing waiting on you. New assignments show up here." : "Your teams have no open tickets.", retry: false)
             } else {
                 list
@@ -56,9 +57,12 @@ struct TicketListView: View {
 
     private var list: some View {
         List(selection: $model.selection) {
-            if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty {
-                orgFilterMenu.listRowSeparator(.hidden)
+            // Wraps onto a second line when the list column is narrow.
+            FlowLayout(spacing: 6, lineSpacing: 6) {
+                if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
+                ListOptionsMenus(options: model.options)
             }
+            .listRowSeparator(.hidden)
             if !model.orgFilter.isEmpty && model.visibleSections.isEmpty && !model.isSearching {
                 orgNoMatch.listRowSeparator(.hidden)
             }
@@ -69,6 +73,10 @@ struct TicketListView: View {
             }
             lookupSection
             let sections = model.visibleSections
+            if !model.isSearching && sections.isEmpty && model.orgFilter.isEmpty {
+                Text("No tickets in this range. Try a longer range in the date menu.")
+                    .foregroundStyle(Theme.secondary).listRowSeparator(.hidden)
+            }
             if model.isSearching && sections.isEmpty && model.lookup == .none && !isLookupPending {
                 Text("No tickets in your list match “\(model.query.trimmingCharacters(in: .whitespaces))”.")
                     .foregroundStyle(Theme.secondary)
