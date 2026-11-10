@@ -297,6 +297,8 @@ As built: the Stacked stubs icon is drawn in code as a template image (your choi
 
 **Dependencies:** 3 (opens in Task 4's detail view) · **Files:** `TicketWrites.swift`, `Sources/ITopKit/PickLists.swift`, `Sources/ITopWrap/NewTicketView.swift`, `NewTicketModel.swift` · **Scope:** M
 
+DropdownField rebuilt to DESIGN.md "Dropdowns (one component everywhere)" during Task 9 (2026-11-11; the Task 7 version used a popover with a filter box on every list and no arrow keys). Now: Organization and Caller take typing in the field with a magnifier; short lists have no search box and jump by first letter; ↓/↑ open and move, ↩ picks, Esc closes the list before it would cancel the sheet; one open at a time, drawn above the sheet and flipped above the field when there's no room below; VoiceOver reads each by its field name, the highlighted item as its value and announced as you move. Checked by keyboard and mouse in New ticket, Resolve and Assign. Differences from the spec: with one list open, clicking another field first closes the open one (a second click opens it); macOS has no combobox role in SwiftUI, so short lists are read as buttons with a hint.
+
 ### Checkpoint C: Write features
 - [ ] antislop Delivery Gate PASS on every sheet and action
 - [ ] Every write in SPEC user stories 4, 5, 7 and 8 is verified in the web UI history

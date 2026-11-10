@@ -72,23 +72,26 @@ struct NewTicketSheet: View {
             .padding(.bottom, 2)
 
             RequiredLabel("Organization", missing: tried && org == nil)
-            DropdownField(placeholder: placeholder(orgs, loading: "Loading organizations…", empty: "No organizations found"),
-                          items: orgs.value ?? [], selection: $org, label: \.name)
+            DropdownField(name: "Organization", placeholder: placeholder(orgs, loading: "Loading organizations…", empty: "No organizations found"),
+                          items: orgs.value ?? [], selection: $org, label: \.name,
+                          searchPrompt: "Search organizations", noMatch: "No organization matches")
                 .disabled(orgs.value == nil)
             RequiredLabel("Caller", missing: tried && caller == nil)
-            DropdownField(placeholder: org == nil ? "Choose an organization first" : placeholder(callers, loading: "Loading people…", empty: "Nobody in \(org?.name ?? "this organization")"),
-                          items: org == nil ? [] : (callers.value ?? []), selection: $caller, label: \.name)
+            DropdownField(name: "Caller", placeholder: org == nil ? "Choose an organization first" : placeholder(callers, loading: "Loading people…", empty: "Nobody in \(org?.name ?? "this organization")"),
+                          items: org == nil ? [] : (callers.value ?? []), selection: $caller, label: \.name,
+                          searchPrompt: "Search people in \(org?.name ?? "the organization")",
+                          noMatch: "No caller in \(org?.name ?? "this organization") matches")
                 .disabled(org == nil || callers.value == nil)
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     RequiredLabel("Service", missing: tried && service == nil)
-                    DropdownField(placeholder: org == nil ? "Choose an organization first" : placeholder(services, loading: "Loading…", empty: "No services"),
+                    DropdownField(name: "Service", placeholder: org == nil ? "Choose an organization first" : placeholder(services, loading: "Loading…", empty: "No services"),
                                   items: org == nil ? [] : (services.value ?? []), selection: $service, label: \.name)
                         .disabled(org == nil || services.value == nil)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     RequiredLabel("Subcategory", missing: tried && subcategory == nil)
-                    DropdownField(placeholder: service == nil ? "Choose a service first" : placeholder(subcategories, loading: "Loading…", empty: "None for this service"),
+                    DropdownField(name: "Service subcategory", placeholder: service == nil ? "Choose a service first" : placeholder(subcategories, loading: "Loading…", empty: "None for this service"),
                                   items: service == nil ? [] : (subcategories.value ?? []), selection: $subcategory, label: \.name)
                         .disabled(service == nil || subcategories.value == nil)
                 }
@@ -96,11 +99,11 @@ struct NewTicketSheet: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Impact").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary).padding(.top, 4)
-                    DropdownField(placeholder: "Choose…", items: PickLists.impacts, selection: $impact, label: \.name)
+                    DropdownField(name: "Impact", placeholder: "Choose…", items: PickLists.impacts, selection: $impact, label: \.name)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Urgency").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary).padding(.top, 4)
-                    DropdownField(placeholder: "Choose…", items: PickLists.urgencies, selection: $urgency, label: \.name)
+                    DropdownField(name: "Urgency", placeholder: "Choose…", items: PickLists.urgencies, selection: $urgency, label: \.name)
                 }
             }
             RequiredLabel("Title", missing: tried && titleEmpty)
@@ -125,7 +128,7 @@ struct NewTicketSheet: View {
                 keepDraft()
                 dismiss()
             }
-            .keyboardShortcut(.cancelAction)
+            .cancelShortcutUnlessDropdownOpen()
             ConfirmButton(title: "Create ticket", busy: creating) { Task { await create() } }
                 .disabled(creating || !source.canCreate)
         }
