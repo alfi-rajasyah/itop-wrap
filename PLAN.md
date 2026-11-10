@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5 done; Checkpoint A passed (2026-11-10).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5b done; Checkpoint A passed (2026-11-11).
 
 ## Overview
 
@@ -158,19 +158,19 @@ Built 2026-11-10 on `task-5-cmdb`: 73 tests; click-through in the debug demo.
 **Description:** Add an Organizations item under CMDB in the sidebar. It lists organizations with their open-ticket count, and selecting one shows all of its open tickets from every agent (`SELECT UserRequest WHERE org_id = :id AND status NOT IN (closed, resolved)`, same for Incident), grouped by status, with the agent's initials on each row. Its header links to the org's people and CIs and has New ticket. Also add an organization filter (multi-select menu) to My tickets and the menu bar. Add a People view in the same layout: search `Person`, show org, email, phone and teams, and open tickets in "Assigned to them" (`agent_id`) and "Reported by them" (`caller_id`) tabs.
 
 **Acceptance criteria:**
-- [ ] Org A's ticket list matches the web UI's open tickets for Org A (your check)
-- [ ] Filtering My tickets to Org A shows only your Org A tickets; no matches shows "None of your tickets are for Org A" with a link to the org view (your check: the filter menu can't be driven in the background)
+- [x] Org A's ticket list matches the web UI's open tickets for Org A (checked by you with the range menu)
+- [x] Filtering My tickets to Org A shows only your Org A tickets; no matches shows "None of your tickets are for Org A" with a link to the org view (checked by you)
 - [x] Only organizations your iTop account can see are listed (iTop applies your rights to every query)
 - [x] People: search by name (each word in the first or last name), "People in Org A" from the org view, details with org link, email and phone, teams for agents, and "Assigned to them" / "Reported by them" tabs
 - Changed: open-ticket counts per person aren't in the People list (two queries per person); they're on the detail tabs. Org counts load every open ticket you can see with only its org id. "New ticket" waits for Task 9; the menu bar's org filter for Task 8c.
 
 - [x] Added after your review: a date range menu (open by default, opened in the last 7/30/90 days, include resolved and closed) and a sort menu (priority, last update, newest, oldest) on all four ticket lists, one setting remembered between launches
-- [ ] With the range menu, an organization's and a person's lists match the web UI, including resolved and closed tickets (your check; the "only 5 tickets" you saw was the open-only view)
+- [x] With the range menu, an organization's and a person's lists match the web UI, including resolved and closed tickets (checked by you)
 
 - [x] After your second review: "Any time" works with resolved and closed; a "Show 10/20/30/50/100/All" menu with a pager on every ticket list; People search says "Showing 100 of N"; long tables build rows lazily
 - [x] A debug trace (`ITOPWRAP_TRACE=1`) showed iTop returns every ticket (556 for one org, 773 for one agent), so the "only 5" limit isn't on the server side
 - [x] The "only 5" display: not a bug. A capture of your window showed one agent with 777 tickets: 5 open (Assigned) and 772 closed. Open-only lists showed the 5; "All tickets, any time" shows all 777
-- [ ] "Reentrant operation in its NSTableView delegate" warnings: selecting a row swapped out another column inside AppKit's selection callback. All five selectable lists now apply the selection one run-loop turn later (`Binding.deferred`). Your terminal run confirms whether they're gone
+- [x] "Reentrant operation in its NSTableView delegate" warnings: selecting a row swapped out another column inside AppKit's selection callback. All five selectable lists now apply the selection one run-loop turn later (`Binding.deferred`). Gone in your terminal run with the fix
 
 Built 2026-11-10 on `task-5b-orgs-people`: 102 tests; click-through in the debug demo.
 
