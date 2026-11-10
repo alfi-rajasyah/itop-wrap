@@ -97,6 +97,7 @@ final class TicketListModel {
             return
         }
         let ref = q.uppercased()
+        if case .found(let t) = lookup, t.ref == ref { return }
         lookup = .searching(ref)
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }

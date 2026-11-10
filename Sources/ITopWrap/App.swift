@@ -142,6 +142,51 @@ enum DebugLaunch {
         #endif
     }
 
+    /// The wireframe's three CIs for the demo session; `nil` outside it.
+    static func demoCMDB() -> CMDBSource? {
+        #if DEBUG
+        guard env["ITOPWRAP_DEMO"] == "1" else { return nil }
+        let gw1 = ConfigItem(key: "55", className: "NetworkDevice", name: "vpn-gw-01", orgName: "Org A")
+        let gw2 = ConfigItem(key: "56", className: "NetworkDevice", name: "vpn-gw-02", orgName: "Org A")
+        let app = ConfigItem(key: "70", className: "ApplicationSolution", name: "Remote access VPN", orgName: "Org A")
+        let device = [CIField(label: "Status", value: "Production"), CIField(label: "Organization", value: "Org A"),
+                      CIField(label: "Location", value: "[Location]"), CIField(label: "Brand", value: "[Brand]"),
+                      CIField(label: "Model", value: "[Model]"), CIField(label: "Serial number", value: "[Serial]"),
+                      CIField(label: "Management IP", value: "[IP address]"), CIField(label: "Contacts", value: "Team Network")]
+        func ticket(_ ref: String, _ title: String, _ status: String, agent: String, name: String) -> Ticket {
+            Ticket(key: String(ref.suffix(3)), ticketClass: .userRequest, ref: ref, title: title, status: status, priority: 3,
+                   callerName: "Caller", orgName: "Org A", teamID: "10", teamName: "Network", agentID: agent, agentName: name,
+                   startDate: Date().addingTimeInterval(-7200), lastUpdate: nil)
+        }
+        let vpnTicket = ticket("R-000412", "VPN drops every hour", "assigned", agent: "2", name: "Demo Agent")
+        let details: [String: ConfigItemDetail] = [
+            gw1.id: ConfigItemDetail(item: gw1, fields: device, description: "", dependsOn: [],
+                                     usedBy: [CIRef(id: app.key, name: app.name, className: app.className)], openTickets: [vpnTicket]),
+            gw2.id: ConfigItemDetail(item: gw2, fields: [CIField(label: "Status", value: "Standby")] + device.dropFirst(), description: "",
+                                     dependsOn: [], usedBy: [CIRef(id: app.key, name: app.name, className: app.className)], openTickets: []),
+            app.id: ConfigItemDetail(item: app, fields: [CIField(label: "Status", value: "Active"), CIField(label: "Organization", value: "Org A"),
+                                                         CIField(label: "Business criticality", value: "High"), CIField(label: "Contacts", value: "Team Network")],
+                                     description: "Remote access for staff working away from the office.",
+                                     dependsOn: [CIRef(id: gw1.key, name: gw1.name, className: gw1.className),
+                                                 CIRef(id: gw2.key, name: gw2.name, className: gw2.className)],
+                                     usedBy: [],
+                                     openTickets: [vpnTicket, ticket("R-000498", "VPN profile for a contractor", "escalated_ttr", agent: "5", name: "Agent 2")]),
+        ]
+        return CMDBSource(
+            search: { q in
+                try? await Task.sleep(for: .milliseconds(200))
+                return [app, gw1, gw2].filter { $0.name.localizedCaseInsensitiveContains(q) }
+                    .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+            },
+            detail: { item in
+                try? await Task.sleep(for: .milliseconds(200))
+                return details[item.id] ?? ConfigItemDetail(item: item, fields: [], description: "", dependsOn: [], usedBy: [], openTickets: [])
+            })
+        #else
+        return nil
+        #endif
+    }
+
     @MainActor static func applyAppearance() {
         #if DEBUG
         switch env["ITOPWRAP_APPEARANCE"] {

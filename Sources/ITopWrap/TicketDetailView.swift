@@ -6,10 +6,12 @@ import SwiftUI
 /// actions, the log composer and the timer arrive with the write tasks.
 struct TicketDetailView: View {
     let list: TicketListModel
+    var openCI: (LinkedCI) -> Void
     @State private var model: TicketDetailModel
 
-    init(ticket: Ticket, list: TicketListModel) {
+    init(ticket: Ticket, list: TicketListModel, openCI: @escaping (LinkedCI) -> Void) {
         self.list = list
+        self.openCI = openCI
         _model = State(initialValue: TicketDetailModel(ticket: ticket, source: list.source))
     }
 
@@ -125,15 +127,13 @@ struct TicketDetailView: View {
             agent
             if case .loaded(let detail) = model.phase {
                 ForEach(detail.linkedCIs) { ci in
-                    if let url = list.webURL(className: ci.className, id: ci.id) {
-                        Link(destination: url) {
-                            Label(ci.name, systemImage: "server.rack")
-                                .font(.system(size: 12, design: .monospaced))
-                                .underline()
-                        }
-                        .foregroundStyle(Theme.text)
-                        .help("Linked CI: open \(ci.name) in iTop on the web")
+                    Button { openCI(ci) } label: {
+                        Label(ci.name, systemImage: "server.rack")
+                            .font(.system(size: 12, design: .monospaced))
+                            .underline()
                     }
+                    .buttonStyle(.plain)
+                    .help("Linked CI: open \(ci.name) in Config items")
                 }
             }
         }
