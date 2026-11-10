@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 built against the mock.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Next: Task 8b, time spent timer.
 
 ## Overview
 
@@ -241,7 +241,7 @@ Stimulus by state: New and Escalated TTO use `ev_assign`; Assigned, Escalated TT
 **Description:** Add `TicketLifecycle.swift` with a state-to-actions map for UserRequest and Incident. The detail view shows only valid actions. Set to pending asks for a reason (required, sent as `pending_reason` with `ev_pending`). Resolve asks for service and service subcategory (prefilled from the ticket, required, subcategory filtered by service), a resolution code and a solution (required), sent as `service_id`, `servicesubcategory_id`, `resolution_code` and `solution` with `ev_resolve`. Both block the action and show an inline error while the required field is empty, and both stop a running timer and save its time.
 
 **Acceptance criteria:**
-- [ ] Pending, resolve, reopen and close work on a test ticket and show in the history (demo mock: built; real check pending)
+- [ ] Pending, resolve, reopen and close work on a test ticket and show in the history (demo mock: done; merged 2026-11-11 without a real check, by your choice: do it on the first ticket you really set to pending or resolve)
 - [x] Pending without a reason, or resolve without a solution, is blocked before anything is sent (tests; demo: the empty solution was blocked)
 - [x] Invalid actions for the current state are not offered (`TicketLifecycle.actions(for:)`; the client refuses them too)
 - [x] iTop rejections (for example a missing required field) show iTop's message (tests; demo: a solution or reason containing "fail" is refused)
