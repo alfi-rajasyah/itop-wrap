@@ -81,6 +81,8 @@ final class TicketListModel {
     var selection: Ticket.ID?
     /// The org filter (DESIGN.md: Org filter): one organization, or `nil` for all.
     var orgFilter: String?
+    /// The app's one timer, shared by both lists (set by the shell).
+    var timer: TimerModel?
     /// Unsent log entries per ticket and log, kept across ticket switches and failed sends.
     var drafts: [String: String] = [:]
 
@@ -143,6 +145,11 @@ final class TicketListModel {
             phase = .loaded
             refreshError = nil
             if let s = selection, ticket(s) == nil { selection = nil }
+            if let timer {
+                if view == .mine { await timer.myTicketsChanged(tickets) }
+                let loaded = tickets
+                Task { await timer.refreshTotals(loaded) }
+            }
         } catch {
             if phase == .loaded { refreshError = ErrorText.describe(error) } else { phase = .failed(ErrorText.describe(error)) }
         }
@@ -229,6 +236,12 @@ final class TicketListModel {
         notice = nil
         defer { working = nil }
         UITrace.log("\(view) list: \(change.action.rawValue) on \(t.id)")
+        // Pending and Resolve stop a running timer and save its time first (DESIGN.md: Time).
+        switch change {
+        case .pending: await timer?.stopIfRunning(on: t, because: "Setting \(t.ref) to pending stopped its timer.")
+        case .resolve: await timer?.stopIfRunning(on: t, because: "Resolving \(t.ref) stopped its timer.")
+        default: break
+        }
         do {
             try await source.change(t, change)
             let done: String

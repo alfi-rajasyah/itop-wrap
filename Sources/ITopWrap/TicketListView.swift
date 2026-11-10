@@ -87,7 +87,7 @@ struct TicketListView: View {
                 Section {
                     ForEach(section.tickets) { t in
                         TicketRow(ticket: t, me: model.me, showAgent: model.view == .team || t.isUnassigned,
-                                  assignToMe: assignAction(t))
+                                  assignToMe: assignAction(t), spent: model.timer?.totals[t.id], running: model.timer?.running.flatMap { $0.ticketID == t.id ? $0 : nil })
                             .tag(t.id)
                     }
                 } header: {
@@ -102,7 +102,7 @@ struct TicketListView: View {
             }
         }
         .listStyle(.inset)
-        .safeAreaInset(edge: .top, spacing: 0) { lookupStatus }
+        .safeAreaInset(edge: .top, spacing: 0) { VStack(spacing: 0) { lookupStatus } }
     }
 
     /// The org filter and View menu sit above the list, not in it: a menu inside a list row
@@ -197,6 +197,25 @@ struct TicketListView: View {
         case .failed(let message):
             statusLine(Text("Couldn't look that up: \(message)"), color: Theme.warning)
         case .none, .found:
+            if let t = model.timer, let n = t.notice {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "timer").accessibilityHidden(true)
+                    Text(n.text).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    if n.canRetry {
+                        Button("Retry") { Task { await t.retry() } }.disabled(t.saving)
+                    }
+                    Button { t.clearNotice() } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.plain)
+                        .help(n.canRetry ? "Discard this time" : "Dismiss")
+                        .accessibilityLabel(n.canRetry ? "Discard this time" : "Dismiss")
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(n.isError ? Theme.warning : Theme.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(.bar)
+            }
             if let n = model.notice {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(n.text).fixedSize(horizontal: false, vertical: true)
@@ -265,6 +284,10 @@ struct TicketRow: View {
     let me: CurrentUser
     let showAgent: Bool
     var assignToMe: (() -> Void)? = nil
+    /// Total time saved on the ticket, in seconds; nil when unknown.
+    var spent: Int? = nil
+    /// The timer, when it's running on this ticket.
+    var running: RunningTimer? = nil
 
     private var needsYou: Bool { TicketList.needsYou(ticket, me: me) }
 
@@ -292,6 +315,19 @@ struct TicketRow: View {
             HStack(spacing: 6) {
                 Text(ticket.callerName).lineLimit(1)
                 Spacer()
+                if let running {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        Label(TimerModel.elapsed(since: running.start, now: context.date), systemImage: "timer")
+                            .monospacedDigit()
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.text)
+                    }
+                    .help("Timer running")
+                    .accessibilityLabel("Timer running")
+                } else if let spent, spent > 0 {
+                    Text(TimeFormat.clock(spent)).monospacedDigit().help("Time spent")
+                        .accessibilityLabel("\(TimeFormat.clock(spent)) spent")
+                }
                 if showAgent { agent }
             }
             .font(.system(size: 11))

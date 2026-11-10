@@ -32,17 +32,27 @@ public struct ITopClient: Sendable {
         return allowlist.contains("\(className)::\(key)")
     }
 
-    private func permits(_ operation: RESTOperation) -> Bool {
+    /// `ticket` is the "Class::key" a create belongs to (a TimeSpent or Activity on that ticket),
+    /// so an allowlist can let it through; other creates need writes on without an allowlist.
+    private func permits(_ operation: RESTOperation, ticket: String?) -> Bool {
         switch operation {
         case .update(let cls, let key, _, _), .applyStimulus(let cls, let key, _, _, _): return canWrite(className: cls, key: key)
-        case .create: return allowsWrites && writeAllowlist == nil
+        case .create:
+            guard allowsWrites else { return false }
+            guard let allowlist = writeAllowlist else { return true }
+            return ticket.map(allowlist.contains) ?? false
         default: return true
         }
     }
 
     /// Sends one operation and returns iTop's answer, or throws an `ITopError`.
     public func send(_ operation: RESTOperation) async throws -> ITopResponse {
-        if operation.isWrite && !permits(operation) { throw ITopError.writesDisabled }
+        try await send(operation, onTicket: nil)
+    }
+
+    /// Sends a create that belongs to one ticket ("Class::key"), checked against the allowlist.
+    public func send(_ operation: RESTOperation, onTicket ticket: String?) async throws -> ITopResponse {
+        if operation.isWrite && !permits(operation, ticket: ticket) { throw ITopError.writesDisabled }
 
         var request = URLRequest(url: server.restEndpoint)
         request.httpMethod = "POST"
