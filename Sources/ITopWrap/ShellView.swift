@@ -44,7 +44,13 @@ struct ShellView: View {
         } detail: {
             Group {
                 if let list = currentList {
-                    TicketDetailPlaceholder(ticket: list.ticket(list.selection), webURL: list.ticket(list.selection).flatMap(list.webURL))
+                    if let t = list.ticket(list.selection) {
+                        TicketDetailView(ticket: t, list: list).id(t.id)
+                    } else {
+                        Text("Select a ticket to see its details.")
+                            .foregroundStyle(Theme.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
                     Color.clear
                 }

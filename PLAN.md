@@ -126,12 +126,15 @@ Done 2026-11-10 on `task-3-ticket-lists`: 47 tests; click-through in the debug d
 **Description:** A detail pane showing description, caller, organisation, team and agent, and the public and private logs parsed into individual entries (author, date, text, with HTML stripped or rendered), plus linked CIs from `functionalcis_list`.
 
 **Acceptance criteria:**
-- [ ] Log entries appear in the same order and with the same authors as in the web UI
-- [ ] Linked CIs are listed and clickable (they open in the CMDB view after Task 5)
+- [ ] Log entries appear in the same order and with the same authors as in the web UI (your check on 3 real tickets)
+- [x] Linked CIs are listed and clickable (they open in iTop on the web for now, and in the CMDB view after Task 5)
+- [x] The description and log HTML become plain text with line breaks; images show as "[Image]" and nothing is fetched from links inside the HTML
+
+Done 2026-11-10 on `task-4-ticket-detail`: 63 tests; click-through in the debug demo (both logs, Copy ref, linked CI).
 
 **Verification:** `swift test --filter CaseLogTests` · manual check on 3 real tickets
 
-**Dependencies:** 3 · **Files:** `Sources/ITopKit/CaseLog.swift`, `Sources/ITopWrap/TicketDetailView.swift`, `TicketDetailModel.swift` · **Scope:** M
+**Dependencies:** 3 · **Files:** `Sources/ITopKit/CaseLog.swift` (with `HTMLText`, `LogDate`), `TicketDetail.swift`, `Sources/ITopWrap/TicketDetailView.swift`, `TicketDetailModel.swift`, `Tests/ITopKitTests/CaseLogTests.swift` · **Scope:** M
 
 ## Task 5: CMDB browse
 

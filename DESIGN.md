@@ -65,7 +65,7 @@ Text stays where the words are the content or a mistake is costly. Everything el
 - **Hints behind ⓘ:** help lines in sheets ("Only members of the selected team are listed" and similar) become an ⓘ button whose tooltip and accessible name hold the text.
 - **Icons:** field labels in the detail strip (person = caller, building = organization, two people = team, server = linked CI, stopwatch = time spent); ticket type in the detail header (speech bubble with ? = user request, warning triangle = incident); priority (`!` in red for P1, grey dot for P2, nothing visible for P3–P4); send icon for "Add to log"; stopwatch in the time field; initials avatar for the account (menu with Sign out); class icons in CMDB results.
 - **Assignee:** the detail strip shows the agent as its own item, an initials avatar plus the name ("You", "Agent 2"). "Unassigned" is bold, with a dashed empty circle, so it stands out. List rows end with the agent's initials when the ticket is assigned to someone else, or a dashed circle when it's unassigned. Your own tickets show nothing, since that's the normal case in My tickets.
-- **Kept as text:** ticket titles, refs, caller names, the main action button, Public/Private log (a lock icon is added to the Private tab and to private entries), status in the detail header, empty and error messages, sheet buttons.
+- **Kept as text:** ticket titles, refs, caller names, the main action button, Public/Private log (a lock icon is added to private entries; the Private tab is text only, because macOS segmented controls don't show icons), status in the detail header, empty and error messages, sheet buttons.
 
 ## Menu bar item
 
