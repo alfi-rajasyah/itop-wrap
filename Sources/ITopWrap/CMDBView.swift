@@ -137,11 +137,13 @@ struct CIDetailView: View {
                     NSPasteboard.general.setString(name, forType: .string)
                 } }
             } label: { Image(systemName: "doc.on.doc") }
+            .buttonStyle(.bordered)
             .help("Copy name").accessibilityLabel("Copy name")
             if let url = model.webURL(item) {
-                Link(destination: url) { Image(systemName: "arrow.up.forward.square") }
+                // A bordered button like Copy name next to it, not a bare link icon.
+                Button { NSWorkspace.shared.open(url) } label: { Image(systemName: "arrow.up.forward.square") }
+                    .buttonStyle(.bordered)
                     .help("Open in iTop on the web").accessibilityLabel("Open in iTop on the web")
-                    .foregroundStyle(Theme.text)
             }
         }
     }

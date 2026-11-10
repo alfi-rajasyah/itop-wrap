@@ -169,7 +169,7 @@ struct AttachmentsView: View {
             }
         }
         .task(id: ticket.id) {
-            do { items = try await source.attachments(ticket) } catch { self.error = error.localizedDescription }
+            do { items = try await source.attachments(ticket) } catch { self.error = ErrorText.describe(error) }
         }
     }
 
@@ -188,7 +188,7 @@ struct AttachmentsView: View {
             try file.data.write(to: url)
             saved = "Saved \(file.filename) (\(ByteCountFormatter.string(fromByteCount: Int64(file.data.count), countStyle: .file)))."
         } catch {
-            self.error = "Couldn't download \(a.name). \(error.localizedDescription)"
+            self.error = "Couldn't download \(a.name). \(ErrorText.describe(error))"
         }
     }
 }

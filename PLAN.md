@@ -201,8 +201,8 @@ Probe result (2026-11-11): your iTop answers the web image links with 403 to HTT
 **Dependencies:** 4 · **Files:** `Sources/ITopKit/RichText.swift` (with `InlineImageLoader`, attachments), `CaseLog.swift` (shared `normalize`, entry HTML kept), `Sources/ITopWrap/RichTextView.swift`, `TicketDetailView.swift`, `scripts/probe-images.py`, `Tests/ITopKitTests/RichTextTests.swift` · **Scope:** M
 
 ### Checkpoint B: Read-only parity
-- [ ] antislop Delivery Gate PASS on list, detail and CMDB, including empty, loading and error states
-- [ ] Every read in SPEC user stories 2, 3, 6, 9 and 10 works on your real data
+- [x] antislop Delivery Gate PASS on list, detail and CMDB, including empty, loading and error states (anti-slop/checkpoint-b-2026-11-11.md; 4 findings fixed)
+- [x] Every read in SPEC user stories 2, 3, 6, 9 and 10 works on your real data (confirmed by you during Tasks 3 to 5c)
 - [ ] You review before any write feature is built
 
 ### Phase 3: Write features (built against the mock transport; no real writes until you say so)

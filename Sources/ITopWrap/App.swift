@@ -175,7 +175,16 @@ enum DebugLaunch {
             img.unlockFocus()
             return NSBitmapImageRep(data: img.tiffRepresentation ?? Data())?.representation(using: .png, properties: [:]) ?? Data()
         }()
-        return TicketSource(load: { scope in try? await Task.sleep(for: .milliseconds(300)); return list(scope) },
+        // ITOPWRAP_DEMO_STATE=empty|loading|error forces a list state for the Delivery Gate.
+        let state = env["ITOPWRAP_DEMO_STATE"] ?? ""
+        return TicketSource(load: { scope in
+                                switch state {
+                                case "empty": return []
+                                case "loading": try? await Task.sleep(for: .seconds(3600)); return []
+                                case "error": throw ITopError.transport(URLError.Code.notConnectedToInternet.rawValue)
+                                default: try? await Task.sleep(for: .milliseconds(300)); return list(scope)
+                                }
+                            },
                             lookup: { $0 == "R-000512" ? found : nil },
                             detail: { t in
                                 try? await Task.sleep(for: .milliseconds(300))
@@ -223,8 +232,11 @@ enum DebugLaunch {
                                      usedBy: [],
                                      openTickets: [vpnTicket, ticket("R-000498", "VPN profile for a contractor", "escalated_ttr", agent: "5", name: "Agent 2")]),
         ]
+        let state = env["ITOPWRAP_DEMO_STATE"] ?? ""
         return CMDBSource(
             search: { q in
+                if state == "error" { throw ITopError.transport(URLError.Code.notConnectedToInternet.rawValue) }
+                if state == "empty" { return [] }
                 try? await Task.sleep(for: .milliseconds(200))
                 return [app, gw1, gw2].filter { $0.name.localizedCaseInsensitiveContains(q) }
                     .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }

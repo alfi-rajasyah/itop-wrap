@@ -32,7 +32,7 @@ final class TicketDetailModel {
             phase = .loaded(try await source.detail(ticket))
         } catch {
             if case .loaded = phase { return }
-            phase = .failed(error.localizedDescription)
+            phase = .failed(ErrorText.describe(error))
         }
     }
 
