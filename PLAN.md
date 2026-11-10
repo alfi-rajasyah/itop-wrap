@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 4 done; Checkpoint A passed (2026-11-10).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5 done; Checkpoint A passed (2026-11-10).
 
 ## Overview
 
@@ -141,9 +141,9 @@ Done 2026-11-10 on `task-4-ticket-detail`: 63 tests; click-through in the debug 
 **Description:** Search `FunctionalCI` (with its real class shown) and `Person` by name. Selecting a CI shows its main fields and its open tickets, using `lnkFunctionalCIToTicket`.
 
 **Acceptance criteria:**
-- [ ] Searching for a known server by name finds it (your check on the real server)
-- [ ] A CI's open tickets match the web UI (your check)
-- [ ] Relationships (Depends on, Used by) match iTop's impact analysis for that CI (your check; uses `core/get_related`, first time against your server)
+- [x] Searching for a known server by name finds it (confirmed by you)
+- [x] A CI's open tickets match the web UI (confirmed by you)
+- [x] Relationships (Depends on, Used by) match iTop's impact analysis for that CI (confirmed by you; `core/get_related` works on your server)
 - [x] A ticket's linked CI opens in Config items, and a CI's open ticket opens in the ticket list
 - Moved: Person search goes to Task 5b with the People view, as the design has it. "New ticket on this CI" waits for Task 9 (it's a write).
 
