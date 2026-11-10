@@ -61,14 +61,6 @@ struct TicketListView: View {
 
     private var list: some View {
         List(selection: $model.selection.deferred) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
-                    if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
-                    ListViewMenu(options: model.options)
-                }
-                ListViewSummary(options: model.options)
-            }
-            .listRowSeparator(.hidden)
             if !model.orgFilter.isEmpty && model.visibleSections.isEmpty && !model.isSearching {
                 orgNoMatch.listRowSeparator(.hidden)
             }
@@ -107,7 +99,28 @@ struct TicketListView: View {
             }
         }
         .listStyle(.inset)
-        .safeAreaInset(edge: .top, spacing: 0) { lookupStatus }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                controls
+                lookupStatus
+            }
+        }
+    }
+
+    /// The org filter and View menu sit above the list, not in it: a menu inside a list row
+    /// that reloads that list made AppKit warn of a reentrant NSTableView operation. They also
+    /// stay in view when you scroll.
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
+                ListViewMenu(options: model.options)
+            }
+            ListViewSummary(options: model.options)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(.bar)
     }
 
     private var isLookupPending: Bool {
@@ -145,7 +158,8 @@ struct TicketListView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("None of your tickets are for \(ListFormatter.localizedString(byJoining: names)).").foregroundStyle(Theme.secondary)
             if names.count == 1, let id = model.orgID(named: names[0]), let openOrg {
-                Button("See all of its tickets") { openOrg(id, names[0]) }
+                // Switches sections, so it waits until the click in this list row is handled.
+                Button("See all of its tickets") { DispatchQueue.main.async { openOrg(id, names[0]) } }
                     .buttonStyle(.link).foregroundStyle(Theme.text)
             }
         }

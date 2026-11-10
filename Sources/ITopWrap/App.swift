@@ -55,6 +55,7 @@ struct RootView: View {
 /// `swift run` starts a bare executable; make it a regular app with a Dock icon and a front window.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DebugLaunch.redirectStderr()
         DebugLaunch.applyAppearance()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
@@ -281,6 +282,13 @@ enum DebugLaunch {
             reported: { id, scope in try await tickets.load(scope).filter { $0.callerName == callerOf[id] } })
         #else
         return nil
+        #endif
+    }
+
+    /// ITOPWRAP_STDERR=<file>: copy AppKit's warnings to a file, for a debug app opened from Finder.
+    static func redirectStderr() {
+        #if DEBUG
+        if let path = env["ITOPWRAP_STDERR"] { freopen(path, "a", stderr) }
         #endif
     }
 
