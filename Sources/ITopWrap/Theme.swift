@@ -1,4 +1,5 @@
 import AppKit
+import ITopKit
 import SwiftUI
 
 /// Colour tokens from DESIGN.md, each with its light and dark value.
@@ -37,6 +38,17 @@ struct PrimaryButtonStyle: ButtonStyle {
             .background(Theme.primaryFill.opacity(configuration.isPressed ? 0.85 : (isEnabled ? 1 : 0.75)),
                         in: RoundedRectangle(cornerRadius: 7))
             .contentShape(RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+/// Error text for the UI (DESIGN.md, Copy): "Can't reach itop.example.com. Check your
+/// connection, then retry." for network failures, iTop's own message otherwise.
+enum ErrorText {
+    nonisolated(unsafe) static var host = "the server"
+
+    static func describe(_ error: Error) -> String {
+        if case ITopError.transport = error { return "Can't reach \(host). Check your connection, then retry." }
+        return error.localizedDescription
     }
 }
 

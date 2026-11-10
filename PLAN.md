@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoint A passed (2026-11-11). Next: Checkpoint B.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Next: Phase 3, write features against the mock.
 
 ## Overview
 
@@ -201,9 +201,9 @@ Probe result (2026-11-11): your iTop answers the web image links with 403 to HTT
 **Dependencies:** 4 · **Files:** `Sources/ITopKit/RichText.swift` (with `InlineImageLoader`, attachments), `CaseLog.swift` (shared `normalize`, entry HTML kept), `Sources/ITopWrap/RichTextView.swift`, `TicketDetailView.swift`, `scripts/probe-images.py`, `Tests/ITopKitTests/RichTextTests.swift` · **Scope:** M
 
 ### Checkpoint B: Read-only parity
-- [ ] antislop Delivery Gate PASS on list, detail and CMDB, including empty, loading and error states
-- [ ] Every read in SPEC user stories 2, 3, 6, 9 and 10 works on your real data
-- [ ] You review before any write feature is built
+- [x] antislop Delivery Gate PASS on list, detail and CMDB, including empty, loading and error states (anti-slop/checkpoint-b-2026-11-11.md; 4 findings fixed)
+- [x] Every read in SPEC user stories 2, 3, 6, 9 and 10 works on your real data (confirmed by you during Tasks 3 to 5c)
+- [x] You review before any write feature is built (approved 2026-11-11)
 
 ### Phase 3: Write features (built against the mock transport; no real writes until you say so)
 

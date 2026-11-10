@@ -119,7 +119,7 @@ final class TicketListModel {
             refreshError = nil
             if let s = selection, ticket(s) == nil { selection = nil }
         } catch {
-            if phase == .loaded { refreshError = error.localizedDescription } else { phase = .failed(error.localizedDescription) }
+            if phase == .loaded { refreshError = ErrorText.describe(error) } else { phase = .failed(ErrorText.describe(error)) }
         }
     }
 
@@ -142,7 +142,7 @@ final class TicketListModel {
             guard query.trimmingCharacters(in: .whitespaces).uppercased() == ref else { return }
             lookup = found.map(Lookup.found) ?? .missing(ref)
         } catch {
-            lookup = .failed(error.localizedDescription)
+            lookup = .failed(ErrorText.describe(error))
         }
     }
 

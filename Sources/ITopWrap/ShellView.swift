@@ -15,6 +15,7 @@ struct ShellView: View {
 
     init(session: Session) {
         self.session = session
+        ErrorText.host = session.client.server.baseURL.host() ?? "the server"
         let options = ListOptions(defaults: DebugLaunch.listDefaults)
         _options = State(initialValue: options)
         _mine = State(initialValue: TicketListModel(view: .mine, session: session, options: options, source: DebugLaunch.demoSource(.mine)))

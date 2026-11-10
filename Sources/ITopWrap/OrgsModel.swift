@@ -65,7 +65,7 @@ final class OrgsModel {
     func loadList() async {
         if case .loaded = orgs { return }
         orgs = .loading
-        do { orgs = .loaded(try await source.list()) } catch { orgs = .failed(error.localizedDescription) }
+        do { orgs = .loaded(try await source.list()) } catch { orgs = .failed(ErrorText.describe(error)) }
     }
 
     func reloadList() async {
@@ -83,7 +83,7 @@ final class OrgsModel {
             tickets = .loaded(try await t)
             counts = try? await c
         } catch {
-            tickets = .failed(error.localizedDescription)
+            tickets = .failed(ErrorText.describe(error))
         }
     }
 }
@@ -142,7 +142,7 @@ final class PeopleModel {
             do {
                 let page = try await source.inOrg(scope.id)
                 results = .loaded(page.people); total = page.total; searched = "org:\(scope.id)"
-            } catch { results = .failed(error.localizedDescription) }
+            } catch { results = .failed(ErrorText.describe(error)) }
             return
         }
         guard q.count >= 2 else { results = .idle; searched = nil; return }
@@ -158,7 +158,7 @@ final class PeopleModel {
             total = page.total
             searched = q
         } catch {
-            results = .failed(error.localizedDescription)
+            results = .failed(ErrorText.describe(error))
         }
     }
 
@@ -171,7 +171,7 @@ final class PeopleModel {
         let scope = options.scope
         async let a = source.assigned(p.id, scope)
         async let r = source.reported(p.id, scope)
-        do { assigned = .loaded(try await a) } catch { assigned = .failed(error.localizedDescription) }
-        do { reported = .loaded(try await r) } catch { reported = .failed(error.localizedDescription) }
+        do { assigned = .loaded(try await a) } catch { assigned = .failed(ErrorText.describe(error)) }
+        do { reported = .loaded(try await r) } catch { reported = .failed(ErrorText.describe(error)) }
     }
 }

@@ -78,7 +78,7 @@ final class CMDBModel {
         if let scope {
             if searched == "org:\(scope.id)", case .loaded = results { return }
             results = .searching
-            do { results = .loaded(try await source.inOrg(scope.id)); searched = "org:\(scope.id)" } catch { results = .failed(error.localizedDescription) }
+            do { results = .loaded(try await source.inOrg(scope.id)); searched = "org:\(scope.id)" } catch { results = .failed(ErrorText.describe(error)) }
             return
         }
         guard q.count >= 2 else { results = .idle; searched = nil; return }
@@ -93,7 +93,7 @@ final class CMDBModel {
             results = .loaded(items)
             searched = q
         } catch {
-            results = .failed(error.localizedDescription)
+            results = .failed(ErrorText.describe(error))
         }
     }
 
@@ -111,7 +111,7 @@ final class CMDBModel {
             guard current?.id == item.id else { return }
             detail = .loaded(d)
         } catch {
-            detail = .failed(error.localizedDescription)
+            detail = .failed(ErrorText.describe(error))
         }
     }
 

@@ -9,6 +9,11 @@ struct TicketListView: View {
 
     var body: some View {
         content
+            // The controls stay when the list is empty: with no open tickets, the View menu is
+            // how you get to resolved and closed ones.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if model.phase == .loaded && !model.hasNoTeams { controls }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) { footer }
             .searchable(text: $model.query, placement: .toolbar, prompt: "R-000412 or VPN")
             .task(id: model.query) { await model.searchChanged() }
@@ -51,8 +56,9 @@ struct TicketListView: View {
         case .loaded:
             if model.hasNoTeams {
                 notice("You're not in any iTop team, so there are no team tickets to show.", retry: false)
-            } else if model.tickets.isEmpty && !model.isSearching && model.options.scope == .open {
-                notice(model.view == .mine ? "Nothing waiting on you. New assignments show up here." : "Your teams have no open tickets.", retry: false)
+            } else if model.tickets.isEmpty && !model.isSearching {
+                notice(model.options.scope != .open ? "No tickets in this range. Try a longer range in the View menu."
+                       : model.view == .mine ? "Nothing waiting on you. New assignments show up here." : "Your teams have no open tickets.", retry: false)
             } else {
                 list
             }
@@ -72,10 +78,6 @@ struct TicketListView: View {
             lookupSection
             let paged = model.currentPage
             let sections = paged.sections
-            if !model.isSearching && sections.isEmpty && model.orgFilter == nil {
-                Text("No tickets in this range. Try a longer range in the date menu.")
-                    .foregroundStyle(Theme.secondary).listRowSeparator(.hidden)
-            }
             if model.isSearching && sections.isEmpty && model.lookup == .none && !isLookupPending {
                 Text("No tickets in your list match “\(model.query.trimmingCharacters(in: .whitespaces))”.")
                     .foregroundStyle(Theme.secondary)
@@ -99,12 +101,7 @@ struct TicketListView: View {
             }
         }
         .listStyle(.inset)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                controls
-                lookupStatus
-            }
-        }
+        .safeAreaInset(edge: .top, spacing: 0) { lookupStatus }
     }
 
     /// The org filter and View menu sit above the list, not in it: a menu inside a list row
@@ -148,8 +145,8 @@ struct TicketListView: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.visible)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: 220, alignment: .leading)
+        // Its own width, up to 200 points: a flexible frame kept it 220 wide and pushed View away.
+        .fixedSize()
         .help(model.orgFilter.map { "Showing tickets for \($0)" } ?? "Filter by organization")
         .accessibilityLabel("Filter by organization: \(model.orgFilter ?? "all")")
     }
