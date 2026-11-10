@@ -132,7 +132,7 @@ struct OrgsListView: View {
                     Text(model.query.isEmpty ? "Your iTop account can't see any organizations." : "No organization matches “\(model.query.trimmingCharacters(in: .whitespaces))”.")
                         .foregroundStyle(Theme.secondary).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(orgs, selection: $model.selectedID) { org in
+                    List(orgs, selection: $model.selectedID.deferred) { org in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(org.name).fontWeight(.medium)
@@ -259,7 +259,7 @@ struct PeopleListView: View {
                     .padding(.horizontal, 14).padding(.vertical, 8)
                     .background(.bar)
             }
-            List(people, selection: $model.selectedID) { p in
+            List(people, selection: $model.selectedID.deferred) { p in
                 HStack(spacing: 10) {
                     Text(p.initials).font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.secondary)
                         .frame(width: 28, height: 28).background(Theme.chip, in: Circle())

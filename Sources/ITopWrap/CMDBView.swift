@@ -41,7 +41,7 @@ struct CMDBListView: View {
         case .loaded(let items) where items.isEmpty:
             message("No config items match “\(model.query.trimmingCharacters(in: .whitespaces))”.")
         case .loaded(let items):
-            List(selection: $model.selectedID) {
+            List(selection: $model.selectedID.deferred) {
                 Section {
                     ForEach(items) { item in
                         VStack(alignment: .leading, spacing: 3) {

@@ -60,7 +60,7 @@ struct TicketListView: View {
     }
 
     private var list: some View {
-        List(selection: $model.selection) {
+        List(selection: $model.selection.deferred) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
