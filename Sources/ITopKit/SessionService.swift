@@ -24,6 +24,11 @@ public struct SessionSettings: @unchecked Sendable {
 public struct Session: Sendable {
     public let client: ITopClient
     public let user: CurrentUser
+
+    public init(client: ITopClient, user: CurrentUser) {
+        self.client = client
+        self.user = user
+    }
 }
 
 /// Sign in, restore after a relaunch, and sign out (PLAN.md, Task 2).

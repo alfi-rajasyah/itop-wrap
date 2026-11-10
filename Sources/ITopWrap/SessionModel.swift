@@ -82,6 +82,11 @@ final class SessionModel {
         state = .signedIn(session)
     }
 
+    /// Debug only: show the shell for a made-up session (see `DebugLaunch`).
+    func showDemo(_ session: Session) {
+        state = .signedIn(session)
+    }
+
     func signOut() {
         if let session { try? service.signOut(session) }
         state = .signedOut(notice: nil)

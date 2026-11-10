@@ -26,8 +26,10 @@ struct ShellView: View {
         } detail: {
             SectionPlaceholder(item: model.selection, session: session)
                 .navigationTitle(model.selection.title)
+                // The minimum size goes on the content: a frame on the split view itself
+                // pushes its content under the toolbar and past the bottom edge (seen in Checkpoint A).
+                .frame(minWidth: 620, minHeight: 520)
         }
-        .frame(minWidth: 880, minHeight: 560)
         .confirmationDialog("Sign out of \(host)?", isPresented: $confirmSignOut) {
             Button("Sign out", role: .destructive) { model.signOut() }
         } message: {
@@ -75,7 +77,6 @@ struct SectionPlaceholder: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(item.title).font(.system(size: 22, weight: .semibold))
             Text("\(item.title) comes in the next build. Sign-in works: here's what iTop told the app about you.")
                 .foregroundStyle(Theme.secondary)
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
