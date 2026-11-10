@@ -178,10 +178,13 @@ struct OrgDetailView: View {
                 }
                 .buttonStyle(.link)
                 .foregroundStyle(Theme.text)
-                HStack {
-                    Text(model.options.includeClosed ? "Tickets" : "Open tickets").font(.system(size: 14, weight: .semibold))
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.options.includeClosed ? "Tickets" : "Open tickets").font(.system(size: 14, weight: .semibold))
+                        ListViewSummary(options: model.options)
+                    }
                     Spacer()
-                    HStack(spacing: 6) { ListOptionsMenus(options: model.options) }
+                    ListViewMenu(options: model.options)
                 }
                 switch model.tickets {
                 case .idle, .loading:
@@ -321,8 +324,9 @@ struct PersonDetailView: View {
                     }
                     .pickerStyle(.segmented).labelsHidden().fixedSize()
                     Spacer()
-                    HStack(spacing: 6) { ListOptionsMenus(options: model.options) }
+                    ListViewMenu(options: model.options)
                 }
+                ListViewSummary(options: model.options)
 
                 let current = model.tab == .assigned ? model.assigned : model.reported
                 switch current {

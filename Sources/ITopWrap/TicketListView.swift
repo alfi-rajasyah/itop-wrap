@@ -61,10 +61,12 @@ struct TicketListView: View {
 
     private var list: some View {
         List(selection: $model.selection) {
-            // Wraps onto a second line when the list column is narrow.
-            FlowLayout(spacing: 6, lineSpacing: 6) {
-                if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
-                ListOptionsMenus(options: model.options)
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
+                    ListViewMenu(options: model.options)
+                }
+                ListViewSummary(options: model.options)
             }
             .listRowSeparator(.hidden)
             if !model.orgFilter.isEmpty && model.visibleSections.isEmpty && !model.isSearching {
@@ -126,11 +128,8 @@ struct TicketListView: View {
                 }
             }
         } label: {
-            Label(model.orgFilter.isEmpty ? "All organizations" : model.orgFilter.sorted().joined(separator: ", "), systemImage: "building.2")
-                .font(.system(size: 12))
-                .lineLimit(1)
-                .padding(.horizontal, 9).frame(height: 24)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(model.orgFilter.isEmpty ? Theme.separator : Theme.text))
+            FilterChip(text: model.orgFilter.isEmpty ? "All organizations" : model.orgFilter.sorted().joined(separator: ", "),
+                       symbol: "building.2", on: !model.orgFilter.isEmpty)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)

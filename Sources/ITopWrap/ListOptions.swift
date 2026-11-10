@@ -42,6 +42,26 @@ final class ListOptions {
         TicketScope(includeClosed: includeClosed, openedWithinDays: range == .any ? nil : range.rawValue)
     }
 
+    static let defaultPageSize: Int? = 20
+
+    var isDefault: Bool { scope == .open && sort == .priority && pageSize == Self.defaultPageSize }
+
+    func reset() {
+        range = .any
+        includeClosed = false
+        sort = .priority
+        pageSize = Self.defaultPageSize
+    }
+
+    /// What differs from the default, e.g. "All tickets, any time · Last update, newest first · 50 per page".
+    var summary: String? {
+        var parts: [String] = []
+        if scope != .open { parts.append(rangeLabel) }
+        if sort != .priority { parts.append(sort.title) }
+        if pageSize != Self.defaultPageSize { parts.append(pageSize.map { "\($0) per page" } ?? "All on one page") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     /// "Open tickets", "Open, last 30 days", "All, last 30 days".
     var rangeLabel: String {
         switch (includeClosed, range) {
@@ -53,64 +73,82 @@ final class ListOptions {
     }
 }
 
-/// The range and sort menus above a ticket list. They're two separate children, so the caller's
-/// container decides the layout: a wrapping row in the narrow list column, an HStack elsewhere.
-struct ListOptionsMenus: View {
+/// One "View" menu above every ticket list: which tickets, sort and page size (DESIGN.md).
+/// A quiet line under it says what differs from the default.
+struct ListViewMenu: View {
     @Bindable var options: ListOptions
 
     var body: some View {
-        Group {
-            Menu {
+        Menu {
+            Section("Show tickets opened") {
                 Picker("Opened", selection: $options.range) {
-                    ForEach(ListOptions.Range.allCases) { r in
-                        Text(r.title).tag(r)
-                    }
+                    ForEach(ListOptions.Range.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.inline)
-                Divider()
+                .labelsHidden()
                 Toggle("Include resolved and closed", isOn: $options.includeClosed)
-            } label: {
-                chip(options.rangeLabel, symbol: "calendar", on: options.scope != .open)
             }
-            .help("Which tickets to show")
-            .accessibilityLabel("Date range: \(options.rangeLabel)")
-
-            Menu {
+            Section("Sort inside each status group") {
                 Picker("Sort", selection: $options.sort) {
                     ForEach(TicketSort.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.inline)
-            } label: {
-                chip(options.sort == .priority ? "Sort" : options.sort.title, symbol: "arrow.up.arrow.down", on: options.sort != .priority)
+                .labelsHidden()
             }
-            .help("Sort inside each status group: \(options.sort.title)")
-            .accessibilityLabel("Sort: \(options.sort.title)")
-
-            Menu {
-                Picker("Show", selection: $options.pageSize) {
-                    ForEach(ListOptions.pageSizes, id: \.self) { size in
-                        Text(size.map { "\($0) per page" } ?? "All").tag(size)
-                    }
+            Section("Per page") {
+                Picker("Per page", selection: $options.pageSize) {
+                    ForEach(ListOptions.pageSizes, id: \.self) { Text($0.map { "\($0) per page" } ?? "All").tag($0) }
                 }
                 .pickerStyle(.inline)
-            } label: {
-                chip(options.pageSize.map { "Show \($0)" } ?? "Show all", symbol: "list.number", on: false)
+                .labelsHidden()
             }
-            .help("How many tickets per page")
-            .accessibilityLabel("Show: \(options.pageSize.map { "\($0) per page" } ?? "all")")
+            if !options.isDefault {
+                Divider()
+                Button("Back to default view") { options.reset() }
+            }
+        } label: {
+            FilterChip(text: "View", symbol: "line.3.horizontal.decrease", on: !options.isDefault)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.visible)
         .fixedSize()
+        .help(options.summary ?? "Open tickets, sorted by priority, 20 per page")
+        .accessibilityLabel("View options: \(options.summary ?? "default")")
     }
+}
 
-    private func chip(_ text: String, symbol: String, on: Bool) -> some View {
-        Label(text, systemImage: symbol)
-            .font(.system(size: 12))
-            .lineLimit(1)
-            .padding(.horizontal, 9).frame(height: 24)
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(on ? Theme.text : Theme.separator))
+/// "All tickets, any time · 20 per page", or nothing when the view is the default.
+struct ListViewSummary: View {
+    let options: ListOptions
+
+    var body: some View {
+        if let summary = options.summary {
+            Text(summary)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.secondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// The neutral button look for the org filter and View menus: grey icon and border,
+/// a dark border when it's changed from the default. Never the accent colour.
+struct FilterChip: View {
+    let text: String
+    let symbol: String
+    let on: Bool
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol).foregroundStyle(Theme.secondary)
+            Text(text).foregroundStyle(Theme.text).lineLimit(1)
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 9).frame(height: 24)
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(on ? Theme.text : Theme.separator))
+        .contentShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 

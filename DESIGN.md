@@ -112,7 +112,9 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 - **Show menu** (numbered-list icon): 10, 20 (default), 30, 50 or 100 per page, or All. Paging happens in the app after grouping and sorting, so page 1 holds the most urgent tickets and the sort covers everything. A pager sits under the list ("‹ 21–40 of 556 ›") and goes back to page 1 when the range, sort, filter or search changes. Group headers count the whole group, not just the page.
 - **People search** asks iTop for at most 100 people and says so when there are more: "Showing 100 of 256 people. Type more of the name to narrow it down."
 - **Sort menu** (arrows icon): inside each status group, "Priority, then oldest" (default), "Last update, newest first", "Opened, newest first" or "Opened, oldest first". Groups never move.
-- One setting for every list, remembered between launches. A chip's border goes dark when it's off the default, like the org filter.
+- **All in one "View" menu** (decided 2026-11-11, after the separate buttons took three lines): sections "Show tickets opened" (range plus the resolved-and-closed switch), "Sort inside each status group" and "Per page", with "Back to default view" when anything's changed. Above the list sit just two buttons: the org filter (My tickets) and View. When the view isn't the default, View's border goes dark and a quiet line under it says what's different ("All tickets, any time · Last update, newest first").
+- Filter buttons are neutral: grey icon, grey border, dark border when on. Never the accent colour.
+- One setting for every list, remembered between launches.
 - Org counts in the Organizations list stay open-ticket counts. "Needs you" only ever counts open tickets.
 
 ## Screens and focal points (one per screen)

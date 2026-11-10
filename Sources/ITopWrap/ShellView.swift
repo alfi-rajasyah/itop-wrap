@@ -15,7 +15,7 @@ struct ShellView: View {
 
     init(session: Session) {
         self.session = session
-        let options = ListOptions()
+        let options = ListOptions(defaults: DebugLaunch.listDefaults)
         _options = State(initialValue: options)
         _mine = State(initialValue: TicketListModel(view: .mine, session: session, options: options, source: DebugLaunch.demoSource(.mine)))
         _team = State(initialValue: TicketListModel(view: .team, session: session, options: options, source: DebugLaunch.demoSource(.team)))

@@ -92,6 +92,14 @@ enum DebugLaunch {
         #endif
     }
 
+    /// Where list view settings live: apart from your real settings when ITOPWRAP_SETTINGS is set.
+    static var listDefaults: UserDefaults {
+        #if DEBUG
+        if let suite = env["ITOPWRAP_SETTINGS"], let d = UserDefaults(suiteName: "ITopWrap.debug.\(suite)") { return d }
+        #endif
+        return .standard
+    }
+
     /// Canned tickets from the wireframe sample data for the demo session; `nil` outside it.
     static func demoSource(_ view: TicketList.View) -> TicketSource? {
         #if DEBUG
