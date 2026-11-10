@@ -21,7 +21,7 @@ struct PendingSheet: View {
             if tried && empty { FieldError("Enter a reason.") }
             if let error { FieldError(error) }
         } buttons: {
-            Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+            Button("Cancel") { dismiss() }.cancelShortcutUnlessDropdownOpen()
             ConfirmButton(title: "Set to pending", busy: list.working == ticket.id) {
                 tried = true
                 guard !empty else { return }
@@ -56,23 +56,23 @@ struct ResolveSheet: View {
     var body: some View {
         SheetFrame(title: "Resolve \(ticket.ref)", subtitle: ticket.title) {
             RequiredLabel("Service", missing: tried && service == nil)
-            DropdownField(placeholder: placeholder(services, loading: "Loading services…", empty: "No services found"),
+            DropdownField(name: "Service", placeholder: placeholder(services, loading: "Loading services…", empty: "No services found"),
                           items: services.value ?? [], selection: $service, label: \.name)
                 .disabled(services.value == nil)
             RequiredLabel("Service subcategory", missing: tried && subcategory == nil)
-            DropdownField(placeholder: service == nil ? "Choose a service first"
+            DropdownField(name: "Service subcategory", placeholder: service == nil ? "Choose a service first"
                                                       : placeholder(subcategories, loading: "Loading subcategories…", empty: "This service has no subcategories"),
                           items: service == nil ? [] : (subcategories.value ?? []), selection: $subcategory, label: \.name)
                 .disabled(service == nil || subcategories.value == nil)
             Text("Resolution code").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.secondary)
-            DropdownField(placeholder: "Choose…", items: ResolutionCode.standard, selection: $code, label: \.name)
+            DropdownField(name: "Resolution code", placeholder: "Choose…", items: ResolutionCode.standard, selection: $code, label: \.name)
             RequiredLabel("Solution", missing: tried && solutionEmpty)
             NoteEditor(text: $solution, placeholder: "What fixed it, in words the caller understands.", height: 110, autofocus: true)
                 .accessibilityLabel("Solution, required")
             if tried && solutionEmpty { FieldError("Enter a solution.") }
             if let error { FieldError(error) }
         } buttons: {
-            Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+            Button("Cancel") { dismiss() }.cancelShortcutUnlessDropdownOpen()
             ConfirmButton(title: "Resolve ticket", busy: list.working == ticket.id) {
                 tried = true
                 guard let service, let subcategory, let code, !solutionEmpty else { return }
@@ -159,6 +159,7 @@ struct SheetFrame<Fields: View, Buttons: View>: View {
         }
         .padding(20)
         .frame(width: 420)
+        .dropdownHost()
     }
 }
 

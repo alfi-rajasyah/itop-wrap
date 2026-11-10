@@ -298,6 +298,14 @@ final class TicketListModel {
         }
     }
 
+    /// Shows a ticket that may not be in the list yet (a new one): as the search result, selected.
+    func show(_ t: Ticket, notice text: String? = nil) {
+        query = t.ref
+        lookup = .found(t)
+        selection = t.id
+        if let text { notice = Notice(text: text, isError: false) }
+    }
+
     /// "Open in iTop on the web" for one ticket.
     func webURL(_ t: Ticket) -> URL? {
         webURL(className: t.ticketClass.rawValue, id: t.key)

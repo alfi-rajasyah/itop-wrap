@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Next: Task 9, create a ticket.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Next: Checkpoint C.
 
 ## Overview
 
@@ -289,13 +289,17 @@ As built: the Stacked stubs icon is drawn in code as a template image (your choi
 **Description:** A New Ticket form (UserRequest or Incident) with searchable dropdowns (type to filter, or open the full list) for organisation and caller (caller filtered by organisation, searched with `core/get` on `Person` as you type), service (`service_id`, required, limited to services the organisation's contract covers) and service subcategory (`servicesubcategory_id`, required, filtered by service), impact and urgency, a title and a description. Submits with `core/create` and opens the new ticket.
 
 **Acceptance criteria:**
-- [ ] The created ticket shows the same fields in the web UI
-- [ ] Required fields are validated before sending
-- [ ] Pick lists come from iTop, not hard-coded
+- [ ] The created ticket shows the same fields in the web UI (demo: created R-000601 by keyboard; real check pending, needs ITOPWRAP_WRITE_TICKETS plus the new-ticket switch)
+- [x] Required fields are validated before sending (tests; demo: an empty form turned every Required label red and sent nothing)
+- [x] Pick lists come from iTop, not hard-coded (organizations, callers, services, subcategories); impact and urgency use iTop's standard values, since REST can't list them
+
+As built: opens from ⌘N, the menu bar, an organization's header, or a CI ("New ticket on this CI" links it); Cancel keeps the draft with Clear form; the new ticket is read back and opened. Also fixed in this task: the ticket header stacks its actions under the title in narrow windows.
 
 **Verification:** `swift test --filter CreateTests` · manual: create one test ticket
 
 **Dependencies:** 3 (opens in Task 4's detail view) · **Files:** `TicketWrites.swift`, `Sources/ITopKit/PickLists.swift`, `Sources/ITopWrap/NewTicketView.swift`, `NewTicketModel.swift` · **Scope:** M
+
+DropdownField rebuilt to DESIGN.md "Dropdowns (one component everywhere)" during Task 9 (2026-11-11; the Task 7 version used a popover with a filter box on every list and no arrow keys). Now: Organization and Caller take typing in the field with a magnifier; short lists have no search box and jump by first letter; ↓/↑ open and move, ↩ picks, Esc closes the list before it would cancel the sheet; one open at a time, drawn above the sheet and flipped above the field when there's no room below; VoiceOver reads each by its field name, the highlighted item as its value and announced as you move. Checked by keyboard and mouse in New ticket, Resolve and Assign. Differences from the spec: with one list open, clicking another field first closes the open one (a second click opens it); macOS has no combobox role in SwiftUI, so short lists are read as buttons with a hint.
 
 ### Checkpoint C: Write features
 - [ ] antislop Delivery Gate PASS on every sheet and action

@@ -75,6 +75,7 @@ struct CIDetailView: View {
     let model: CMDBModel
     let item: ConfigItem
     var openTicket: (Ticket) -> Void
+    var newTicket: (ConfigItem) -> Void = { _ in }
 
     var body: some View {
         ScrollView {
@@ -131,6 +132,9 @@ struct CIDetailView: View {
                 }
             }
             Spacer(minLength: 0)
+            Button { newTicket(item) } label: { Label("New ticket", systemImage: "square.and.pencil") }
+                .buttonStyle(.bordered)
+                .help("New ticket on \(item.name)")
             Button {
                 Task { await model.copyName { name in
                     NSPasteboard.general.clearContents()

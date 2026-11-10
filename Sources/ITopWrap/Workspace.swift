@@ -15,6 +15,11 @@ final class Workspace {
     let orgs: OrgsModel
     let people: PeopleModel
     let timer: TimerModel
+    let newTickets: NewTicketSource
+    /// Set to show New ticket in the main window (from ⌘N, the menu bar, an org or a CI).
+    var newTicketStart: NewTicketStart?
+    /// What you typed in New ticket before cancelling, offered again next time.
+    var newTicketDraft: NewTicket?
     private var refreshLoop: Task<Void, Never>?
     private var clockLoop: Task<Void, Never>?
     /// Ticks every 15 seconds so the menu bar's timer (h:mm) stays current.
@@ -38,6 +43,11 @@ final class Workspace {
                            me: session.user, canWrite: canWrite)
         mine.timer = timer
         team.timer = timer
+        newTickets = DebugLaunch.demoNewTickets() ?? NewTicketSource.live(session)
+    }
+
+    func requestNewTicket(_ start: NewTicketStart = NewTicketStart()) {
+        newTicketStart = start
     }
 
     /// My tickets drives the menu bar count, so it refreshes every 2 minutes (UX-FLOWS F10)

@@ -43,12 +43,12 @@ struct AssignSheet: View {
                 .frame(maxWidth: .infinity)
 
             field("Team") {
-                DropdownField(placeholder: placeholder(teams, empty: "No teams found", loading: "Loading teams…"),
+                DropdownField(name: "Team", placeholder: placeholder(teams, empty: "No teams found", loading: "Loading teams…"),
                               items: teams.value ?? [], selection: $team, label: \.name)
                     .disabled(teams.value == nil)
             }
             field("Agent") {
-                DropdownField(placeholder: team == nil ? "Choose a team first" : placeholder(agents, empty: "Nobody in this team", loading: "Loading agents…"),
+                DropdownField(name: "Agent", placeholder: team == nil ? "Choose a team first" : placeholder(agents, empty: "Nobody in this team", loading: "Loading agents…"),
                               items: team == nil ? [] : (agents.value ?? []), selection: $agent,
                               label: { $0.id == list.me.contactID ? "\($0.name) (you)" : $0.name })
                     .disabled(team == nil || agents.value == nil)
@@ -61,7 +61,7 @@ struct AssignSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+                    .cancelShortcutUnlessDropdownOpen()
                 Button {
                     guard let team, let agent else { return }
                     Task {
@@ -82,6 +82,7 @@ struct AssignSheet: View {
         }
         .padding(20)
         .frame(width: 380)
+        .dropdownHost()
         .task { await loadTeams() }
         .onChange(of: team) { _, new in
             agent = nil
@@ -124,91 +125,5 @@ struct AssignSheet: View {
         } catch {
             agents = .failed(ErrorText.describe(error))
         }
-    }
-}
-
-/// The one picker used across the app (DESIGN.md: "One dropdown component"): a field that opens
-/// a filterable list in a popover. Typing narrows it; Return picks the first match.
-struct DropdownField<Item: Identifiable & Hashable>: View {
-    let placeholder: String
-    let items: [Item]
-    @Binding var selection: Item?
-    let label: (Item) -> String
-
-    init(placeholder: String, items: [Item], selection: Binding<Item?>, label: @escaping (Item) -> String) {
-        self.placeholder = placeholder
-        self.items = items
-        _selection = selection
-        self.label = label
-    }
-
-    init(placeholder: String, items: [Item], selection: Binding<Item?>, label: KeyPath<Item, String>) {
-        self.init(placeholder: placeholder, items: items, selection: selection, label: { $0[keyPath: label] })
-    }
-
-    @State private var open = false
-    @State private var filter = ""
-    @Environment(\.isEnabled) private var isEnabled
-
-    private var matches: [Item] {
-        let words = filter.lowercased().split(separator: " ").map(String.init)
-        guard !words.isEmpty else { return items }
-        return items.filter { item in let l = label(item).lowercased(); return words.allSatisfy { l.contains($0) } }
-    }
-
-    var body: some View {
-        Button {
-            filter = ""
-            open = true
-        } label: {
-            HStack {
-                Text(selection.map(label) ?? placeholder)
-                    .foregroundStyle(selection == nil ? Theme.secondary : Theme.text)
-                    .lineLimit(1)
-                Spacer(minLength: 6)
-                Image(systemName: "chevron.up.chevron.down").font(.system(size: 10)).foregroundStyle(Theme.secondary)
-            }
-            .padding(.horizontal, 10).frame(height: 30)
-            .background(Theme.chip.opacity(isEnabled ? 0.6 : 0.3), in: RoundedRectangle(cornerRadius: 7))
-            .overlay(RoundedRectangle(cornerRadius: 7).stroke(Theme.separator))
-            .contentShape(RoundedRectangle(cornerRadius: 7))
-        }
-        .buttonStyle(.plain)
-        .accessibilityValue(selection.map(label) ?? "none")
-        .popover(isPresented: $open, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 0) {
-                TextField("Filter", text: $filter)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(8)
-                    .onSubmit { if let first = matches.first { pick(first) } }
-                Divider()
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(matches) { item in
-                            Button { pick(item) } label: {
-                                HStack {
-                                    Text(label(item)).lineLimit(1)
-                                    Spacer()
-                                    if item == selection { Image(systemName: "checkmark").font(.system(size: 11)) }
-                                }
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        if matches.isEmpty {
-                            Text("Nothing matches “\(filter)”.").foregroundStyle(Theme.secondary).padding(10)
-                        }
-                    }
-                }
-                .frame(maxHeight: 260)
-            }
-            .frame(width: 300)
-        }
-    }
-
-    private func pick(_ item: Item) {
-        selection = item
-        open = false
     }
 }
