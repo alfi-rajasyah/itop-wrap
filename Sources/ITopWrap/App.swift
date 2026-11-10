@@ -154,6 +154,7 @@ enum DebugLaunch {
                 <p><img src="pages/ajax.document.php?operation=download_inlineimage&amp;id=900&amp;s=demo" data-img-id="900"></p>
                 <p>A screenshot the caller linked from elsewhere:</p>
                 <p><img src="https://images.example.net/screenshot.png"></p>
+                <p><b>Caller 1</b><br>Sales<br><img src="https://lh5.googleusercontent.com/phone-icon" width="16" height="16"> : +00 0000 0001<br><img src="https://lh6.googleusercontent.com/mail-icon" width="16" height="16"> : <a href="mailto:caller.one@example.com">caller.one@example.com</a></p>
                 """),
         ]
         @Sendable func list(_ scope: TicketScope) -> [Ticket] {
@@ -163,9 +164,11 @@ enum DebugLaunch {
         }
         // A drawn PNG stands in for a pasted iTop image.
         let demoPNG: Data = {
-            let img = NSImage(size: NSSize(width: 520, height: 180))
+            // Wide on purpose: the full-size viewer has to fit screenshots wider than the window.
+            let img = NSImage(size: NSSize(width: 2400, height: 900))
             img.lockFocus()
-            NSColor(calibratedWhite: 0.92, alpha: 1).setFill(); NSRect(x: 0, y: 0, width: 520, height: 180).fill()
+            NSColor(calibratedWhite: 0.92, alpha: 1).setFill(); NSRect(x: 0, y: 0, width: 2400, height: 900).fill()
+            NSColor(calibratedWhite: 0.6, alpha: 1).setFill(); NSRect(x: 2300, y: 0, width: 100, height: 900).fill()
             NSColor(calibratedRed: 0.77, green: 0.16, blue: 0.11, alpha: 1).setFill(); NSRect(x: 24, y: 120, width: 200, height: 28).fill()
             ("VPN disconnected: session timeout (60 min)" as NSString).draw(at: NSPoint(x: 24, y: 70), withAttributes: [.font: NSFont.systemFont(ofSize: 18)])
             img.unlockFocus()

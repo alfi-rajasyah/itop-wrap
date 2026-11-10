@@ -1,13 +1,22 @@
 import Foundation
 
-/// A piece of text, with a link when it came from an `<a>`.
+/// A piece of text, with a link when it came from an `<a>`; or a small image from another
+/// host (a signature icon) shown as an icon in the line and never loaded.
 public struct RichRun: Sendable, Equatable {
     public let text: String
     public let link: URL?
+    public let icon: URL?
 
     public init(text: String, link: URL? = nil) {
         self.text = text
         self.link = link
+        self.icon = nil
+    }
+
+    public init(icon: URL) {
+        self.text = ""
+        self.link = nil
+        self.icon = icon
     }
 }
 
@@ -35,12 +44,13 @@ public enum RichText {
         var blocks: [RichBlock] = []
         var buffer = ""
         var links: [URL] = []
+        var icons: [URL] = []
         var inLink = false
 
         func flush() {
             let text = HTMLText.normalize(buffer)
             buffer = ""
-            let runs = runs(from: text, links: links)
+            let runs = runs(from: text, links: links, icons: icons)
             if !runs.isEmpty { blocks.append(.text(runs)) }
         }
 
@@ -56,9 +66,15 @@ public enum RichText {
             switch name {
             case "img":
                 if let image = image(from: piece, base: base) {
-                    if inLink { buffer += end; inLink = false }
-                    flush()
-                    blocks.append(.image(image))
+                    if case .external(let url) = image, isSmall(piece) {
+                        // A signature-size icon from another host stays in the line.
+                        icons.append(url)
+                        buffer += iconMark + String(icons.count - 1) + mid
+                    } else {
+                        if inLink { buffer += end; inLink = false }
+                        flush()
+                        blocks.append(.image(image))
+                    }
                 }
             case "br": buffer += "\n"
             case "li": if !closing { buffer += "\n• " }
@@ -82,28 +98,61 @@ public enum RichText {
         return blocks
     }
 
-    // Link boundaries survive whitespace clean-up as private-use characters, then become runs.
-    private static let start = "\u{E000}", mid = "\u{E001}", end = "\u{E002}"
+    // Link boundaries and icons survive whitespace clean-up as private-use characters,
+    // then a scanner turns them into runs.
+    private static let start = "\u{E000}", mid = "\u{E001}", end = "\u{E002}", iconMark = "\u{E003}"
 
-    private static func runs(from text: String, links: [URL]) -> [RichRun] {
+    private static func runs(from text: String, links: [URL], icons: [URL]) -> [RichRun] {
         var out: [RichRun] = []
-        var rest = Substring(text)
-        while let s = rest.range(of: start) {
-            if s.lowerBound > rest.startIndex { out.append(RichRun(text: String(rest[..<s.lowerBound]))) }
-            rest = rest[s.upperBound...]
-            guard let m = rest.range(of: mid), let index = Int(rest[..<m.lowerBound]), links.indices.contains(index) else { break }
-            rest = rest[m.upperBound...]
-            let e = rest.range(of: end) ?? (rest.endIndex..<rest.endIndex)
-            let label = String(rest[..<e.lowerBound])
-            if !label.isEmpty { out.append(RichRun(text: label, link: links[index])) }
-            rest = rest[e.upperBound...]
+        var plain = "", label = ""
+        var link: URL?
+        var reading: (icon: Bool, digits: String)?
+        func emitPlain() { if !plain.isEmpty { out.append(RichRun(text: plain)); plain = "" } }
+
+        for ch in text {
+            if var r = reading {
+                if String(ch) == mid {
+                    let i = Int(r.digits) ?? -1
+                    if r.icon {
+                        if icons.indices.contains(i) { emitPlain(); out.append(RichRun(icon: icons[i])) }
+                    } else if links.indices.contains(i) {
+                        emitPlain(); link = links[i]; label = ""
+                    }
+                    reading = nil
+                } else if ch.isNumber {
+                    r.digits.append(ch); reading = r
+                } else {
+                    reading = nil
+                }
+                continue
+            }
+            switch String(ch) {
+            case start: reading = (false, "")
+            case iconMark: reading = (true, "")
+            case end:
+                if let l = link, !label.isEmpty { out.append(RichRun(text: label, link: l)) }
+                link = nil; label = ""
+            case mid: break
+            default:
+                if link != nil { label.append(ch) } else { plain.append(ch) }
+            }
         }
-        if !rest.isEmpty { out.append(RichRun(text: String(rest))) }
-        // Clean-up can leave a stray marker character next to trimmed whitespace.
-        return out.compactMap { r in
-            let t = r.text.replacingOccurrences(of: start, with: "").replacingOccurrences(of: mid, with: "").replacingOccurrences(of: end, with: "")
-            return t.isEmpty ? nil : RichRun(text: t, link: r.link)
+        if let l = link, !label.isEmpty { out.append(RichRun(text: label, link: l)) } else { plain += label }
+        emitPlain()
+        return out
+    }
+
+    /// Signature-icon size: the width and height it declares (attributes or inline style) are at most 40 px.
+    static func isSmall(_ tag: String) -> Bool {
+        func px(_ name: String) -> Int? {
+            if let v = attribute(name, in: tag), let n = Int(v.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "px", with: "")) { return n }
+            if let style = attribute("style", in: tag),
+               let regex = try? Regex("(?i)(?:^|;)\\s*\(name)\\s*:\\s*(\\d+)\\s*px"),
+               let m = style.firstMatch(of: regex), let d = m.output[1].substring { return Int(d) }
+            return nil
         }
+        let sizes = [px("width"), px("height")].compactMap { $0 }
+        return !sizes.isEmpty && sizes.allSatisfy { $0 <= 40 }
     }
 
     private static func attribute(_ name: String, in tag: String) -> String? {

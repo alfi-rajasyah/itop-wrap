@@ -21,7 +21,7 @@ struct RichTextView: View {
                 ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                     switch block {
                     case .text(let runs):
-                        Text(attributed(runs))
+                        text(runs)
                             .fixedSize(horizontal: false, vertical: true)
                             .textSelection(.enabled)
                             .tint(Theme.text)
@@ -33,17 +33,29 @@ struct RichTextView: View {
         }
     }
 
-    private func attributed(_ runs: [RichRun]) -> AttributedString {
-        var out = AttributedString()
-        for run in runs {
-            var piece = AttributedString(run.text)
-            if let link = run.link {
-                piece.link = link
-                piece.underlineStyle = .single
-            }
-            out += piece
+    /// Text with links; small outside images (signature icons) become a grey photo symbol
+    /// in the line. They're never loaded.
+    private func text(_ runs: [RichRun]) -> Text {
+        var result = Text(verbatim: "")
+        var pending = AttributedString()
+        func flushPending() {
+            if !pending.characters.isEmpty { result = Text("\(result)\(Text(pending))"); pending = AttributedString() }
         }
-        return out
+        for run in runs {
+            if run.icon != nil {
+                flushPending()
+                result = Text("\(result)\(Text(Image(systemName: "photo")).foregroundStyle(Theme.secondary))")
+            } else {
+                var piece = AttributedString(run.text)
+                if let link = run.link {
+                    piece.link = link
+                    piece.underlineStyle = .single
+                }
+                pending += piece
+            }
+        }
+        flushPending()
+        return result
     }
 }
 
@@ -60,14 +72,14 @@ struct RichImageView: View {
         Group {
             switch image {
             case .external(let url):
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Image(systemName: "photo").foregroundStyle(Theme.secondary)
-                    Text("Image from \(url.host() ?? "another site")").foregroundStyle(Theme.secondary)
+                    Text("Image from \(url.host() ?? "another site")").foregroundStyle(Theme.secondary).lineLimit(1)
                     Link("Open in browser", destination: url).foregroundStyle(Theme.text)
                 }
-                .font(.system(size: 12))
-                .padding(10)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.separator))
+                .font(.system(size: 11))
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Theme.separator))
                 .help("Not loaded automatically: it's on another site")
             case .inline, .data:
                 if let loaded {
@@ -96,14 +108,7 @@ struct RichImageView: View {
         }
         .task(id: image) { await load() }
         .sheet(isPresented: $fullSize) {
-            if let loaded {
-                VStack(alignment: .trailing, spacing: 10) {
-                    ScrollView([.horizontal, .vertical]) { Image(nsImage: loaded) }
-                    Button("Close") { fullSize = false }.keyboardShortcut(.cancelAction)
-                }
-                .padding(16)
-                .frame(minWidth: 480, idealWidth: min(loaded.size.width + 40, 1200), minHeight: 360, idealHeight: min(loaded.size.height + 80, 900))
-            }
+            if let loaded { ImageViewer(image: loaded) }
         }
     }
 
@@ -189,5 +194,40 @@ struct AttachmentsView: View {
         } catch {
             self.error = "Couldn't download \(a.name). \(error.localizedDescription)"
         }
+    }
+}
+
+/// Full-size image: the whole image fits the window by default; "Actual size" scrolls at 1:1.
+struct ImageViewer: View {
+    let image: NSImage
+    @State private var actualSize = false
+    @Environment(\.dismiss) private var dismiss
+
+    /// Sized to the image, within a comfortable window (the user found wide screenshots cropped).
+    private var frame: CGSize {
+        let w = max(image.size.width, 1), h = max(image.size.height, 1)
+        let scale = min(1, 1100 / w, 720 / h)
+        return CGSize(width: max(480, w * scale), height: max(300, h * scale))
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Group {
+                if actualSize {
+                    ScrollView([.horizontal, .vertical]) { Image(nsImage: image) }
+                } else {
+                    Image(nsImage: image).resizable().scaledToFit()
+                }
+            }
+            .frame(width: frame.width, height: frame.height)
+            HStack {
+                Toggle("Actual size", isOn: $actualSize).toggleStyle(.checkbox)
+                    .help("Show the image at 100%, scrolling if it's bigger than the window")
+                Text("\(Int(image.size.width)) × \(Int(image.size.height))").font(.system(size: 11)).foregroundStyle(Theme.secondary)
+                Spacer()
+                Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
+            }
+        }
+        .padding(16)
     }
 }

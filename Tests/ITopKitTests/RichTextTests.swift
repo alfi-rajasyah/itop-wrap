@@ -50,6 +50,23 @@ struct RichTextTests {
         #expect(blocks == [.image(.external(URL(string: "https://cdn.example.net/pic.png")!))])
     }
 
+    @Test("A small image from another host (a signature icon) stays in the line as an icon, still not loaded", arguments: [
+        #"<p><img src="https://lh5.googleusercontent.com/phone" width="16" height="16"> : +62 878</p>"#,
+        #"<p><img src="https://lh5.googleusercontent.com/phone" style="width: 12px; height:12px"> : +62 878</p>"#,
+    ])
+    func smallExternalIsInline(_ html: String) {
+        let url = URL(string: "https://lh5.googleusercontent.com/phone")!
+        #expect(RichText.parse(html, base: base) == [.text([RichRun(icon: url), RichRun(text: " : +62 878")])])
+    }
+
+    @Test("A large or unsized outside image is still its own block", arguments: [
+        #"<img src="https://cdn.example.net/pic.png" width="600" height="400">"#,
+        #"<img src="https://cdn.example.net/pic.png">"#,
+    ])
+    func largeExternalIsBlock(_ html: String) {
+        #expect(RichText.parse(html, base: base) == [.image(.external(URL(string: "https://cdn.example.net/pic.png")!))])
+    }
+
     @Test("A data: image is decoded in place, with no network")
     func dataImage() {
         let blocks = RichText.parse(#"<img src="data:image/png;base64,QUJD">"#, base: base)

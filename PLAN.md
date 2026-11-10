@@ -185,11 +185,14 @@ Built 2026-11-10 on `task-5b-orgs-people`: 102 tests; click-through in the debug
 **First, a read-only probe:** on one ticket that has a pasted image, check whether iTop's image links (`ajax.document.php?operation=download_inlineimage…`) accept the REST login, or need the web login (a session cookie). The approach depends on the answer.
 
 **Acceptance criteria:**
-- [ ] Images stored in your iTop show inline, sized to the pane, in the description and in log entries (demo works; your check on real tickets)
+- [x] Images stored in your iTop show inline, sized to the pane, in the description and in log entries (seen by you on a real ticket)
 - [x] No request goes to any host other than your iTop server unless you click "Open in browser" (images from other hosts are only a placeholder; tested)
 - [x] Links in descriptions and log entries are clickable and open in your browser (web and email links only; `javascript:` and `file:` stay plain text)
 - [ ] The ticket's attachments are listed by name; each downloads on click into a Save panel, which shows the size once saved (your check: the Save panel can't be driven in the background). iTop can't send a size without the whole file, so the list has names only
 - [x] An image that fails to load shows "Couldn't load this image" plus "Open in iTop on the web"
+
+- [x] After your check: the full-size viewer fits the whole image to the window (with "Actual size" for 1:1), and small outside images such as email-signature icons stay in the line as a grey photo symbol instead of a big "Image from…" box
+- Attachments: not tested on real data, at your choice
 
 Probe result (2026-11-11): your iTop answers the web image links with 403 to HTTP Basic auth, and serves `InlineImage` contents through REST, so images load through REST only. Built on `task-5c-images-links`: 117 tests.
 
