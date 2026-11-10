@@ -122,7 +122,12 @@ enum DebugLaunch {
             t("R-000355", "Monitor arm for desk 14", "resolved", agent: "2", team: "11", teamName: "Service desk", prio: 4, hours: 200, caller: "Caller 12"),
             t("R-000349", "Guest Wi-Fi password for the event", "closed", agent: "2", prio: 3, hours: 420, caller: "Caller 13", org: "Org B"),
         ]
-        let base = view == .mine ? mine : mine + others
+        // ITOPWRAP_DEMO_MANY=1: a big Org A, to check long lists.
+        let many = env["ITOPWRAP_DEMO_MANY"] == "1"
+            ? (1...60).map { i in t(String(format: "R-%06d", 500 + i), "Bulk demo ticket \(i)", ["assigned", "pending", "new"][i % 3],
+                                    agent: i % 4 == 0 ? "0" : "7", agentName: "Agent 7", prio: 1 + i % 4, hours: Double(i * 5), caller: "Caller \(i)") }
+            : []
+        let base = (view == .mine ? mine : mine + others) + (view == .team ? many : [])
         func entry(_ id: Int, _ who: String, hoursAgo: Double, _ text: String) -> LogEntry {
             LogEntry(id: id, date: now.addingTimeInterval(-hoursAgo * 3600), author: who, text: text)
         }
@@ -232,8 +237,11 @@ enum DebugLaunch {
         ]
         let callerOf = ["21": "Caller 1", "22": "Caller 2"]
         return PeopleSource(
-            search: { q in people.filter { p in q.split(separator: " ").allSatisfy { p.displayName.localizedCaseInsensitiveContains($0) } } },
-            inOrg: { id in people.filter { $0.orgID == id } },
+            search: { q in
+                let found = people.filter { p in q.split(separator: " ").allSatisfy { p.displayName.localizedCaseInsensitiveContains($0) } }
+                return (found, found.count)
+            },
+            inOrg: { id in let found = people.filter { $0.orgID == id }; return (found, found.count) },
             assigned: { id, scope in try await tickets.load(scope).filter { $0.agentID == id } },
             reported: { id, scope in try await tickets.load(scope).filter { $0.callerName == callerOf[id] } })
         #else

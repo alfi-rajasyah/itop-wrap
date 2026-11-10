@@ -167,7 +167,12 @@ Built 2026-11-10 on `task-5-cmdb`: 73 tests; click-through in the debug demo.
 - [x] Added after your review: a date range menu (open by default, opened in the last 7/30/90 days, include resolved and closed) and a sort menu (priority, last update, newest, oldest) on all four ticket lists, one setting remembered between launches
 - [ ] With the range menu, an organization's and a person's lists match the web UI, including resolved and closed tickets (your check; the "only 5 tickets" you saw was the open-only view)
 
-Built 2026-11-10 on `task-5b-orgs-people`: 93 tests; click-through in the debug demo.
+- [x] After your second review: "Any time" works with resolved and closed; a "Show 10/20/30/50/100/All" menu with a pager on every ticket list; People search says "Showing 100 of N"; long tables build rows lazily
+- [x] A debug trace (`ITOPWRAP_TRACE=1`) showed iTop returns every ticket (556 for one org, 773 for one agent), so the "only 5" limit isn't on the server side
+- [ ] The "only 5" display: not reproduced in the demo with 65 or 69 tickets; waiting on your screenshot
+- [ ] "Reentrant operation in its NSTableView delegate" warnings seen in your terminal when clicking in lists; to be traced to the selection change that causes them
+
+Built 2026-11-10 on `task-5b-orgs-people`: 102 tests; click-through in the debug demo.
 
 **Verification:** `swift test --filter OrgQueryTests` · manual comparison with the web UI
 

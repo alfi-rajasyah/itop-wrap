@@ -12,7 +12,11 @@ struct TicketListView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) { footer }
             .searchable(text: $model.query, placement: .toolbar, prompt: "R-000412 or VPN")
             .task(id: model.query) { await model.searchChanged() }
-            .onChange(of: model.options.scope) { Task { await model.refresh() } }
+            .onChange(of: model.options.scope) { model.page = 1; Task { await model.refresh() } }
+            .onChange(of: model.query) { model.page = 1 }
+            .onChange(of: model.orgFilter) { model.page = 1 }
+            .onChange(of: model.options.sort) { model.page = 1 }
+            .onChange(of: model.options.pageSize) { model.page = 1 }
             .toolbar {
                 ToolbarItem {
                     Button { Task { await model.refresh() } } label: {
@@ -72,7 +76,8 @@ struct TicketListView: View {
                     .listRowSeparator(.hidden)
             }
             lookupSection
-            let sections = model.visibleSections
+            let paged = model.currentPage
+            let sections = paged.sections
             if !model.isSearching && sections.isEmpty && model.orgFilter.isEmpty {
                 Text("No tickets in this range. Try a longer range in the date menu.")
                     .foregroundStyle(Theme.secondary).listRowSeparator(.hidden)
@@ -92,7 +97,7 @@ struct TicketListView: View {
                     HStack {
                         Text(section.group.title)
                         Spacer()
-                        Text("\(section.tickets.count)").monospacedDigit()
+                        Text("\(paged.groupTotal(section.group))").monospacedDigit()
                     }
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
@@ -195,9 +200,12 @@ struct TicketListView: View {
 
     private var footer: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            HStack(spacing: 6) {
-                if model.refreshing && model.phase == .loaded { ProgressView().controlSize(.mini) }
-                Text(updatedText(now: context.date))
+            VStack(spacing: 4) {
+                if model.phase == .loaded { Pager(page: model.currentPage, current: $model.page) }
+                HStack(spacing: 6) {
+                    if model.refreshing && model.phase == .loaded { ProgressView().controlSize(.mini) }
+                    Text(updatedText(now: context.date))
+                }
             }
             .font(.system(size: 11))
             .foregroundStyle(Theme.secondary)

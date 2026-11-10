@@ -10,13 +10,17 @@ struct TicketTable: View {
     /// The last column: the assignee on org lists and "Reported by them", the caller on "Assigned to them".
     var lastColumn: LastColumn = .assignee
     var sort: TicketSort = .priority
+    var pageSize: Int? = nil
     var openTicket: (Ticket) -> Void
+    @State private var page = 1
 
     enum LastColumn { case assignee, caller }
 
     var body: some View {
-        let sections = TicketList.groups(tickets, me: me, view: .team, sort: sort)
-        VStack(alignment: .leading, spacing: 0) {
+        let paged = TicketPage(TicketList.groups(tickets, me: me, view: .team, sort: sort), size: pageSize, page: page)
+        let sections = paged.sections
+        // Lazy, so an agent with hundreds of tickets doesn't build every row at once.
+        LazyVStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 10) {
                 Text("Ref").frame(width: 96, alignment: .leading)
                 Text("Title").frame(maxWidth: .infinity, alignment: .leading)
@@ -31,7 +35,7 @@ struct TicketTable: View {
                 HStack {
                     Text(section.group.title)
                     Spacer()
-                    Text("\(section.tickets.count)").monospacedDigit()
+                    Text("\(paged.groupTotal(section.group))").monospacedDigit()
                 }
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(Theme.secondary)
@@ -43,7 +47,13 @@ struct TicketTable: View {
                     Divider()
                 }
             }
+            Pager(page: paged, current: $page)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 12)
         }
+        .onChange(of: tickets) { page = 1 }
+        .onChange(of: sort) { page = 1 }
+        .onChange(of: pageSize) { page = 1 }
     }
 
     private func row(_ t: Ticket) -> some View {
@@ -185,7 +195,7 @@ struct OrgDetailView: View {
                     Text(model.options.scope == .open ? "\(org.name) has no open tickets." : "\(org.name) has no tickets in this range.")
                         .foregroundStyle(Theme.secondary)
                 case .loaded(let tickets):
-                    TicketTable(tickets: tickets, me: model.me, sort: model.options.sort, openTicket: openTicket)
+                    TicketTable(tickets: tickets, me: model.me, sort: model.options.sort, pageSize: model.options.pageSize, openTicket: openTicket)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 18)
@@ -237,6 +247,15 @@ struct PeopleListView: View {
             Text(model.scope != nil ? "Nobody in this organization." : "Nobody matches “\(model.query.trimmingCharacters(in: .whitespaces))”.")
                 .foregroundStyle(Theme.secondary).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded(let people):
+            if model.total > people.count {
+                Text(model.scope != nil
+                     ? "Showing \(people.count) of \(model.total) people. Search by name to find someone."
+                     : "Showing \(people.count) of \(model.total) people. Type more of the name to narrow it down.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(.bar)
+            }
             List(people, selection: $model.selectedID) { p in
                 HStack(spacing: 10) {
                     Text(p.initials).font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.secondary)
@@ -317,7 +336,7 @@ struct PersonDetailView: View {
                         .foregroundStyle(Theme.secondary)
                 case .loaded(let tickets):
                     TicketTable(tickets: tickets, me: model.me, lastColumn: model.tab == .assigned ? .caller : .assignee,
-                                sort: model.options.sort, openTicket: openTicket)
+                                sort: model.options.sort, pageSize: model.options.pageSize, openTicket: openTicket)
                 }
             }
             .padding(.horizontal, 24).padding(.vertical, 18)

@@ -52,6 +52,8 @@ final class TicketListModel {
     var selection: Ticket.ID?
     /// The org filter (DESIGN.md: Org filter); empty means all organizations.
     var orgFilter: Set<String> = []
+    /// The page shown; back to 1 whenever what's listed changes.
+    var page = 1
 
     init(view: TicketList.View, session: Session, options: ListOptions, source: TicketSource? = nil) {
         self.view = view
@@ -67,6 +69,8 @@ final class TicketListModel {
     var visibleSections: [TicketSection] {
         TicketList.groups(TicketSearch.filter(TicketSearch.filter(tickets, orgs: orgFilter), query: query), me: me, view: view, sort: options.sort)
     }
+
+    var currentPage: TicketPage { TicketPage(visibleSections, size: options.pageSize, page: page) }
 
     var orgChoices: [String] { TicketSearch.orgs(in: tickets) }
 

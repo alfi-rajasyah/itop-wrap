@@ -178,6 +178,51 @@ public enum TicketList {
     }
 }
 
+/// One page of grouped tickets (the "Show 20" menu). Paging happens in the app, after grouping
+/// and sorting, so page 1 holds the most urgent tickets and the sort covers the whole list.
+public struct TicketPage: Sendable, Equatable {
+    public let sections: [TicketSection]
+    public let page: Int
+    public let pageCount: Int
+    public let total: Int
+    private let totals: [TicketGroup: Int]
+    private let first: Int
+    private let last: Int
+
+    /// `size` nil means everything on one page.
+    public init(_ all: [TicketSection], size: Int?, page requested: Int) {
+        total = all.reduce(0) { $0 + $1.tickets.count }
+        totals = Dictionary(uniqueKeysWithValues: all.map { ($0.group, $0.tickets.count) })
+        guard let size, size > 0, total > 0 else {
+            sections = all; page = 1; pageCount = 1; first = total > 0 ? 1 : 0; last = total
+            return
+        }
+        pageCount = max(1, (total + size - 1) / size)
+        page = min(max(1, requested), pageCount)
+        let start = (page - 1) * size, end = min(start + size, total)
+        var out: [TicketSection] = []
+        var index = 0
+        for section in all {
+            // Check the bounds before making a Range: a group that ends before this page starts
+            // would give lower > upper, which traps.
+            let lo = max(start, index), hi = min(end, index + section.tickets.count)
+            if lo < hi {
+                out.append(TicketSection(group: section.group, tickets: Array(section.tickets[(lo - index)..<(hi - index)])))
+            }
+            index += section.tickets.count
+        }
+        sections = out
+        first = start + 1
+        last = end
+    }
+
+    /// How many tickets the whole group has, for its header: a page may show only part of it.
+    public func groupTotal(_ group: TicketGroup) -> Int { totals[group] ?? 0 }
+
+    /// "21–40 of 556".
+    public var label: String { total == 0 ? "No tickets" : "\(first)–\(last) of \(total)" }
+}
+
 public enum TicketSearch {
     /// The org filter: no orgs chosen means everything.
     public static func filter(_ tickets: [Ticket], orgs: Set<String>) -> [Ticket] {

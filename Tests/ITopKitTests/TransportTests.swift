@@ -242,3 +242,23 @@ struct TraceTests {
         #expect(!line.contains("s3cret") && !line.contains("agent"))
     }
 }
+
+@Suite("Found count")
+struct FoundCountTests {
+    @Test("iTop's \"Found: N\" message gives the total even when fewer objects came back", arguments: [
+        ("Found: 256", 256), ("Found: 0", 0), ("", nil), ("Scope: 1; Found: Server=4, VirtualMachine=3", nil),
+    ] as [(String, Int?)])
+    func found(message: String, expected: Int?) throws {
+        let body = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"code":0,"message":"\#(message)"}"#.utf8))
+        #expect(ITopResponse(body: body).found == expected)
+    }
+
+    @Test("People search reports how many matched in total")
+    func peopleTotal() async throws {
+        let stub = StubServer(.json(#"{"code":0,"message":"Found: 256","objects":{"Person::1":{"class":"Person","key":"1","fields":{"name":"Rajasyah","first_name":"Alfi"}}}}"#))
+        let client = ITopClient(server: try ServerAddress("itop.example.com"), credentials: Credentials(user: "a", password: "p"), session: stub.session)
+        let page = try await OrgService(client: client).peoplePage(matching: "alfi")
+        #expect(page.people.count == 1)
+        #expect(page.total == 256)
+    }
+}

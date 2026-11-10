@@ -25,12 +25,17 @@ final class ListOptions {
     var range: Range { didSet { defaults.set(range.rawValue, forKey: "list.range") } }
     var includeClosed: Bool { didSet { defaults.set(includeClosed, forKey: "list.includeClosed") } }
     var sort: TicketSort { didSet { defaults.set(sort.rawValue, forKey: "list.sort") } }
+    /// Tickets per page; `nil` shows them all (the "Show" menu).
+    var pageSize: Int? { didSet { defaults.set(pageSize ?? 0, forKey: "list.pageSize") } }
+    static let pageSizes: [Int?] = [10, 20, 30, 50, 100, nil]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         range = Range(rawValue: defaults.integer(forKey: "list.range")) ?? .any
         includeClosed = defaults.bool(forKey: "list.includeClosed")
         sort = TicketSort(rawValue: defaults.string(forKey: "list.sort") ?? "") ?? .priority
+        let size = defaults.object(forKey: "list.pageSize") as? Int ?? 20
+        pageSize = size == 0 ? nil : size
     }
 
     var scope: TicketScope {
@@ -80,6 +85,19 @@ struct ListOptionsMenus: View {
             }
             .help("Sort inside each status group: \(options.sort.title)")
             .accessibilityLabel("Sort: \(options.sort.title)")
+
+            Menu {
+                Picker("Show", selection: $options.pageSize) {
+                    ForEach(ListOptions.pageSizes, id: \.self) { size in
+                        Text(size.map { "\($0) per page" } ?? "All").tag(size)
+                    }
+                }
+                .pickerStyle(.inline)
+            } label: {
+                chip(options.pageSize.map { "Show \($0)" } ?? "Show all", symbol: "list.number", on: false)
+            }
+            .help("How many tickets per page")
+            .accessibilityLabel("Show: \(options.pageSize.map { "\($0) per page" } ?? "all")")
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -93,5 +111,30 @@ struct ListOptionsMenus: View {
             .lineLimit(1)
             .padding(.horizontal, 9).frame(height: 24)
             .overlay(RoundedRectangle(cornerRadius: 6).stroke(on ? Theme.text : Theme.separator))
+    }
+}
+
+/// "‹  21–40 of 556  ›" under a ticket list.
+struct Pager: View {
+    let page: TicketPage
+    @Binding var current: Int
+
+    var body: some View {
+        if page.pageCount > 1 {
+            HStack(spacing: 10) {
+                Button { current = page.page - 1 } label: { Image(systemName: "chevron.left") }
+                    .disabled(page.page <= 1)
+                    .help("Previous page").accessibilityLabel("Previous page")
+                Text(page.label).monospacedDigit()
+                Button { current = page.page + 1 } label: { Image(systemName: "chevron.right") }
+                    .disabled(page.page >= page.pageCount)
+                    .help("Next page").accessibilityLabel("Next page")
+            }
+            .buttonStyle(.borderless)
+            .font(.system(size: 12))
+            .foregroundStyle(Theme.secondary)
+        } else if page.total > 0 {
+            Text(page.total == 1 ? "1 ticket" : "\(page.total) tickets").font(.system(size: 12)).foregroundStyle(Theme.secondary)
+        }
     }
 }

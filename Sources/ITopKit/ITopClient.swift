@@ -128,6 +128,14 @@ public struct ITopResponse: Sendable, Equatable {
     /// The whole decoded JSON body, for operations with their own fields (`authorized`, `operations`).
     public let body: JSONValue
 
+    /// iTop's own total from a message like "Found: 256", which can be more than the objects
+    /// returned when a limit was asked for.
+    public var found: Int? {
+        guard let message = body["message"]?.stringValue,
+              let match = message.wholeMatch(of: /Found: (\d+)/) else { return nil }
+        return Int(match.output.1)
+    }
+
     /// The returned objects. iTop sends them as a JSON object keyed "Class::id", which has no
     /// order, so they are sorted by id here; callers sort by what they show.
     public var objects: [ITopObject] {

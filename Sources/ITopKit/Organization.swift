@@ -143,8 +143,19 @@ public struct OrgService: Sendable {
     }
 
     public func people(matching text: String) async throws -> [Person] {
-        guard let oql = OrgQueries.peopleSearch(text) else { return [] }
-        return try await people(oql)
+        try await peoplePage(matching: text).people
+    }
+
+    /// The first people found (up to 100) and how many matched in total, so the app can say
+    /// "Showing 100 of 256". iTop can't order them, so a narrower search is the way to the rest.
+    public func peoplePage(matching text: String) async throws -> (people: [Person], total: Int) {
+        guard let oql = OrgQueries.peopleSearch(text) else { return ([], 0) }
+        return try await peoplePage(oql)
+    }
+
+    public func peoplePage(inOrg orgID: String) async throws -> (people: [Person], total: Int) {
+        guard let oql = OrgQueries.people(orgID: orgID) else { return ([], 0) }
+        return try await peoplePage(oql)
     }
 
     public func people(inOrg orgID: String) async throws -> [Person] {
@@ -163,9 +174,14 @@ public struct OrgService: Sendable {
     static let peopleLimit = 100
 
     private func people(_ oql: String) async throws -> [Person] {
+        try await peoplePage(oql).people
+    }
+
+    private func peoplePage(_ oql: String) async throws -> (people: [Person], total: Int) {
         let r = try await client.send(.get(className: "Person", key: oql, outputFields: Person.fields, limit: Self.peopleLimit))
-        return r.objects.prefix(Self.peopleLimit).map(Person.init(object:))
+        let people = r.objects.prefix(Self.peopleLimit).map(Person.init(object:))
             .sorted { $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending }
+        return (people, max(r.found ?? people.count, people.count))
     }
 
     private func tickets(_ queries: [(TicketClass, String)]) async throws -> [Ticket] {

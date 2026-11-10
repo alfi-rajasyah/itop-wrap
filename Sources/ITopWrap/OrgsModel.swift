@@ -15,14 +15,14 @@ struct OrgSource: Sendable {
 }
 
 struct PeopleSource: Sendable {
-    var search: @Sendable (String) async throws -> [Person]
-    var inOrg: @Sendable (String) async throws -> [Person]
+    var search: @Sendable (String) async throws -> (people: [Person], total: Int)
+    var inOrg: @Sendable (String) async throws -> (people: [Person], total: Int)
     var assigned: @Sendable (String, TicketScope) async throws -> [Ticket]
     var reported: @Sendable (String, TicketScope) async throws -> [Ticket]
 
     static func live(_ session: Session) -> PeopleSource {
         let s = OrgService(client: session.client)
-        return PeopleSource(search: { try await s.people(matching: $0) }, inOrg: { try await s.people(inOrg: $0) },
+        return PeopleSource(search: { try await s.peoplePage(matching: $0) }, inOrg: { try await s.peoplePage(inOrg: $0) },
                             assigned: { try await s.tickets(assignedTo: $0, scope: $1) },
                             reported: { try await s.tickets(reportedBy: $0, scope: $1) })
     }
@@ -101,6 +101,8 @@ final class PeopleModel {
     /// Set by the org view's People link; typing a search clears it.
     private(set) var scope: (id: String, name: String)?
     private(set) var results: Loadable<[Person]> = .idle
+    /// How many iTop found in total; more than shown when the search hit the 100-person cap.
+    private(set) var total = 0
     var selectedID: Person.ID?
     var tab: Tab = .assigned
     private(set) var assigned: Loadable<[Ticket]> = .idle
@@ -137,7 +139,10 @@ final class PeopleModel {
         if let scope {
             if searched == "org:\(scope.id)", case .loaded = results { return }
             results = .loading
-            do { results = .loaded(try await source.inOrg(scope.id)); searched = "org:\(scope.id)" } catch { results = .failed(error.localizedDescription) }
+            do {
+                let page = try await source.inOrg(scope.id)
+                results = .loaded(page.people); total = page.total; searched = "org:\(scope.id)"
+            } catch { results = .failed(error.localizedDescription) }
             return
         }
         guard q.count >= 2 else { results = .idle; searched = nil; return }
@@ -147,9 +152,10 @@ final class PeopleModel {
         try? await Task.sleep(for: .milliseconds(300))
         guard !Task.isCancelled else { results = previous; return }
         do {
-            let people = try await source.search(q)
+            let page = try await source.search(q)
             guard query.trimmingCharacters(in: .whitespaces) == q else { return }
-            results = .loaded(people)
+            results = .loaded(page.people)
+            total = page.total
             searched = q
         } catch {
             results = .failed(error.localizedDescription)

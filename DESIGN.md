@@ -108,7 +108,9 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 
 ## Date range and sorting (all ticket lists)
 
-- **Range menu** (calendar icon) above My tickets, Team tickets, an organization's tickets and a person's tickets: "Open tickets" by default; "Opened in the last 7, 30 or 90 days"; and "Include resolved and closed". With resolved and closed included there's always a range (30 days by default, "Any time" is off), because iTop's OQL can't order results and an unbounded history can't be cut to the newest. Resolved and Closed get their own groups after the open ones. The label says what's shown: "Open tickets", "Open, last 30 days", "All, last 30 days".
+- **Range menu** (calendar icon) above My tickets, Team tickets, an organization's tickets and a person's tickets: "Open tickets" by default; "Opened in the last 7, 30 or 90 days" or "Any time"; and "Include resolved and closed", which can cover any time ("All tickets, any time"). Resolved and Closed get their own groups after the open ones. The label says what's shown: "Open tickets", "Open, last 30 days", "All, last 30 days".
+- **Show menu** (numbered-list icon): 10, 20 (default), 30, 50 or 100 per page, or All. Paging happens in the app after grouping and sorting, so page 1 holds the most urgent tickets and the sort covers everything. A pager sits under the list ("‹ 21–40 of 556 ›") and goes back to page 1 when the range, sort, filter or search changes. Group headers count the whole group, not just the page.
+- **People search** asks iTop for at most 100 people and says so when there are more: "Showing 100 of 256 people. Type more of the name to narrow it down."
 - **Sort menu** (arrows icon): inside each status group, "Priority, then oldest" (default), "Last update, newest first", "Opened, newest first" or "Opened, oldest first". Groups never move.
 - One setting for every list, remembered between launches. A chip's border goes dark when it's off the default, like the org filter.
 - Org counts in the Organizations list stay open-ticket counts. "Needs you" only ever counts open tickets.

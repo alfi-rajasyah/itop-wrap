@@ -88,3 +88,48 @@ struct TicketSortTests {
         #expect(TicketList.groups(mixed, me: me, view: .mine, sort: .lastUpdate).map(\.group) == [.escalatedTTR, .assigned])
     }
 }
+
+@Suite("Ticket paging")
+struct TicketPagingTests {
+    let me = CurrentUser(userID: "1", contactID: "2", login: "a", displayName: "A", profiles: [], teams: [])
+
+    func tickets(_ ttr: Int, _ assigned: Int) -> [Ticket] {
+        (0..<ttr).map { t(String(format: "R-%06d", $0), status: "escalated_ttr", opened: "2026-11-01 09:00:00", updated: "2026-11-01 09:00:00") } +
+        (0..<assigned).map { t(String(format: "R-%06d", 100 + $0), opened: "2026-11-01 09:00:00", updated: "2026-11-01 09:00:00") }
+    }
+
+    @Test("Page 1 takes the first tickets in group order, so the most urgent come first")
+    func firstPage() {
+        let groups = TicketList.groups(tickets(3, 30), me: me, view: .mine)
+        let page = TicketPage(groups, size: 10, page: 1)
+        #expect(page.sections.map(\.group) == [.escalatedTTR, .assigned])
+        #expect(page.sections.map(\.tickets.count) == [3, 7])
+        #expect(page.total == 33)
+        #expect(page.pageCount == 4)
+        #expect(page.label == "1–10 of 33")
+        #expect(page.groupTotal(.assigned) == 30, "headers count the whole group, not just this page")
+    }
+
+    @Test("A later page keeps the group headers of what it shows")
+    func laterPage() {
+        let page = TicketPage(TicketList.groups(tickets(3, 30), me: me, view: .mine), size: 10, page: 4)
+        #expect(page.sections.map(\.group) == [.assigned])
+        #expect(page.sections.first?.tickets.count == 3)
+        #expect(page.label == "31–33 of 33")
+    }
+
+    @Test("Pages out of range are clamped, and All shows everything on one page")
+    func clampAndAll() {
+        let groups = TicketList.groups(tickets(3, 30), me: me, view: .mine)
+        #expect(TicketPage(groups, size: 10, page: 99).page == 4)
+        #expect(TicketPage(groups, size: 10, page: 0).page == 1)
+        let all = TicketPage(groups, size: nil, page: 3)
+        #expect(all.page == 1 && all.pageCount == 1 && all.sections.flatMap(\.tickets).count == 33)
+    }
+
+    @Test("No tickets: one empty page")
+    func empty() {
+        let page = TicketPage([], size: 20, page: 1)
+        #expect(page.pageCount == 1 && page.total == 0 && page.sections.isEmpty)
+    }
+}
