@@ -117,7 +117,8 @@ struct TimeSpentTests {
         #expect(f["start_date"] as? String == "2026-11-11 09:30:00")
         #expect(f["end_date"] as? String == "2026-11-11 10:12:09")
         #expect(f["duration"] as? String == "2529")
-        #expect(f["title"] as? String == "R-000007 VPN drops")
+        #expect(f["title"] as? String == "R-000007", "a ref-only title, like iTop's web stopwatch")
+        #expect(f["origin"] as? String == "stopwatch", "the same origin as the web stopwatch, so the calendar shows them alike")
     }
 
     @Test("A ticket without an Activity gets one first, then the TimeSpent on it")

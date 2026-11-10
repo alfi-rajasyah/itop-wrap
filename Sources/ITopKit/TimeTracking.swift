@@ -134,7 +134,9 @@ public struct TimeTracking: Sendable {
             "activity_id": .string(activity), "user_id": .string(me.userID), "contact_id": .string(me.contactID),
             "org_id": .string(ticket.orgID), "start_date": .string(TimeFormat.itop(entry.start)),
             "end_date": .string(TimeFormat.itop(entry.end)), "duration": .string(String(entry.duration)),
-            "title": .string(Self.label(ticket)),
+            // Like iTop's web stopwatch: origin "stopwatch" and a ref-only title, so the calendar
+            // and reports treat app time the same (your choice, 2026-11-11; probe showed "manual" otherwise).
+            "title": .string(ticket.ref), "origin": .string("stopwatch"),
         ], comment: TicketWrites.comment), onTicket: link)
         try TicketWrites.check(response)
     }

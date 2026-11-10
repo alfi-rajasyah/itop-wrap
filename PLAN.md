@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b built against the mock; real check pending.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Next: Task 8c, menu bar.
 
 ## Overview
 
@@ -261,7 +261,7 @@ Lifecycle as built (standard iTop, your iTop has some customisation): New and Es
 - [x] Starting a second timer stops and saves the first (TimerModel.start; "Switch timer here" on another Assigned ticket)
 - [x] The start button appears only on Assigned tickets; a ticket that leaves Assigned (pending, resolved, escalated) stops its timer and saves the time (demo: resolving R-000412 stopped its timer)
 - [x] Quitting and relaunching keeps a running timer (demo: quit for a minute, it was still running at 0:01:09)
-- [ ] Real check: one stop on a test ticket shows up in iTop's time tracking (pending)
+- [x] Real check: stops on a test ticket show up in iTop's time tracking under your name (2026-11-11: two stops, 79 s and 92 s, on the ticket's existing Activity). They came out with origin "manual" (teal in the calendar) while the web stopwatch uses "stopwatch" (grey); you chose to match the web, so the app now sends origin "stopwatch" and a ref-only title
 
 As built: stops under a minute aren't saved (likely misclicks); past 4 hours the timer saves 4:00, like iTop's stopwatch; a failed save keeps the time with Retry and Discard; a running web stopwatch on the ticket is shown instead of Start. "Time for this entry" in the composer is a follow-up.
 

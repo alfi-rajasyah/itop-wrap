@@ -44,5 +44,58 @@
         ]
       }
     ]
+  },
+  {
+    "step": "no",
+    "notes": [],
+    "activities_on_ticket": 1,
+    "note_on_time": "minutes are measured against this Mac's clock; iTop's server clock or timezone may differ",
+    "your_latest_timespent_on_ticket": [
+      {
+        "origin": "stopwatch",
+        "start_set": true,
+        "end_set": true,
+        "end_raw_if_odd": null,
+        "duration": "69",
+        "minutes_since_start": 24,
+        "minutes_since_end": 23,
+        "fields": [
+          "duration",
+          "end_date",
+          "origin",
+          "start_date"
+        ]
+      },
+      {
+        "origin": "manual",
+        "start_set": true,
+        "end_set": true,
+        "end_raw_if_odd": null,
+        "duration": "79",
+        "minutes_since_start": 6,
+        "minutes_since_end": 5,
+        "fields": [
+          "duration",
+          "end_date",
+          "origin",
+          "start_date"
+        ]
+      },
+      {
+        "origin": "manual",
+        "start_set": true,
+        "end_set": true,
+        "end_raw_if_odd": null,
+        "duration": "92",
+        "minutes_since_start": 4,
+        "minutes_since_end": 2,
+        "fields": [
+          "duration",
+          "end_date",
+          "origin",
+          "start_date"
+        ]
+      }
+    ]
   }
 ]
