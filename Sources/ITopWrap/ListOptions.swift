@@ -22,11 +22,11 @@ final class ListOptions {
 
     private let defaults: UserDefaults
 
-    var range: Range { didSet { defaults.set(range.rawValue, forKey: "list.range") } }
-    var includeClosed: Bool { didSet { defaults.set(includeClosed, forKey: "list.includeClosed") } }
-    var sort: TicketSort { didSet { defaults.set(sort.rawValue, forKey: "list.sort") } }
+    var range: Range { didSet { defaults.set(range.rawValue, forKey: "list.range"); UITrace.log("view: range \(range)") } }
+    var includeClosed: Bool { didSet { defaults.set(includeClosed, forKey: "list.includeClosed"); UITrace.log("view: include closed \(includeClosed)") } }
+    var sort: TicketSort { didSet { defaults.set(sort.rawValue, forKey: "list.sort"); UITrace.log("view: sort \(sort)") } }
     /// Tickets per page; `nil` shows them all (the "Show" menu).
-    var pageSize: Int? { didSet { defaults.set(pageSize ?? 0, forKey: "list.pageSize") } }
+    var pageSize: Int? { didSet { defaults.set(pageSize ?? 0, forKey: "list.pageSize"); UITrace.log("view: page size \(pageSize ?? 0)") } }
     static let pageSizes: [Int?] = [10, 20, 30, 50, 100, nil]
 
     init(defaults: UserDefaults = .standard) {
@@ -143,7 +143,7 @@ struct FilterChip: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: symbol).foregroundStyle(Theme.secondary)
-            Text(text).foregroundStyle(Theme.text).lineLimit(1)
+            Text(text).foregroundStyle(Theme.text).lineLimit(1).truncationMode(.tail)
         }
         .font(.system(size: 12))
         .padding(.horizontal, 9).frame(height: 24)

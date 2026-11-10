@@ -104,7 +104,7 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 
 - **Organizations view** (sidebar, under CMDB): a list of organizations with their open-ticket count, and a detail pane for the selected one. The focal point is the org's open tickets from every agent, grouped by status like My tickets. The list has column headers (Ref, Title, Caller, Assignee). The Assignee column shows an initials avatar plus the name ("You", "Agent 2"), or a dashed circle and a bold "Unassigned". Rows also get a P1 mark. The teal dot still marks tickets waiting on you. Clicking a row opens it in the ticket detail view.
 - **Secondary:** People and Config items links with their counts, and a New ticket button prefilled with the org.
-- **Org filter:** a building-icon menu above My tickets and next to the menu bar's search. It's multi-select with "All organizations" to reset, and the button shows the chosen org(s) with a darker border when a filter is on. Empty sections hide while filtering. If none of your tickets match, it says so and links to the full org view.
+- **Org filter:** a building-icon menu above My tickets and next to the menu bar's search. It's single select (changed 2026-11-11: several orgs made the label too long for the column) with "All organizations" to reset, and the button shows the chosen org, truncated if long, with a darker border when a filter is on. Empty sections hide while filtering. If none of your tickets match, it says so and links to the full org view.
 
 ## Images, links and attachments in tickets
 

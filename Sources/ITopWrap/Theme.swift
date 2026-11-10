@@ -40,6 +40,22 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+/// Debug builds with ITOPWRAP_TRACE=1: one timestamped line per UI event, in the same terminal
+/// as AppKit's warnings, so the line before a warning shows its cause. Names, ids and counts only.
+enum UITrace {
+    static let on = ProcessInfo.processInfo.environment["ITOPWRAP_TRACE"] == "1"
+    private static let clock: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"; return f
+    }()
+
+    static func log(_ event: @autoclosure () -> String) {
+        #if DEBUG
+        guard on else { return }
+        FileHandle.standardError.write(Data("\(clock.string(from: Date())) [UI] \(event())\n".utf8))
+        #endif
+    }
+}
+
 extension Binding where Value: Equatable {
     /// A List selection that's applied after the click has been handled.
     ///
@@ -47,10 +63,18 @@ extension Binding where Value: Equatable {
     /// middle list; a row rebuilds the detail pane). Done inside AppKit's selection callback,
     /// that makes it log "Application performed a reentrant operation in its NSTableView
     /// delegate", which it says will become an assert. Deferring one run-loop turn avoids it.
-    @MainActor var deferred: Binding<Value> {
+    @MainActor var deferred: Binding<Value> { deferred("list") }
+
+    @MainActor func deferred(_ name: String) -> Binding<Value> {
         let base = self
         return Binding(get: { base.wrappedValue }, set: { new in
-            DispatchQueue.main.async { if base.wrappedValue != new { base.wrappedValue = new } }
+            UITrace.log("\(name) selection clicked: \(String(describing: new))")
+            DispatchQueue.main.async {
+                if base.wrappedValue != new {
+                    base.wrappedValue = new
+                    UITrace.log("\(name) selection applied")
+                }
+            }
         })
     }
 }

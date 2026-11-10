@@ -25,6 +25,8 @@ final class TicketDetailModel {
     }
 
     func load() async {
+        UITrace.log("detail: loading \(ticket.ticketClass.rawValue)::\(ticket.key)")
+        defer { UITrace.log("detail: loaded \(ticket.ticketClass.rawValue)::\(ticket.key)") }
         if case .loaded = phase {} else { phase = .loading }
         do {
             phase = .loaded(try await source.detail(ticket))
