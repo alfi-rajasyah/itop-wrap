@@ -16,6 +16,9 @@ struct TicketSource: Sendable {
     var assignToMe: @Sendable (Ticket) async throws -> Void
     var teams: @Sendable () async throws -> [Team]
     var agents: @Sendable (String) async throws -> [Agent]
+    var change: @Sendable (Ticket, TicketChange) async throws -> Void
+    var services: @Sendable (Ticket) async throws -> [ServiceRef]
+    var subcategories: @Sendable (String) async throws -> [ServiceRef]
 
     static func live(_ session: Session, view: TicketList.View) -> TicketSource {
         let service = TicketService(client: session.client)
@@ -24,6 +27,7 @@ struct TicketSource: Sendable {
         let client = session.client
         let me = session.user
         let directory = TeamDirectory(client: session.client)
+        let catalog = ServiceCatalog(client: session.client)
         return TicketSource(
             load: { scope in view == .mine ? try await service.loadMine(me: me, scope: scope) : try await service.loadTeam(me: me, scope: scope) },
             lookup: { try await service.lookup($0) },
@@ -36,7 +40,10 @@ struct TicketSource: Sendable {
             assign: { try await writes.assign($0, teamID: $1, agentID: $2) },
             assignToMe: { try await writes.assignToMe($0, me: me) },
             teams: { try await directory.teams() },
-            agents: { try await directory.agents(inTeam: $0) })
+            agents: { try await directory.agents(inTeam: $0) },
+            change: { try await writes.apply($1, to: $0) },
+            services: { try await catalog.services(for: $0) },
+            subcategories: { try await catalog.subcategories(ofService: $0) })
     }
 }
 
@@ -167,7 +174,7 @@ final class TicketListModel {
     // MARK: Assign (PLAN.md Task 7)
 
     /// The ticket an assign is running on, for a spinner and to block a second click.
-    private(set) var assigning: Ticket.ID?
+    private(set) var working: Ticket.ID?
     /// One line about the last assign, shown above the list: what happened, or why not.
     private(set) var notice: Notice?
 
@@ -182,10 +189,10 @@ final class TicketListModel {
 
     /// Assign to me from a row, the header or the sheet: one call, then a refresh.
     func assignToMe(_ t: Ticket) async {
-        guard assigning == nil else { return }
-        assigning = t.id
+        guard working == nil else { return }
+        working = t.id
         notice = nil
-        defer { assigning = nil }
+        defer { working = nil }
         UITrace.log("\(view) list: assign to me on \(t.id)")
         do {
             try await source.assignToMe(t)
@@ -199,10 +206,10 @@ final class TicketListModel {
 
     /// Assign or reassign to a chosen team and agent. Returns the error text, or nil when done.
     func assign(_ t: Ticket, team: Team, agent: Agent) async -> String? {
-        guard assigning == nil else { return "Another assignment is still running." }
-        assigning = t.id
+        guard working == nil else { return "Another assignment is still running." }
+        working = t.id
         notice = nil
-        defer { assigning = nil }
+        defer { working = nil }
         UITrace.log("\(view) list: assign \(t.id) to a chosen team and agent")
         do {
             try await source.assign(t, team.id, agent.id)
@@ -215,7 +222,47 @@ final class TicketListModel {
         }
     }
 
+    /// Pending, resolve, reopen or close, then a refresh. Returns the error text, or nil when done.
+    func apply(_ change: TicketChange, to t: Ticket) async -> String? {
+        guard working == nil else { return "Another change is still running." }
+        working = t.id
+        notice = nil
+        defer { working = nil }
+        UITrace.log("\(view) list: \(change.action.rawValue) on \(t.id)")
+        do {
+            try await source.change(t, change)
+            let done: String
+            switch change {
+            case .pending: done = "set to pending"
+            case .resolve: done = "resolved"
+            case .reopen: done = "reopened"
+            case .close: done = "closed"
+            }
+            notice = Notice(text: "\(t.ref) is \(done).", isError: false)
+            await refresh()
+            return nil
+        } catch {
+            let verb: String
+            switch change {
+            case .pending: verb = "set \(t.ref) to pending"
+            case .resolve: verb = "resolve \(t.ref)"
+            case .reopen: verb = "reopen \(t.ref)"
+            case .close: verb = "close \(t.ref)"
+            }
+            return Self.actionError(error, ticket: t, verb: verb)
+        }
+    }
+
+    /// Reopen and Close have no sheet, so their errors go to the notice line.
+    func applyFromHeader(_ change: TicketChange, to t: Ticket) async {
+        if let message = await apply(change, to: t) { notice = Notice(text: message, isError: true) }
+    }
+
     static func assignError(_ error: Error, ticket t: Ticket) -> String {
+        actionError(error, ticket: t, verb: "assign \(t.ref)")
+    }
+
+    static func actionError(_ error: Error, ticket t: Ticket, verb: String) -> String {
         switch error {
         case TicketWrites.Failure.alreadyTaken(let name):
             return "\(name) took \(t.ref) a moment ago, so it stays with them."
@@ -225,12 +272,16 @@ final class TicketListModel {
             return "\(TicketGroup.statusLabel(status)) tickets can't be assigned."
         case TicketWrites.Failure.invalidChoice:
             return "Pick a team and an agent first."
+        case TicketWrites.Failure.missing(let field):
+            return "Fill in the \(field) first."
+        case TicketWrites.Failure.notAllowed(let status):
+            return "\(TicketGroup.statusLabel(status)) tickets can't do that. Refresh to see the ticket as it is now."
         case ITopError.writesDisabled:
             return "Changes to iTop are switched off in this build, so nothing was sent."
         default:
             var reason = ErrorText.describe(error).trimmingCharacters(in: .whitespaces)
             if let last = reason.last, !".!?".contains(last) { reason += "." }
-            return "iTop didn't assign \(t.ref). \(reason)"
+            return "iTop didn't \(verb). \(reason)"
         }
     }
 

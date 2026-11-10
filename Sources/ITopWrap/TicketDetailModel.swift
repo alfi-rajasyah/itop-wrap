@@ -40,6 +40,8 @@ final class TicketDetailModel {
 
     var canWrite: Bool { source.canWrite(ticket) }
 
+    var loadedDetail: TicketDetail? { if case .loaded(let d) = phase { d } else { nil } }
+
     /// Adds the entry to the log of the current tab, then reloads the ticket to show it.
     /// On failure the draft stays and the error says why.
     func send(_ text: String) async -> Bool {

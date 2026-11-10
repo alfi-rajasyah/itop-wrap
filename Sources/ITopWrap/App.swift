@@ -161,11 +161,13 @@ enum DebugLaunch {
                 <p>A screenshot the caller linked from elsewhere:</p>
                 <p><img src="https://images.example.net/screenshot.png"></p>
                 <p><b>Caller 1</b><br>Sales<br><img src="https://lh5.googleusercontent.com/phone-icon" width="16" height="16"> : +00 0000 0001<br><img src="https://lh6.googleusercontent.com/mail-icon" width="16" height="16"> : <a href="mailto:caller.one@example.com">caller.one@example.com</a></p>
-                """),
+                """,
+                serviceID: "3", subcategoryID: "12"),
         ]
         let demoMe = demoSession?.user
-        @Sendable func list(_ scope: TicketScope, assigned: [String: DemoWrites.Assignment]) -> [Ticket] {
-            var all = (base + (scope.includeClosed ? closed : [])).map { DemoWrites.apply(assigned[$0.ref], to: $0) }
+        @Sendable func list(_ scope: TicketScope, assigned: [String: DemoWrites.Assignment], statuses: [String: (String, Date)]) -> [Ticket] {
+            var all = (base + closed).map { DemoWrites.apply(assigned[$0.ref], statuses[$0.ref], to: $0) }
+                .filter { scope.includeClosed || !["resolved", "closed"].contains($0.status) }
             // My tickets after an assign: mine, or unassigned TTO in my teams (the real query's rule).
             if view == .mine, let me = demoMe {
                 let myTeams = Set(me.teams.map(\.id))
@@ -188,6 +190,12 @@ enum DebugLaunch {
         }()
         // The demo's mock iTop for writes: added entries are kept in memory and show in the logs.
         let mock = DemoWrites.shared
+        let demoServices = [ServiceRef(id: "3", name: "Network access"), ServiceRef(id: "4", name: "Workplace"), ServiceRef(id: "5", name: "Collaboration")]
+        let demoSubcategories: [String: [ServiceRef]] = [
+            "3": [ServiceRef(id: "12", name: "VPN"), ServiceRef(id: "13", name: "Wi-Fi")],
+            "4": [ServiceRef(id: "20", name: "Laptop"), ServiceRef(id: "21", name: "Printer")],
+            "5": [ServiceRef(id: "30", name: "Teams calls")],
+        ]
         let demoTeams = [Team(id: "10", name: "Network"), Team(id: "11", name: "Service desk"), Team(id: "12", name: "Collaboration")]
         let demoAgents: [String: [Agent]] = [
             "10": [Agent(id: "2", name: "Demo Agent"), Agent(id: "4", name: "Agent 4")],
@@ -201,7 +209,7 @@ enum DebugLaunch {
                                 case "empty": return []
                                 case "loading": try? await Task.sleep(for: .seconds(3600)); return []
                                 case "error": throw ITopError.transport(URLError.Code.notConnectedToInternet.rawValue)
-                                default: try? await Task.sleep(for: .milliseconds(300)); return list(scope, assigned: await mock.assignments)
+                                default: try? await Task.sleep(for: .milliseconds(300)); return list(scope, assigned: await mock.assignments, statuses: await mock.statuses)
                                 }
                             },
                             lookup: { $0 == "R-000512" ? found : nil },
@@ -239,7 +247,25 @@ enum DebugLaunch {
                                 await mock.assign(t.ref, team: team, agent: Agent(id: "2", name: "Demo Agent"), status: "assigned")
                             },
                             teams: { try? await Task.sleep(for: .milliseconds(200)); return demoTeams },
-                            agents: { id in try? await Task.sleep(for: .milliseconds(200)); return demoAgents[id] ?? [] })
+                            agents: { id in try? await Task.sleep(for: .milliseconds(200)); return demoAgents[id] ?? [] },
+                            change: { t, change in
+                                try? await Task.sleep(for: .milliseconds(400))
+                                guard TicketLifecycle.actions(for: t.status).contains(change.action) else { throw TicketWrites.Failure.notAllowed(status: t.status) }
+                                let next: String
+                                switch change {
+                                case .pending(let reason):
+                                    if reason.localizedCaseInsensitiveContains("fail") { throw ITopError.server(code: 100, message: "Error: demo failure on pending") }
+                                    next = "pending"
+                                case .resolve(let r):
+                                    if r.solution.localizedCaseInsensitiveContains("fail") { throw ITopError.server(code: 100, message: "Error: servicesubcategory_id: the subcategory doesn't belong to this service") }
+                                    next = "resolved"
+                                case .reopen: next = "assigned"
+                                case .close: next = "closed"
+                                }
+                                await mock.setStatus(t.ref, next)
+                            },
+                            services: { _ in try? await Task.sleep(for: .milliseconds(200)); return demoServices },
+                            subcategories: { id in try? await Task.sleep(for: .milliseconds(200)); return demoSubcategories[id] ?? [] })
         #else
         return nil
         #endif
@@ -371,16 +397,24 @@ actor DemoWrites {
 
     private var added: [String: [(text: String, isPrivate: Bool, date: Date)]] = [:]
     private(set) var assignments: [String: Assignment] = [:]
+    /// Status changes from lifecycle actions; they win over an assignment's status when newer.
+    private(set) var statuses: [String: (String, Date)] = [:]
 
     func assign(_ ref: String, team: Team, agent: Agent, status: String) {
         assignments[ref] = Assignment(team: team, agent: agent, status: status, date: Date())
+        statuses[ref] = nil
     }
 
-    nonisolated static func apply(_ a: Assignment?, to t: Ticket) -> Ticket {
-        guard let a else { return t }
-        return Ticket(key: t.key, ticketClass: t.ticketClass, ref: t.ref, title: t.title, status: a.status, priority: t.priority,
-                      callerName: t.callerName, orgName: t.orgName, teamID: a.team.id, teamName: a.team.name, agentID: a.agent.id,
-                      agentName: a.agent.name, startDate: t.startDate, lastUpdate: a.date, orgID: t.orgID)
+    func setStatus(_ ref: String, _ status: String) {
+        statuses[ref] = (status, Date())
+    }
+
+    nonisolated static func apply(_ a: Assignment?, _ s: (String, Date)?, to t: Ticket) -> Ticket {
+        guard a != nil || s != nil else { return t }
+        return Ticket(key: t.key, ticketClass: t.ticketClass, ref: t.ref, title: t.title, status: s?.0 ?? a?.status ?? t.status,
+                      priority: t.priority, callerName: t.callerName, orgName: t.orgName, teamID: a?.team.id ?? t.teamID,
+                      teamName: a?.team.name ?? t.teamName, agentID: a?.agent.id ?? t.agentID, agentName: a?.agent.name ?? t.agentName,
+                      startDate: t.startDate, lastUpdate: max(s?.1 ?? .distantPast, a?.date ?? .distantPast), orgID: t.orgID)
     }
 
     func add(_ text: String, ref: String, isPrivate: Bool) {
@@ -396,6 +430,7 @@ actor DemoWrites {
         }
         return TicketDetail(description: base.description, publicLog: base.publicLog + entries(false, from: 1000),
                             privateLog: base.privateLog + entries(true, from: 2000), linkedCIs: base.linkedCIs,
-                            serviceName: base.serviceName, subcategoryName: base.subcategoryName, descriptionHTML: base.descriptionHTML)
+                            serviceName: base.serviceName, subcategoryName: base.subcategoryName, descriptionHTML: base.descriptionHTML,
+                            serviceID: base.serviceID, subcategoryID: base.subcategoryID)
     }
 }

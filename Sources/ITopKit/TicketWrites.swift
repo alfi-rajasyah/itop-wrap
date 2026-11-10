@@ -22,6 +22,10 @@ public struct TicketWrites: Sendable {
         case alreadyTaken(by: String)
         /// Assign to me needs one of your teams.
         case noTeam
+        /// A required field is empty (or not a valid id): "reason", "service", "subcategory", "resolution code", "solution".
+        case missing(String)
+        /// The ticket's state doesn't offer this action.
+        case notAllowed(status: String)
     }
 
     public static func allowlistKey(for ticket: Ticket) -> String {
@@ -39,11 +43,10 @@ public struct TicketWrites: Sendable {
     /// The stimulus that sets team and agent for a ticket in this state: unowned tickets are
     /// assigned, owned ones reassigned. Nil when the state has neither (resolved, closed).
     public static func assignStimulus(for status: String) -> String? {
-        switch status {
-        case "new", "escalated_tto": return "ev_assign"
-        case "assigned", "escalated_ttr", "pending": return "ev_reassign"
-        default: return nil
-        }
+        let actions = TicketLifecycle.actions(for: status)
+        if actions.contains(.assign) { return TicketAction.assign.stimulus }
+        if actions.contains(.reassign) { return TicketAction.reassign.stimulus }
+        return nil
     }
 
     /// Sets the ticket's team and agent with one stimulus.
@@ -80,7 +83,7 @@ public struct TicketWrites: Sendable {
         try await assign(current, teamID: team.id, agentID: me.contactID)
     }
 
-    static func isID(_ value: String) -> Bool {
+    public static func isID(_ value: String) -> Bool {
         !value.isEmpty && value.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
