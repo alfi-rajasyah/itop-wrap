@@ -154,9 +154,4 @@ final class TimerModel {
         date.formatted(date: Calendar.current.isDateInToday(date) ? .omitted : .abbreviated, time: .shortened)
     }
 
-    /// "0:42:10" for the running display.
-    static func elapsed(since start: Date, now: Date = Date()) -> String {
-        let s = Int(max(0, now.timeIntervalSince(start)))
-        return "\(s / 3600):" + String(format: "%02d:%02d", (s / 60) % 60, s % 60)
-    }
 }

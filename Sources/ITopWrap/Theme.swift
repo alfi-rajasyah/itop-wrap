@@ -16,6 +16,9 @@ enum Theme {
     static let accent = dynamic(light: 0x0F6E56, dark: 0x5DCAA5)
     static let accentTint = dynamic(light: 0xE1F5EE, dark: 0x085041)
     static let accentText = dynamic(light: 0x0F6E56, dark: 0x9FE1CB)
+    /// Text on a teal button: white on the dark light-mode teal (6.2:1), near-black on the
+    /// bright dark-mode teal (8.4:1); white there was 2.0:1 (Checkpoint C).
+    static let onAccent = dynamic(light: 0xFFFFFF, dark: 0x1D1D1F)
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
@@ -38,6 +41,24 @@ struct PrimaryButtonStyle: ButtonStyle {
             .background(Theme.primaryFill.opacity(configuration.isPressed ? 0.85 : (isEnabled ? 1 : 0.75)),
                         in: RoundedRectangle(cornerRadius: 7))
             .contentShape(RoundedRectangle(cornerRadius: 7))
+    }
+}
+
+/// The ticket header's main action (Assign to me, Resolve ticket, Reopen ticket). Our own
+/// style, because the system's prominent button picks white text on any tint, which fails
+/// contrast on the dark-mode teal (Checkpoint C).
+struct MainActionStyle: ButtonStyle {
+    let fill: Color
+    let text: Color
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(text)
+            .padding(.horizontal, 11).frame(height: 24)
+            .background(fill.opacity(configuration.isPressed ? 0.85 : (isEnabled ? 1 : 0.5)), in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 

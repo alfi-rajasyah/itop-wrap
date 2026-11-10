@@ -18,7 +18,14 @@ struct PendingSheet: View {
             RequiredLabel("Reason", missing: tried && empty)
             NoteEditor(text: $reason, placeholder: "What are you waiting for? For example the caller's reply or a part.", height: 90, autofocus: true)
                 .accessibilityLabel("Reason, required")
-            if tried && empty { FieldError("Enter a reason.") }
+            if tried && empty { FieldError("Enter why the ticket is waiting.") }
+            if let running = list.timer?.running, running.ticketID == ticket.id {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    Label("Your timer stops and saves \(TimeFormat.clock(Int(context.date.timeIntervalSince(running.start)))) to this ticket.",
+                          systemImage: "stopwatch")
+                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                }
+            }
             if let error { FieldError(error) }
         } buttons: {
             Button("Cancel") { dismiss() }.cancelShortcutUnlessDropdownOpen()
@@ -69,7 +76,14 @@ struct ResolveSheet: View {
             RequiredLabel("Solution", missing: tried && solutionEmpty)
             NoteEditor(text: $solution, placeholder: "What fixed it, in words the caller understands.", height: 110, autofocus: true)
                 .accessibilityLabel("Solution, required")
-            if tried && solutionEmpty { FieldError("Enter a solution.") }
+            if tried && solutionEmpty { FieldError("Describe what fixed it. The caller sees this.") }
+            if let running = list.timer?.running, running.ticketID == ticket.id {
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    Label("Your timer stops and saves \(TimeFormat.clock(Int(context.date.timeIntervalSince(running.start)))) to this ticket.",
+                          systemImage: "stopwatch")
+                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                }
+            }
             if let error { FieldError(error) }
         } buttons: {
             Button("Cancel") { dismiss() }.cancelShortcutUnlessDropdownOpen()
@@ -139,7 +153,7 @@ struct ResolveSheet: View {
 /// Title, subtitle, a single column of fields, and the buttons at the bottom right.
 struct SheetFrame<Fields: View, Buttons: View>: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
     @ViewBuilder let fields: Fields
     @ViewBuilder let buttons: Buttons
 
@@ -147,7 +161,7 @@ struct SheetFrame<Fields: View, Buttons: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 15, weight: .semibold))
-                Text(subtitle).foregroundStyle(Theme.secondary).lineLimit(2)
+                if let subtitle { Text(subtitle).foregroundStyle(Theme.secondary).lineLimit(2) }
             }
             .padding(.bottom, 6)
             fields

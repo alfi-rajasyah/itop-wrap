@@ -62,7 +62,7 @@ struct NewTicketSheet: View {
     private var descriptionEmpty: Bool { draft.description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
-        SheetFrame(title: "New ticket", subtitle: start.ciName.map { "On \($0)" } ?? "Organization first, then the caller") {
+        SheetFrame(title: "New ticket", subtitle: start.ciName.map { "On \($0)" }) {
             Picker("Type", selection: $draft.ticketClass) {
                 Text("User request").tag(TicketClass.userRequest)
                 Text("Incident").tag(TicketClass.incident)

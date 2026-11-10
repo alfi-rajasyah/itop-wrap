@@ -42,7 +42,7 @@ struct MenuBarPanel: View {
                 .padding(10)
             if let n = timer.notice {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "timer").accessibilityHidden(true)
+                    Image(systemName: "stopwatch").accessibilityHidden(true)
                     Text(n.text).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 4)
                     if n.canRetry { Button("Retry") { Task { await timer.retry() } }.disabled(timer.saving) }
@@ -117,11 +117,12 @@ struct MenuBarPanel: View {
             .help("Open \(t.ref) in iTop Wrap")
             if let running {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(TimerModel.elapsed(since: running.start, now: context.date)).monospacedDigit().fontWeight(.bold)
+                    Text(TimeFormat.counter(Int(context.date.timeIntervalSince(running.start))))
+                        .font(.system(size: 12, weight: .bold, design: .monospaced))
                 }
                 .font(.system(size: 12))
             } else if let spent = timer.totals[t.id], spent > 0 {
-                Text(TimeFormat.clock(spent)).font(.system(size: 12)).monospacedDigit().foregroundStyle(Theme.secondary)
+                Text(TimeFormat.total(spent)).font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.secondary)
             }
             timerButton(t, running: running != nil)
         }

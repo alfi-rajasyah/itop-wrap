@@ -201,7 +201,7 @@ struct TicketListView: View {
         case .none, .found:
             if let t = model.timer, let n = t.notice {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "timer").accessibilityHidden(true)
+                    Image(systemName: "stopwatch").accessibilityHidden(true)
                     Text(n.text).fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 4)
                     if n.canRetry {
@@ -319,16 +319,16 @@ struct TicketRow: View {
                 Spacer()
                 if let running {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Label(TimerModel.elapsed(since: running.start, now: context.date), systemImage: "timer")
-                            .monospacedDigit()
-                            .fontWeight(.semibold)
+                        // DESIGN.md: a small stopwatch and 0:12 in bold, in the refs' SF Mono.
+                        Label(TimeFormat.clock(Int(context.date.timeIntervalSince(running.start))), systemImage: "stopwatch")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
                             .foregroundStyle(Theme.text)
                     }
                     .help("Timer running")
                     .accessibilityLabel("Timer running")
                 } else if let spent, spent > 0 {
-                    Text(TimeFormat.clock(spent)).monospacedDigit().help("Time spent")
-                        .accessibilityLabel("\(TimeFormat.clock(spent)) spent")
+                    Text(TimeFormat.total(spent)).font(.system(size: 11, design: .monospaced)).help("Time spent")
+                        .accessibilityLabel("\(TimeFormat.total(spent)) spent")
                 }
                 if showAgent { agent }
             }

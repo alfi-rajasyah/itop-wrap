@@ -63,6 +63,20 @@ public enum TimeFormat {
         return "\(minutes / 60):" + String(format: "%02d", minutes % 60)
     }
 
+    /// Totals on rows and in the detail (DESIGN.md: Time spent): "1h 20m", "45m".
+    public static func total(_ seconds: Int) -> String {
+        let minutes = max(0, seconds) / 60
+        let h = minutes / 60, m = minutes % 60
+        if h == 0 { return "\(m)m" }
+        return m == 0 ? "\(h)h" : "\(h)h \(m)m"
+    }
+
+    /// The live counter while a timer runs: "00:12:34".
+    public static func counter(_ seconds: Int) -> String {
+        let s = max(0, seconds)
+        return String(format: "%02d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60)
+    }
+
     static func itop(_ date: Date) -> String { formatter.string(from: date) }
 
     private static let formatter: DateFormatter = {
