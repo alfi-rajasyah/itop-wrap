@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Next: Task 9, create a ticket.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Next: Checkpoint C.
 
 ## Overview
 
@@ -289,9 +289,11 @@ As built: the Stacked stubs icon is drawn in code as a template image (your choi
 **Description:** A New Ticket form (UserRequest or Incident) with searchable dropdowns (type to filter, or open the full list) for organisation and caller (caller filtered by organisation, searched with `core/get` on `Person` as you type), service (`service_id`, required, limited to services the organisation's contract covers) and service subcategory (`servicesubcategory_id`, required, filtered by service), impact and urgency, a title and a description. Submits with `core/create` and opens the new ticket.
 
 **Acceptance criteria:**
-- [ ] The created ticket shows the same fields in the web UI
-- [ ] Required fields are validated before sending
-- [ ] Pick lists come from iTop, not hard-coded
+- [ ] The created ticket shows the same fields in the web UI (demo: created R-000601 by keyboard; real check pending, needs ITOPWRAP_WRITE_TICKETS plus the new-ticket switch)
+- [x] Required fields are validated before sending (tests; demo: an empty form turned every Required label red and sent nothing)
+- [x] Pick lists come from iTop, not hard-coded (organizations, callers, services, subcategories); impact and urgency use iTop's standard values, since REST can't list them
+
+As built: opens from ⌘N, the menu bar, an organization's header, or a CI ("New ticket on this CI" links it); Cancel keeps the draft with Clear form; the new ticket is read back and opened. Also fixed in this task: the ticket header stacks its actions under the title in narrow windows.
 
 **Verification:** `swift test --filter CreateTests` · manual: create one test ticket
 
