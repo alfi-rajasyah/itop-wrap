@@ -2,12 +2,13 @@ import AppKit
 import ITopKit
 import SwiftUI
 
-/// The ticket on the right (DESIGN.md: Ticket detail; wireframe Main.dc.html). Read-only for now:
-/// actions, the log composer and the timer arrive with the write tasks.
+/// The ticket on the right (DESIGN.md: Ticket detail; wireframe Main.dc.html): header with
+/// Assign to me and the More menu, details strip, description, logs and the log composer.
 struct TicketDetailView: View {
     let list: TicketListModel
     var openCI: (LinkedCI) -> Void
     @State private var model: TicketDetailModel
+    @State private var showAssign = false
 
     init(ticket: Ticket, list: TicketListModel, openCI: @escaping (LinkedCI) -> Void) {
         self.list = list
@@ -15,7 +16,8 @@ struct TicketDetailView: View {
         _model = State(initialValue: TicketDetailModel(ticket: ticket, source: list.source))
     }
 
-    private var ticket: Ticket { model.ticket }
+    /// The list's latest copy, so an assign or refresh shows up here at once.
+    private var ticket: Ticket { list.ticket(model.ticket.id) ?? model.ticket }
 
     var body: some View {
         ScrollView {
@@ -53,7 +55,10 @@ struct TicketDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if case .loaded = model.phase { LogComposer(model: model, list: list) }
         }
-        .task(id: ticket.lastUpdate) { await model.load() }
+        .task(id: "\(ticket.status)|\(ticket.agentID)|\(ticket.teamID)|\(ticket.lastUpdate?.timeIntervalSince1970 ?? 0)") {
+            model.ticket = ticket
+            await model.load()
+        }
     }
 
     // MARK: Header
@@ -100,7 +105,27 @@ struct TicketDetailView: View {
                 }
             }
             Spacer(minLength: 0)
+            if ticket.isUnassigned && list.canAssign(ticket) {
+                let needsYou = TicketList.needsYou(ticket, me: list.me)
+                Button {
+                    Task { await list.assignToMe(ticket) }
+                } label: {
+                    HStack(spacing: 6) {
+                        if list.assigning == ticket.id { ProgressView().controlSize(.mini) }
+                        Text("Assign to me")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(needsYou ? Theme.accent : Theme.primaryFill)
+                .disabled(list.assigning != nil || !model.canWrite)
+                .help(model.canWrite ? "Assign \(ticket.ref) to you" : "Changes to iTop are switched off in this build")
+            }
             Menu {
+                if list.canAssign(ticket) {
+                    Button(ticket.isUnassigned ? "Assign to someone else…" : "Reassign…") { showAssign = true }
+                        .disabled(!model.canWrite || list.assigning != nil)
+                    Divider()
+                }
                 Button("Copy ref \(ticket.ref)") {
                     Task { await model.copyRef { ref in
                         NSPasteboard.general.clearContents()
@@ -117,6 +142,9 @@ struct TicketDetailView: View {
             .fixedSize()
             .help("More actions")
             .accessibilityLabel("More actions")
+        }
+        .sheet(isPresented: $showAssign) {
+            AssignSheet(ticket: ticket, list: list)
         }
     }
 

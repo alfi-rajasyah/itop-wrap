@@ -11,7 +11,7 @@ final class TicketDetailModel {
         case failed(String)
     }
 
-    let ticket: Ticket
+    var ticket: Ticket
     private let source: TicketSource
     private(set) var phase: Phase = .loading
     var tab: Tab = .public

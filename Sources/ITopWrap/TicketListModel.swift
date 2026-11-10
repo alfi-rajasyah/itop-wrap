@@ -12,6 +12,10 @@ struct TicketSource: Sendable {
     var download: @Sendable (AttachmentRef) async throws -> AttachmentFile
     var addEntry: @Sendable (Ticket, String, Bool) async throws -> Void
     var canWrite: @Sendable (Ticket) -> Bool
+    var assign: @Sendable (Ticket, String, String) async throws -> Void
+    var assignToMe: @Sendable (Ticket) async throws -> Void
+    var teams: @Sendable () async throws -> [Team]
+    var agents: @Sendable (String) async throws -> [Agent]
 
     static func live(_ session: Session, view: TicketList.View) -> TicketSource {
         let service = TicketService(client: session.client)
@@ -19,6 +23,7 @@ struct TicketSource: Sendable {
         let writes = TicketWrites(client: session.client)
         let client = session.client
         let me = session.user
+        let directory = TeamDirectory(client: session.client)
         return TicketSource(
             load: { scope in view == .mine ? try await service.loadMine(me: me, scope: scope) : try await service.loadTeam(me: me, scope: scope) },
             lookup: { try await service.lookup($0) },
@@ -27,7 +32,11 @@ struct TicketSource: Sendable {
             attachments: { try await loader.attachments(of: $0) },
             download: { try await loader.download($0) },
             addEntry: { try await writes.addLogEntry(to: $0, text: $1, isPrivate: $2) },
-            canWrite: { client.canWrite(className: $0.ticketClass.rawValue, key: $0.key) })
+            canWrite: { client.canWrite(className: $0.ticketClass.rawValue, key: $0.key) },
+            assign: { try await writes.assign($0, teamID: $1, agentID: $2) },
+            assignToMe: { try await writes.assignToMe($0, me: me) },
+            teams: { try await directory.teams() },
+            agents: { try await directory.agents(inTeam: $0) })
     }
 }
 
@@ -152,6 +161,76 @@ final class TicketListModel {
             lookup = found.map(Lookup.found) ?? .missing(ref)
         } catch {
             lookup = .failed(ErrorText.describe(error))
+        }
+    }
+
+    // MARK: Assign (PLAN.md Task 7)
+
+    /// The ticket an assign is running on, for a spinner and to block a second click.
+    private(set) var assigning: Ticket.ID?
+    /// One line about the last assign, shown above the list: what happened, or why not.
+    private(set) var notice: Notice?
+
+    struct Notice: Equatable {
+        let text: String
+        let isError: Bool
+    }
+
+    func clearNotice() { notice = nil }
+
+    func canAssign(_ t: Ticket) -> Bool { TicketWrites.assignStimulus(for: t.status) != nil }
+
+    /// Assign to me from a row, the header or the sheet: one call, then a refresh.
+    func assignToMe(_ t: Ticket) async {
+        guard assigning == nil else { return }
+        assigning = t.id
+        notice = nil
+        defer { assigning = nil }
+        UITrace.log("\(view) list: assign to me on \(t.id)")
+        do {
+            try await source.assignToMe(t)
+            notice = Notice(text: "\(t.ref) is assigned to you.", isError: false)
+            await refresh()
+        } catch {
+            notice = Notice(text: Self.assignError(error, ticket: t), isError: true)
+            if case TicketWrites.Failure.alreadyTaken = error { await refresh() }
+        }
+    }
+
+    /// Assign or reassign to a chosen team and agent. Returns the error text, or nil when done.
+    func assign(_ t: Ticket, team: Team, agent: Agent) async -> String? {
+        guard assigning == nil else { return "Another assignment is still running." }
+        assigning = t.id
+        notice = nil
+        defer { assigning = nil }
+        UITrace.log("\(view) list: assign \(t.id) to a chosen team and agent")
+        do {
+            try await source.assign(t, team.id, agent.id)
+            let who = agent.id == me.contactID ? "you" : agent.name
+            notice = Notice(text: "\(t.ref) is assigned to \(who) in \(team.name).", isError: false)
+            await refresh()
+            return nil
+        } catch {
+            return Self.assignError(error, ticket: t)
+        }
+    }
+
+    static func assignError(_ error: Error, ticket t: Ticket) -> String {
+        switch error {
+        case TicketWrites.Failure.alreadyTaken(let name):
+            return "\(name) took \(t.ref) a moment ago, so it stays with them."
+        case TicketWrites.Failure.noTeam:
+            return "You aren't in any team in iTop, so Assign to me can't pick one. Choose a team and agent instead."
+        case TicketWrites.Failure.cannotAssign(let status):
+            return "\(TicketGroup.statusLabel(status)) tickets can't be assigned."
+        case TicketWrites.Failure.invalidChoice:
+            return "Pick a team and an agent first."
+        case ITopError.writesDisabled:
+            return "Changes to iTop are switched off in this build, so nothing was sent."
+        default:
+            var reason = ErrorText.describe(error).trimmingCharacters(in: .whitespaces)
+            if let last = reason.last, !".!?".contains(last) { reason += "." }
+            return "iTop didn't assign \(t.ref). \(reason)"
         }
     }
 

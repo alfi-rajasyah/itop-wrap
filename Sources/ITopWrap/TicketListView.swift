@@ -86,7 +86,8 @@ struct TicketListView: View {
             ForEach(sections) { section in
                 Section {
                     ForEach(section.tickets) { t in
-                        TicketRow(ticket: t, me: model.me, showAgent: model.view == .team || t.isUnassigned)
+                        TicketRow(ticket: t, me: model.me, showAgent: model.view == .team || t.isUnassigned,
+                                  assignToMe: assignAction(t))
                             .tag(t.id)
                     }
                 } header: {
@@ -170,8 +171,17 @@ struct TicketListView: View {
     private var lookupSection: some View {
         if case .found(let t) = model.lookup {
             Section("Search result: not in your queue") {
-                TicketRow(ticket: t, me: model.me, showAgent: true).tag(t.id)
+                TicketRow(ticket: t, me: model.me, showAgent: true, assignToMe: assignAction(t)).tag(t.id)
             }
+        }
+    }
+
+    /// The row's "Assign to me" pill: opens the ticket and assigns it, when it can be assigned.
+    private func assignAction(_ t: Ticket) -> (() -> Void)? {
+        guard t.isUnassigned, model.canAssign(t), model.source.canWrite(t) else { return nil }
+        return {
+            model.selection = t.id
+            Task { await model.assignToMe(t) }
         }
     }
 
@@ -187,7 +197,21 @@ struct TicketListView: View {
         case .failed(let message):
             statusLine(Text("Couldn't look that up: \(message)"), color: Theme.warning)
         case .none, .found:
-            EmptyView()
+            if let n = model.notice {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(n.text).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    Button { model.clearNotice() } label: { Image(systemName: "xmark") }
+                        .buttonStyle(.plain)
+                        .help("Dismiss")
+                        .accessibilityLabel("Dismiss")
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(n.isError ? Theme.warning : Theme.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(.bar)
+            }
         }
     }
 
@@ -240,6 +264,7 @@ struct TicketRow: View {
     let ticket: Ticket
     let me: CurrentUser
     let showAgent: Bool
+    var assignToMe: (() -> Void)? = nil
 
     private var needsYou: Bool { TicketList.needsYou(ticket, me: me) }
 
@@ -293,7 +318,18 @@ struct TicketRow: View {
 
     @ViewBuilder
     private var agent: some View {
-        if ticket.isUnassigned {
+        if ticket.isUnassigned, let assignToMe {
+            Button(action: assignToMe) {
+                Text("Assign to me")
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .overlay(Capsule().strokeBorder(Theme.secondary, style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Assign \(ticket.ref) to you")
+            .accessibilityLabel("Assign \(ticket.ref) to me")
+        } else if ticket.isUnassigned {
             HStack(spacing: 4) {
                 Circle().strokeBorder(Theme.secondary, style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
                     .frame(width: 14, height: 14)
