@@ -19,7 +19,7 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
         }
         let recorded = RecordedRequest(request: request, body: Self.body(of: request))
         server.record(recorded)
-        switch server.reply {
+        switch server.reply(recorded) {
         case .failure(let error):
             client?.urlProtocol(self, didFailWithError: error)
         case .response(let status, let contentType, let body):
@@ -74,6 +74,10 @@ enum StubReply: Sendable {
     case response(status: Int, contentType: String, body: Data)
     case failure(URLError)
 
+    static func fixture(_ name: String) -> StubReply {
+        .response(status: 200, contentType: "application/json", body: (try? Fixture.data(name)) ?? Data())
+    }
+
     static func json(_ text: String, status: Int = 200) -> StubReply {
         .response(status: status, contentType: "application/json", body: Data(text.utf8))
     }
@@ -81,12 +85,16 @@ enum StubReply: Sendable {
 
 final class StubServer: @unchecked Sendable {
     let id = UUID().uuidString
-    let reply: StubReply
+    let reply: @Sendable (RecordedRequest) -> StubReply
     private let lock = NSLock()
     private var _requests: [RecordedRequest] = []
 
-    init(_ reply: StubReply) {
-        self.reply = reply
+    /// Always answers with the same reply.
+    convenience init(_ reply: StubReply) { self.init { _ in reply } }
+
+    /// Answers each request with what `handler` returns, for example by iTop class.
+    init(handler: @escaping @Sendable (RecordedRequest) -> StubReply) {
+        self.reply = handler
         StubRegistry.shared.add(self)
     }
 

@@ -87,13 +87,14 @@ Done 2026-11-10: `swift test` 20/20 passing, no warnings.
 **Description:** Add a login screen (server URL, username, password) that calls `check_credentials`, saves the password to the Keychain and the URL and username to UserDefaults, then loads the current User, Person and teams. Add the sidebar app shell (My Tickets / Team Tickets / CMDB, all placeholders) and Sign out.
 
 **Acceptance criteria:**
-- [ ] A wrong password shows "Invalid credentials"; the right one opens the shell
-- [ ] After relaunch you're signed in without re-entering anything
-- [ ] Sign out removes the Keychain item
+- [x] A wrong password shows "Invalid credentials"; the right one opens the shell (tests; your real sign-in still to confirm)
+- [x] After relaunch you're signed in without re-entering anything (tests; real relaunch still to confirm)
+- [x] Sign out removes the Keychain item (tests, including a real Keychain round trip)
+- [x] An account without REST rights gets its own message (the iTop wording is a guess until seen on a real server)
 
 **Verification:** `swift test --filter AuthTests` · manual: `swift run ITopWrap` against your server (read-only)
 
-**Dependencies:** 1, 0b · **Files:** `Sources/ITopKit/CurrentUser.swift`, `Sources/ITopWrap/App.swift`, `LoginView.swift`, `KeychainStore.swift`, `SessionModel.swift` · **Scope:** M
+**Dependencies:** 1, 0b · **Files:** `Sources/ITopKit/CurrentUser.swift`, `KeychainStore.swift`, `SessionService.swift`, `OQL.swift` (moved into ITopKit so they're testable), `Sources/ITopWrap/App.swift`, `LoginView.swift`, `ShellView.swift`, `SessionModel.swift`, `Theme.swift`, `Tests/ITopKitTests/AuthTests.swift` · **Scope:** M
 
 ### Checkpoint A: Foundation
 - [ ] `swift test` passes, no warnings in ITopKit
