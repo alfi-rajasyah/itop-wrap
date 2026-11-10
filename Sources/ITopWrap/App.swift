@@ -71,13 +71,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 enum DebugLaunch {
     static var env: [String: String] { ProcessInfo.processInfo.environment }
 
+    ///   ITOPWRAP_WRITE_TICKETS=R-079999,R-080001   switch writes on for these tickets only (testing on a real iTop)
     @MainActor static var service: SessionService {
         #if DEBUG
+        let refs = (env["ITOPWRAP_WRITE_TICKETS"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).uppercased() }.filter { !$0.isEmpty }
+        let access: WriteAccess = refs.isEmpty ? .off : .tickets(refs)
         if let suite = env["ITOPWRAP_SETTINGS"], let defaults = UserDefaults(suiteName: "ITopWrap.debug.\(suite)") {
-            return SessionService(secrets: KeychainStore(service: "iTop Wrap debug \(suite)"), settings: SessionSettings(defaults: defaults))
+            return SessionService(secrets: KeychainStore(service: "iTop Wrap debug \(suite)"), settings: SessionSettings(defaults: defaults), writeAccess: access)
         }
-        #endif
+        return SessionService(writeAccess: access)
+        #else
         return SessionService()
+        #endif
     }
 
     static var demoSession: Session? {
@@ -175,6 +180,8 @@ enum DebugLaunch {
             img.unlockFocus()
             return NSBitmapImageRep(data: img.tiffRepresentation ?? Data())?.representation(using: .png, properties: [:]) ?? Data()
         }()
+        // The demo's mock iTop for writes: added entries are kept in memory and show in the logs.
+        let mock = DemoWrites()
         // ITOPWRAP_DEMO_STATE=empty|loading|error forces a list state for the Delivery Gate.
         let state = env["ITOPWRAP_DEMO_STATE"] ?? ""
         return TicketSource(load: { scope in
@@ -188,7 +195,8 @@ enum DebugLaunch {
                             lookup: { $0 == "R-000512" ? found : nil },
                             detail: { t in
                                 try? await Task.sleep(for: .milliseconds(300))
-                                return details[t.ref] ?? TicketDetail(description: "Demo ticket without a description.", publicLog: [], privateLog: [], linkedCIs: [])
+                                let base = details[t.ref] ?? TicketDetail(description: "Demo ticket without a description.", publicLog: [], privateLog: [], linkedCIs: [])
+                                return await mock.merged(base, ref: t.ref)
                             },
                             image: { id in
                                 try? await Task.sleep(for: .milliseconds(400))
@@ -196,7 +204,13 @@ enum DebugLaunch {
                                 return InlineImageLoader.Image(data: demoPNG, mimetype: "image/png")
                             },
                             attachments: { t in t.ref == "R-000412" ? [AttachmentRef(id: "1", name: "vpn-client.log"), AttachmentRef(id: "2", name: "gateway-config.txt")] : [] },
-                            download: { a in AttachmentFile(data: Data("Demo attachment \(a.name)\n".utf8), filename: a.name, mimetype: "text/plain") })
+                            download: { a in AttachmentFile(data: Data("Demo attachment \(a.name)\n".utf8), filename: a.name, mimetype: "text/plain") },
+                            addEntry: { t, text, isPrivate in
+                                try? await Task.sleep(for: .milliseconds(400))
+                                if text.localizedCaseInsensitiveContains("fail") { throw ITopError.server(code: 100, message: "Error: demo failure on request") }
+                                await mock.add(text.trimmingCharacters(in: .whitespacesAndNewlines), ref: t.ref, isPrivate: isPrivate)
+                            },
+                            canWrite: { _ in true })
         #else
         return nil
         #endif
@@ -312,5 +326,26 @@ enum DebugLaunch {
         default: break
         }
         #endif
+    }
+}
+
+/// The demo's mock iTop for log entries (debug only).
+actor DemoWrites {
+    private var added: [String: [(text: String, isPrivate: Bool, date: Date)]] = [:]
+
+    func add(_ text: String, ref: String, isPrivate: Bool) {
+        added[ref, default: []].append((text, isPrivate, Date()))
+    }
+
+    func merged(_ base: TicketDetail, ref: String) -> TicketDetail {
+        let extra = added[ref] ?? []
+        func entries(_ priv: Bool, from start: Int) -> [LogEntry] {
+            extra.filter { $0.isPrivate == priv }.enumerated().map { i, e in
+                LogEntry(id: start + i, date: e.date, author: "Demo Agent", text: e.text)
+            }
+        }
+        return TicketDetail(description: base.description, publicLog: base.publicLog + entries(false, from: 1000),
+                            privateLog: base.privateLog + entries(true, from: 2000), linkedCIs: base.linkedCIs,
+                            serviceName: base.serviceName, subcategoryName: base.subcategoryName, descriptionHTML: base.descriptionHTML)
     }
 }

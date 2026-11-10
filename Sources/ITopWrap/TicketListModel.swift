@@ -10,10 +10,14 @@ struct TicketSource: Sendable {
     var image: @Sendable (String) async throws -> InlineImageLoader.Image
     var attachments: @Sendable (Ticket) async throws -> [AttachmentRef]
     var download: @Sendable (AttachmentRef) async throws -> AttachmentFile
+    var addEntry: @Sendable (Ticket, String, Bool) async throws -> Void
+    var canWrite: @Sendable (Ticket) -> Bool
 
     static func live(_ session: Session, view: TicketList.View) -> TicketSource {
         let service = TicketService(client: session.client)
         let loader = InlineImageLoader(client: session.client)
+        let writes = TicketWrites(client: session.client)
+        let client = session.client
         let me = session.user
         return TicketSource(
             load: { scope in view == .mine ? try await service.loadMine(me: me, scope: scope) : try await service.loadTeam(me: me, scope: scope) },
@@ -21,7 +25,9 @@ struct TicketSource: Sendable {
             detail: { try await service.detail(for: $0) },
             image: { try await loader.image(id: $0) },
             attachments: { try await loader.attachments(of: $0) },
-            download: { try await loader.download($0) })
+            download: { try await loader.download($0) },
+            addEntry: { try await writes.addLogEntry(to: $0, text: $1, isPrivate: $2) },
+            canWrite: { client.canWrite(className: $0.ticketClass.rawValue, key: $0.key) })
     }
 }
 
@@ -59,6 +65,9 @@ final class TicketListModel {
     var selection: Ticket.ID?
     /// The org filter (DESIGN.md: Org filter): one organization, or `nil` for all.
     var orgFilter: String?
+    /// Unsent log entries per ticket and log, kept across ticket switches and failed sends.
+    var drafts: [String: String] = [:]
+
     /// The page shown; back to 1 whenever what's listed changes.
     var page = 1 { didSet { if page != oldValue { UITrace.log("\(view) list: page \(page)") } } }
 

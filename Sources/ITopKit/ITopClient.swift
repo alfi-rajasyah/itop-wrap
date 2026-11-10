@@ -5,20 +5,44 @@ public struct ITopClient: Sendable {
     public let server: ServerAddress
     public let credentials: Credentials
     public let allowsWrites: Bool
+    /// When set, writes are allowed only on these objects ("UserRequest::7"), and nothing can be
+    /// created: the safety net for testing writes on chosen tickets of a real iTop.
+    public let writeAllowlist: Set<String>?
     let session: URLSession
 
     /// `allowsWrites` is `false` by default: during development the app only reads.
     public init(server: ServerAddress, credentials: Credentials,
-                session: URLSession = .shared, allowsWrites: Bool = false) {
+                session: URLSession = .shared, allowsWrites: Bool = false, writeAllowlist: Set<String>? = nil) {
         self.server = server
         self.credentials = credentials
         self.session = session
         self.allowsWrites = allowsWrites
+        self.writeAllowlist = writeAllowlist
+    }
+
+    /// The same client with writes on, optionally limited to an allowlist.
+    public func allowingWrites(only allowlist: Set<String>?) -> ITopClient {
+        ITopClient(server: server, credentials: credentials, session: session, allowsWrites: true, writeAllowlist: allowlist)
+    }
+
+    /// Whether a write to this object would be sent (for enabling the composer and actions).
+    public func canWrite(className: String, key: String) -> Bool {
+        guard allowsWrites else { return false }
+        guard let allowlist = writeAllowlist else { return true }
+        return allowlist.contains("\(className)::\(key)")
+    }
+
+    private func permits(_ operation: RESTOperation) -> Bool {
+        switch operation {
+        case .update(let cls, let key, _, _), .applyStimulus(let cls, let key, _, _, _): return canWrite(className: cls, key: key)
+        case .create: return allowsWrites && writeAllowlist == nil
+        default: return true
+        }
     }
 
     /// Sends one operation and returns iTop's answer, or throws an `ITopError`.
     public func send(_ operation: RESTOperation) async throws -> ITopResponse {
-        if operation.isWrite && !allowsWrites { throw ITopError.writesDisabled }
+        if operation.isWrite && !permits(operation) { throw ITopError.writesDisabled }
 
         var request = URLRequest(url: server.restEndpoint)
         request.httpMethod = "POST"

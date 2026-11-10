@@ -50,6 +50,9 @@ struct TicketDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.system(size: 13))
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if case .loaded = model.phase { LogComposer(model: model, list: list) }
+        }
         .task(id: ticket.lastUpdate) { await model.load() }
     }
 
@@ -272,5 +275,72 @@ struct FlowLayout: Layout {
             rows.append(row)
         }
         return rows.filter { !$0.indices.isEmpty }
+    }
+}
+
+/// The log composer pinned under the detail (wireframe Main.dc.html; DESIGN.md: Copy).
+/// It writes to the log of the selected tab; ⌘↩ sends.
+struct LogComposer: View {
+    let model: TicketDetailModel
+    let list: TicketListModel
+    @FocusState private var focused: Bool
+
+    private var isPrivate: Bool { model.tab == .private }
+    private var key: String { "\(model.ticket.id)|\(isPrivate ? "private" : "public")" }
+    private var draft: Binding<String> {
+        Binding(get: { list.drafts[key] ?? "" }, set: { list.drafts[key] = $0 })
+    }
+    private var canSend: Bool {
+        model.canWrite && !model.sending && !(list.drafts[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: draft)
+                    .font(.system(size: 13))
+                    .scrollContentBackground(.hidden)
+                    .focused($focused)
+                    .frame(height: 64)
+                    .disabled(!model.canWrite)
+                    .accessibilityLabel(isPrivate ? "Private entry" : "Public entry")
+                if (list.drafts[key] ?? "").isEmpty {
+                    Text(isPrivate ? "Write a private entry, only agents see it" : "Write a public entry, the caller sees it")
+                        .foregroundStyle(Theme.secondary)
+                        .padding(.leading, 5).padding(.top, 1)
+                        .allowsHitTesting(false)
+                }
+            }
+            .padding(8)
+            .background(Theme.chip.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(focused ? Theme.text.opacity(0.5) : Theme.separator))
+
+            HStack(spacing: 8) {
+                if let error = model.sendError {
+                    Text(error).font(.system(size: 12)).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true)
+                } else if !model.canWrite {
+                    Text("Adding entries is switched off in this build, so nothing is sent to iTop.")
+                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    let text = list.drafts[key] ?? ""
+                    Task { if await model.send(text) { list.drafts[key] = nil } }
+                } label: {
+                    HStack(spacing: 6) {
+                        if model.sending { ProgressView().controlSize(.mini) }
+                        Text(isPrivate ? "Add to private log" : "Add to public log")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.primaryFill)
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(!canSend)
+                .help(model.canWrite ? "Add the entry (⌘↩)" : "Changes to iTop are switched off in this build")
+            }
+        }
+        .padding(.horizontal, 24).padding(.vertical, 12)
+        .background(.bar)
+        .overlay(alignment: .top) { Divider() }
     }
 }

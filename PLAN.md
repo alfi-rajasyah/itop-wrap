@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Next: Phase 3, write features against the mock.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Next: Task 7, reassign.
 
 ## Overview
 
@@ -212,12 +212,13 @@ Probe result (2026-11-11): your iTop answers the web image links with 403 to HTT
 **Description:** On ticket detail, a composer for public or private log entries, saved with `core/update` on `public_log` / `private_log` plus a `comment`.
 
 **Acceptance criteria:**
-- [ ] The entry appears in the web UI history with your name
-- [ ] Failures show an error and keep the draft
+- [x] The entry appears in the web UI history with your name (checked 2026-11-11: one private entry on a test ticket, the only write sent)
+- [x] Failures show an error and keep the draft (demo mock: an entry containing "fail" is rejected)
+- [x] Writes are off unless switched on per ticket: `ITOPWRAP_WRITE_TICKETS=R-…` (debug builds) resolves refs to keys, and the client refuses any write to another ticket before sending
 
-**Verification:** `swift test --filter UpdateTests` (encoded request) · manual on a test ticket
+**Verification:** `swift test --filter UpdateTests` (encoded request, write allowlist) · demo: `ITOPWRAP_DEMO=1` · manual on a test ticket
 
-**Dependencies:** 4 · **Files:** `Sources/ITopKit/TicketWrites.swift`, `Sources/ITopWrap/LogComposerView.swift` · **Scope:** S
+**Dependencies:** 4 · **Files:** `Sources/ITopKit/TicketWrites.swift`, `Sources/ITopKit/ITopClient.swift`, `Sources/ITopKit/SessionService.swift`, `Sources/ITopWrap/TicketDetailView.swift` (LogComposer) · **Scope:** S
 
 ## Task 7: Reassign team and agent
 
