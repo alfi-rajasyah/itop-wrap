@@ -37,6 +37,8 @@ The teal appears in exactly one meaning: **this ticket needs you**, which means 
 - Their list rows get a teal "Needs you" pill.
 - The detail view shows the primary action as the one filled (teal) button.
 
+Sidebar selection uses the macOS accent colour the user chose in System Settings (blue by default); the app doesn't override system controls, and teal stays reserved for "needs you".
+
 Every other status pill (Assigned, Pending, Resolved, Closed) is neutral text on a neutral tint. Status is always written as text, never shown by colour alone.
 
 ## Time spent (start/stop timer)

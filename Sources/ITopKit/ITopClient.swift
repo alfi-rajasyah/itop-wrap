@@ -50,7 +50,7 @@ public struct ITopClient: Sendable {
         let message = body["message"]?.stringValue ?? ""
         switch code {
         case 0: return ITopResponse(body: body)
-        case 1: throw ITopError.invalidCredentials
+        case 1: throw Self.isPermissionMessage(message) ? ITopError.restNotAllowed : ITopError.invalidCredentials
         default: throw ITopError.server(code: code, message: message)
         }
     }
@@ -78,6 +78,13 @@ public struct ITopClient: Sendable {
     /// RFC 3986 unreserved characters. Foundation's `.urlQueryAllowed` keeps `&`, `=` and `+`,
     /// which would split a password like "p&ss=w+rd" (TransportTests covers this).
     static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+    /// iTop answers code 1 both for a wrong password and for an account without REST rights;
+    /// only the message tells them apart. The exact wording should be confirmed on the real server.
+    static func isPermissionMessage(_ message: String) -> Bool {
+        let m = message.lowercased()
+        return m.contains("permission") || m.contains("rest services") || m.contains("not allowed")
+    }
 
     static func map(_ error: URLError) -> ITopError {
         switch error.code {

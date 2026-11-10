@@ -3,8 +3,10 @@ import Foundation
 public enum ITopError: Error, Equatable, Sendable {
     /// The server address can't be used (empty, or not http/https).
     case invalidServerAddress
-    /// iTop code 1: wrong username or password, or the account can't use REST.
+    /// iTop code 1: wrong username or password.
     case invalidCredentials
+    /// iTop code 1 with a permissions message: the account lacks the "REST Services User" profile.
+    case restNotAllowed
     /// Any other non-zero iTop `code`, with iTop's own message.
     case server(code: Int, message: String)
     /// The web server answered with an HTTP error status.
@@ -26,6 +28,8 @@ extension ITopError: LocalizedError {
             return "That server address can't be used. Enter it like https://itop.example.com."
         case .invalidCredentials:
             return "Invalid credentials. Check your username and password."
+        case .restNotAllowed:
+            return "This account can't use the iTop REST API. Ask your iTop admin to add the \"REST Services User\" profile, then sign in again."
         case .server(let code, let message):
             return message.isEmpty ? "iTop returned error \(code)." : "iTop returned error \(code): \(message)"
         case .http(let status):
