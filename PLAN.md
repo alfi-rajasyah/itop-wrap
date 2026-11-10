@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 3 done; Checkpoint A passed (2026-11-10).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 4 done; Checkpoint A passed (2026-11-10).
 
 ## Overview
 
@@ -126,7 +126,7 @@ Done 2026-11-10 on `task-3-ticket-lists`: 47 tests; click-through in the debug d
 **Description:** A detail pane showing description, caller, organisation, team and agent, and the public and private logs parsed into individual entries (author, date, text, with HTML stripped or rendered), plus linked CIs from `functionalcis_list`.
 
 **Acceptance criteria:**
-- [ ] Log entries appear in the same order and with the same authors as in the web UI (your check on 3 real tickets)
+- [x] Log entries appear in the same order and with the same authors as in the web UI (confirmed by you on real tickets)
 - [x] Linked CIs are listed and clickable (they open in iTop on the web for now, and in the CMDB view after Task 5)
 - [x] The description and log HTML become plain text with line breaks; images show as "[Image]" and nothing is fetched from links inside the HTML
 
@@ -161,6 +161,23 @@ Done 2026-11-10 on `task-4-ticket-detail`: 63 tests; click-through in the debug 
 **Verification:** `swift test --filter OrgQueryTests` · manual comparison with the web UI
 
 **Dependencies:** 3, 4 · **Files:** `Sources/ITopKit/Organization.swift`, `OrgQueries.swift`, `Sources/ITopWrap/OrgsView.swift`, `OrgFilterMenu.swift` · **Scope:** M
+
+## Task 5c: Inline images, clickable links and attachments
+
+**Description:** Show images from descriptions and log entries inline instead of "[Image]", make links clickable, and list the ticket's attachments. Images stored in your iTop are downloaded from your own server with your login. Images hosted anywhere else are never loaded automatically: they show as "Image from <host>" with a button that opens them in your browser. Clicking an inline image opens it full size. Links open in your browser.
+
+**First, a read-only probe:** on one ticket that has a pasted image, check whether iTop's image links (`ajax.document.php?operation=download_inlineimage…`) accept the REST login, or need the web login (a session cookie). The approach depends on the answer.
+
+**Acceptance criteria:**
+- [ ] Images stored in your iTop show inline, sized to the pane, in the description and in log entries
+- [ ] No request goes to any host other than your iTop server unless you click "Open in browser"
+- [ ] Links in descriptions and log entries are clickable and open in your browser
+- [ ] The ticket's attachments are listed with name and size; each downloads on click
+- [ ] An image that fails to load shows "Couldn't load this image" plus "Open in iTop on the web"
+
+**Verification:** `swift test --filter RichTextTests` (image and link extraction, host check) · manual check on a real ticket with a pasted image and an attachment
+
+**Dependencies:** 4 · **Files:** `Sources/ITopKit/HTMLText.swift` (images and links as parts, not flattened), `InlineImageLoader.swift`, `Sources/ITopWrap/RichTextView.swift`, `TicketDetailView.swift` · **Scope:** M
 
 ### Checkpoint B: Read-only parity
 - [ ] antislop Delivery Gate PASS on list, detail and CMDB, including empty, loading and error states
