@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5b done; Checkpoint A passed (2026-11-11).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoint A passed (2026-11-11). Next: Checkpoint B.
 
 ## Overview
 
@@ -170,7 +170,7 @@ Built 2026-11-10 on `task-5-cmdb`: 73 tests; click-through in the debug demo.
 - [x] After your second review: "Any time" works with resolved and closed; a "Show 10/20/30/50/100/All" menu with a pager on every ticket list; People search says "Showing 100 of N"; long tables build rows lazily
 - [x] A debug trace (`ITOPWRAP_TRACE=1`) showed iTop returns every ticket (556 for one org, 773 for one agent), so the "only 5" limit isn't on the server side
 - [x] The "only 5" display: not a bug. A capture of your window showed one agent with 777 tickets: 5 open (Assigned) and 772 closed. Open-only lists showed the 5; "All tickets, any time" shows all 777
-- [x] "Reentrant operation in its NSTableView delegate" warnings: selecting a row swapped out another column inside AppKit's selection callback. All five selectable lists now apply the selection one run-loop turn later (`Binding.deferred`). A second cause found after that: the org filter and View menus sat inside the list as a row, so changing them reloaded the list from within its own row. They now sit in a bar above the list. Tested in the demo: picking tickets, switching sections, orgs, people, CMDB, opening a ticket from another view and refresh all log 0 warnings; menus can't be driven in the background, so your terminal run confirms the last case
+- [x] "Reentrant operation in its NSTableView delegate" warnings: selecting a row swapped out another column inside AppKit's selection callback. All five selectable lists now apply the selection one run-loop turn later (`Binding.deferred`). A second cause found after that: the org filter and View menus sat inside the list as a row, so changing them reloaded the list from within its own row. They now sit in a bar above the list. Tested in the demo: picking tickets, switching sections, orgs, people, CMDB, opening a ticket from another view and refresh all log 0 warnings; your traced run on real data (2026-11-11) logged none
 
 Built 2026-11-10 on `task-5b-orgs-people`: 102 tests; click-through in the debug demo.
 
