@@ -60,16 +60,8 @@ struct TicketListView: View {
     }
 
     private var list: some View {
-        List(selection: $model.selection.deferred) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
-                    if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty { orgFilterMenu }
-                    ListViewMenu(options: model.options)
-                }
-                ListViewSummary(options: model.options)
-            }
-            .listRowSeparator(.hidden)
-            if !model.orgFilter.isEmpty && model.visibleSections.isEmpty && !model.isSearching {
+        List(selection: $model.selection.deferred(model.view == .mine ? "my-tickets" : "team-tickets")) {
+            if model.orgFilter != nil && model.visibleSections.isEmpty && !model.isSearching {
                 orgNoMatch.listRowSeparator(.hidden)
             }
             if let error = model.refreshError {
@@ -80,7 +72,7 @@ struct TicketListView: View {
             lookupSection
             let paged = model.currentPage
             let sections = paged.sections
-            if !model.isSearching && sections.isEmpty && model.orgFilter.isEmpty {
+            if !model.isSearching && sections.isEmpty && model.orgFilter == nil {
                 Text("No tickets in this range. Try a longer range in the date menu.")
                     .foregroundStyle(Theme.secondary).listRowSeparator(.hidden)
             }
@@ -107,7 +99,28 @@ struct TicketListView: View {
             }
         }
         .listStyle(.inset)
-        .safeAreaInset(edge: .top, spacing: 0) { lookupStatus }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                controls
+                lookupStatus
+            }
+        }
+    }
+
+    /// The org filter and View menu sit above the list, not in it: a menu inside a list row
+    /// that reloads that list made AppKit warn of a reentrant NSTableView operation. They also
+    /// stay in view when you scroll.
+    private var controls: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                if openOrg != nil, model.orgChoices.count > 1 || model.orgFilter != nil { orgFilterMenu }
+                ListViewMenu(options: model.options)
+            }
+            ListViewSummary(options: model.options)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16).padding(.vertical, 8)
+        .background(.bar)
     }
 
     private var isLookupPending: Bool {
@@ -115,38 +128,42 @@ struct TicketListView: View {
         return false
     }
 
-    /// A building-icon menu: multi-select, "All organizations" resets, darker border when on (DESIGN.md).
+    /// A building-icon menu: one organization at a time, "All organizations" resets, darker
+    /// border when on (DESIGN.md). The label is capped so a long name can't push the column.
     private var orgFilterMenu: some View {
         Menu {
-            Button { model.orgFilter = [] } label: {
-                if model.orgFilter.isEmpty { Label("All organizations", systemImage: "checkmark") } else { Text("All organizations") }
+            Button { model.orgFilter = nil } label: {
+                if model.orgFilter == nil { Label("All organizations", systemImage: "checkmark") } else { Text("All organizations") }
             }
             Divider()
             ForEach(model.orgChoices, id: \.self) { name in
                 Button { model.toggleOrg(name) } label: {
-                    if model.orgFilter.contains(name) { Label(name, systemImage: "checkmark") } else { Text(name) }
+                    if model.orgFilter == name { Label(name, systemImage: "checkmark") } else { Text(name) }
                 }
             }
         } label: {
-            FilterChip(text: model.orgFilter.isEmpty ? "All organizations" : model.orgFilter.sorted().joined(separator: ", "),
-                       symbol: "building.2", on: !model.orgFilter.isEmpty)
+            FilterChip(text: model.orgFilter ?? "All organizations", symbol: "building.2", on: model.orgFilter != nil)
+                .frame(maxWidth: 200, alignment: .leading)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.visible)
-        .fixedSize()
-        .help("Filter by organization")
-        .accessibilityLabel("Filter by organization: \(model.orgFilter.isEmpty ? "all" : model.orgFilter.sorted().joined(separator: ", "))")
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: 220, alignment: .leading)
+        .help(model.orgFilter.map { "Showing tickets for \($0)" } ?? "Filter by organization")
+        .accessibilityLabel("Filter by organization: \(model.orgFilter ?? "all")")
     }
 
     @ViewBuilder
     private var orgNoMatch: some View {
-        let names = model.orgFilter.sorted()
-        VStack(alignment: .leading, spacing: 6) {
-            Text("None of your tickets are for \(ListFormatter.localizedString(byJoining: names)).").foregroundStyle(Theme.secondary)
-            if names.count == 1, let id = model.orgID(named: names[0]), let openOrg {
-                Button("See all of its tickets") { openOrg(id, names[0]) }
-                    .buttonStyle(.link).foregroundStyle(Theme.text)
+        if let name = model.orgFilter {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("None of your tickets are for \(name).").foregroundStyle(Theme.secondary)
+                if let id = model.orgID(named: name), let openOrg {
+                    // Switches sections, so it waits until the click in this list row is handled.
+                    Button("See all of its tickets") { DispatchQueue.main.async { openOrg(id, name) } }
+                        .buttonStyle(.link).foregroundStyle(Theme.text)
+                }
             }
         }
     }

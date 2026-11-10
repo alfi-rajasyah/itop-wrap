@@ -7,14 +7,21 @@ struct TicketSource: Sendable {
     var load: @Sendable (TicketScope) async throws -> [Ticket]
     var lookup: @Sendable (String) async throws -> Ticket?
     var detail: @Sendable (Ticket) async throws -> TicketDetail
+    var image: @Sendable (String) async throws -> InlineImageLoader.Image
+    var attachments: @Sendable (Ticket) async throws -> [AttachmentRef]
+    var download: @Sendable (AttachmentRef) async throws -> AttachmentFile
 
     static func live(_ session: Session, view: TicketList.View) -> TicketSource {
         let service = TicketService(client: session.client)
+        let loader = InlineImageLoader(client: session.client)
         let me = session.user
         return TicketSource(
             load: { scope in view == .mine ? try await service.loadMine(me: me, scope: scope) : try await service.loadTeam(me: me, scope: scope) },
             lookup: { try await service.lookup($0) },
-            detail: { try await service.detail(for: $0) })
+            detail: { try await service.detail(for: $0) },
+            image: { try await loader.image(id: $0) },
+            attachments: { try await loader.attachments(of: $0) },
+            download: { try await loader.download($0) })
     }
 }
 
@@ -50,10 +57,10 @@ final class TicketListModel {
     private(set) var lookup: Lookup = .none
     var query = ""
     var selection: Ticket.ID?
-    /// The org filter (DESIGN.md: Org filter); empty means all organizations.
-    var orgFilter: Set<String> = []
+    /// The org filter (DESIGN.md: Org filter): one organization, or `nil` for all.
+    var orgFilter: String?
     /// The page shown; back to 1 whenever what's listed changes.
-    var page = 1
+    var page = 1 { didSet { if page != oldValue { UITrace.log("\(view) list: page \(page)") } } }
 
     init(view: TicketList.View, session: Session, options: ListOptions, source: TicketSource? = nil) {
         self.view = view
@@ -67,7 +74,7 @@ final class TicketListModel {
     var needCount: Int { tickets.filter { TicketList.needsYou($0, me: me) }.count }
 
     var visibleSections: [TicketSection] {
-        TicketList.groups(TicketSearch.filter(TicketSearch.filter(tickets, orgs: orgFilter), query: query), me: me, view: view, sort: options.sort)
+        TicketList.groups(TicketSearch.filter(TicketSearch.filter(tickets, orgs: orgFilter.map { [$0] } ?? []), query: query), me: me, view: view, sort: options.sort)
     }
 
     var currentPage: TicketPage { TicketPage(visibleSections, size: options.pageSize, page: page) }
@@ -80,7 +87,8 @@ final class TicketListModel {
     }
 
     func toggleOrg(_ name: String) {
-        if orgFilter.contains(name) { orgFilter.remove(name) } else { orgFilter.insert(name) }
+        UITrace.log("\(view) list: org filter changed")
+        orgFilter = orgFilter == name ? nil : name
     }
 
     var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }
@@ -98,12 +106,14 @@ final class TicketListModel {
         // A range change during a refresh runs right after it, instead of being dropped.
         if refreshing { refreshAgain = true; return }
         refreshing = true
+        UITrace.log("\(view) list: reload started (\(tickets.count) shown)")
         defer {
             refreshing = false
             if refreshAgain { refreshAgain = false; Task { await refresh() } }
         }
         do {
             tickets = try await source.load(options.scope)
+            UITrace.log("\(view) list: reload finished, \(tickets.count) tickets, selection \(selection ?? "none")")
             updatedAt = Date()
             phase = .loaded
             refreshError = nil
@@ -124,6 +134,7 @@ final class TicketListModel {
         let ref = q.uppercased()
         if case .found(let t) = lookup, t.ref == ref { return }
         lookup = .searching(ref)
+        UITrace.log("\(view) list: looking up a ref")
         try? await Task.sleep(for: .milliseconds(250))
         guard !Task.isCancelled else { return }
         do {

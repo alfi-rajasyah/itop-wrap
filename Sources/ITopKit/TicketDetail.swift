@@ -16,6 +16,8 @@ public struct LinkedCI: Sendable, Equatable, Identifiable, Hashable {
 /// What the detail pane adds to a list row: description, both logs and linked CIs.
 public struct TicketDetail: Sendable, Equatable {
     public let description: String
+    /// The description's HTML, for links and images (`RichText`).
+    public let descriptionHTML: String
     public let publicLog: [LogEntry]
     public let privateLog: [LogEntry]
     public let linkedCIs: [LinkedCI]
@@ -23,8 +25,9 @@ public struct TicketDetail: Sendable, Equatable {
     public let subcategoryName: String
 
     public init(description: String, publicLog: [LogEntry], privateLog: [LogEntry], linkedCIs: [LinkedCI],
-                serviceName: String = "", subcategoryName: String = "") {
+                serviceName: String = "", subcategoryName: String = "", descriptionHTML: String = "") {
         self.description = description
+        self.descriptionHTML = descriptionHTML
         self.publicLog = publicLog
         self.privateLog = privateLog
         self.linkedCIs = linkedCIs
@@ -51,7 +54,8 @@ public struct TicketDetail: Sendable, Equatable {
                   privateLog: CaseLog.entries(from: f["private_log"]),
                   linkedCIs: cis,
                   serviceName: f["service_id_friendlyname"]?.stringValue ?? "",
-                  subcategoryName: f["servicesubcategory_id_friendlyname"]?.stringValue ?? "")
+                  subcategoryName: f["servicesubcategory_id_friendlyname"]?.stringValue ?? "",
+                  descriptionHTML: f["description"]?.stringValue ?? "")
     }
 }
 
