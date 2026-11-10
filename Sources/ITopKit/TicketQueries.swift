@@ -1,0 +1,151 @@
+import Foundation
+
+/// The OQL behind each list (PLAN.md Task 3; the "needs you" rule from DESIGN.md).
+public enum TicketQueries {
+    static let open = "status NOT IN ('resolved','closed')"
+
+    /// Open tickets assigned to me, plus unassigned Escalated TTO tickets in my teams.
+    public static func mine(_ cls: TicketClass, me: CurrentUser) -> String {
+        let assigned = "agent_id = \(me.contactID)"
+        guard !me.teams.isEmpty else { return "SELECT \(cls.rawValue) WHERE \(open) AND \(assigned)" }
+        return "SELECT \(cls.rawValue) WHERE \(open) AND (\(assigned) OR (status = 'escalated_tto' AND agent_id = 0 AND team_id IN (\(teamIDs(me)))))"
+    }
+
+    /// Everything open in my teams, or `nil` when I'm in no team.
+    public static func team(_ cls: TicketClass, me: CurrentUser) -> String? {
+        guard !me.teams.isEmpty else { return nil }
+        return "SELECT \(cls.rawValue) WHERE \(open) AND team_id IN (\(teamIDs(me)))"
+    }
+
+    /// For a full ref like "R-000512", the class and the query that finds it; otherwise `nil`.
+    public static func refLookup(_ text: String) -> (TicketClass, String)? {
+        let ref = text.trimmingCharacters(in: .whitespaces).uppercased()
+        guard ref.wholeMatch(of: /[RI]-\d{6}/) != nil,
+              let cls = TicketClass.allCases.first(where: { ref.hasPrefix($0.refPrefix + "-") }) else { return nil }
+        return (cls, "SELECT \(cls.rawValue) WHERE ref = \(OQL.quote(ref))")
+    }
+
+    private static func teamIDs(_ me: CurrentUser) -> String {
+        me.teams.compactMap { Int($0.id) }.map(String.init).joined(separator: ",")
+    }
+}
+
+/// Loads the lists. Read-only.
+public struct TicketService: Sendable {
+    let client: ITopClient
+
+    public init(client: ITopClient) {
+        self.client = client
+    }
+
+    public func loadMine(me: CurrentUser) async throws -> [Ticket] {
+        try await load(TicketClass.allCases.map { ($0, TicketQueries.mine($0, me: me)) })
+    }
+
+    public func loadTeam(me: CurrentUser) async throws -> [Ticket] {
+        try await load(TicketClass.allCases.compactMap { cls in TicketQueries.team(cls, me: me).map { (cls, $0) } })
+    }
+
+    /// A ticket by full ref, for search; `nil` if it doesn't exist or this account can't see it.
+    public func lookup(_ ref: String) async throws -> Ticket? {
+        guard let (cls, oql) = TicketQueries.refLookup(ref) else { return nil }
+        return try await load([(cls, oql)]).first
+    }
+
+    private func load(_ queries: [(TicketClass, String)]) async throws -> [Ticket] {
+        try await withThrowingTaskGroup(of: [Ticket].self) { group in
+            for (cls, oql) in queries {
+                group.addTask {
+                    let response = try await client.send(.get(className: cls.rawValue, key: oql, outputFields: Ticket.listFields))
+                    return response.objects.compactMap(Ticket.init(object:))
+                }
+            }
+            return try await group.reduce(into: []) { $0 += $1 }
+        }
+    }
+}
+
+public enum TicketGroup: String, Sendable, CaseIterable {
+    case escalatedTTR, escalatedTTO, new, assigned, pending, other
+
+    public var title: String {
+        switch self {
+        case .escalatedTTR: "Escalated TTR"
+        case .escalatedTTO: "Escalated TTO"
+        case .new: "New"
+        case .assigned: "Assigned"
+        case .pending: "Pending"
+        case .other: "Other open"
+        }
+    }
+
+    static func of(_ status: String) -> TicketGroup {
+        switch status {
+        case "escalated_ttr": .escalatedTTR
+        case "escalated_tto": .escalatedTTO
+        case "new": .new
+        case "assigned": .assigned
+        case "pending": .pending
+        default: .other
+        }
+    }
+}
+
+public struct TicketSection: Sendable, Equatable, Identifiable {
+    public var id: TicketGroup { group }
+    public let group: TicketGroup
+    public let tickets: [Ticket]
+}
+
+public enum TicketList {
+    public enum View: Sendable { case mine, team }
+
+    /// "Needs you" (DESIGN.md): my Escalated TTR, or an unassigned Escalated TTO in one of my teams.
+    public static func needsYou(_ t: Ticket, me: CurrentUser) -> Bool {
+        switch t.status {
+        case "escalated_ttr": return t.agentID == me.contactID
+        case "escalated_tto": return t.isUnassigned && me.teams.contains { $0.id == t.teamID }
+        default: return false
+        }
+    }
+
+    /// Sections in DESIGN.md order, escalated first; empty ones are left out.
+    /// Inside a section: priority 1 first, then the oldest.
+    public static func groups(_ tickets: [Ticket], me: CurrentUser, view: View) -> [TicketSection] {
+        let order: [TicketGroup] = view == .team
+            ? [.escalatedTTR, .escalatedTTO, .new, .assigned, .pending, .other]
+            : [.escalatedTTR, .escalatedTTO, .assigned, .new, .pending, .other]
+        let byGroup = Dictionary(grouping: tickets) { TicketGroup.of($0.status) }
+        return order.compactMap { g in
+            guard let list = byGroup[g], !list.isEmpty else { return nil }
+            return TicketSection(group: g, tickets: list.sorted {
+                ($0.priority, $0.startDate ?? .distantFuture, $0.ref) < ($1.priority, $1.startDate ?? .distantFuture, $1.ref)
+            })
+        }
+    }
+}
+
+public enum TicketSearch {
+    /// Every word must appear in the ref or the title. Order is kept.
+    public static func filter(_ tickets: [Ticket], query: String) -> [Ticket] {
+        let words = query.lowercased().split(separator: " ").map(String.init)
+        guard !words.isEmpty else { return tickets }
+        return tickets.filter { t in
+            let haystack = (t.ref + " " + t.title).lowercased()
+            return words.allSatisfy { haystack.contains($0) }
+        }
+    }
+}
+
+public enum Age {
+    /// "now", "40m", "2h", "9d", as in the wireframe's list rows.
+    public static func short(from date: Date, now: Date = Date()) -> String {
+        let s = max(0, now.timeIntervalSince(date))
+        switch s {
+        case ..<60: return "now"
+        case ..<3600: return "\(Int(s / 60))m"
+        case ..<86400: return "\(Int(s / 3600))h"
+        default: return "\(Int(s / 86400))d"
+        }
+    }
+}
