@@ -1,30 +1,40 @@
 import Foundation
 
-/// A piece of text, with a link when it came from an `<a>`; or a small image from another
-/// host (a signature icon) shown as an icon in the line and never loaded.
+/// A piece of text, with a link when it came from an `<a>`. Images from other hosts are never
+/// loaded and stay in the line: a small one (a signature icon) as an icon, a larger one as a
+/// chip labelled with its host that opens it in the browser.
 public struct RichRun: Sendable, Equatable {
     public let text: String
     public let link: URL?
     public let icon: URL?
+    /// True for the "🖼 host ↗" chip of a larger outside image; `link` opens it.
+    public let isOutsideImage: Bool
 
     public init(text: String, link: URL? = nil) {
         self.text = text
         self.link = link
         self.icon = nil
+        self.isOutsideImage = false
     }
 
     public init(icon: URL) {
         self.text = ""
         self.link = nil
         self.icon = icon
+        self.isOutsideImage = false
+    }
+
+    public init(outsideImage url: URL) {
+        self.text = url.host() ?? "another site"
+        self.link = url
+        self.icon = nil
+        self.isOutsideImage = true
     }
 }
 
 public enum RichImage: Sendable, Equatable {
     /// An image pasted into iTop: loaded by id through REST, never through the web link.
     case inline(id: String)
-    /// An image on another host: never loaded automatically.
-    case external(URL)
     /// A `data:` image: already in the HTML, no network needed.
     case data(Data)
 }
@@ -44,7 +54,7 @@ public enum RichText {
         var blocks: [RichBlock] = []
         var buffer = ""
         var links: [URL] = []
-        var icons: [URL] = []
+        var icons: [(url: URL, small: Bool)] = []
         var inLink = false
 
         func flush() {
@@ -65,16 +75,15 @@ public enum RichText {
             let closing = tag.hasPrefix("</")
             switch name {
             case "img":
-                if let image = image(from: piece, base: base) {
-                    if case .external(let url) = image, isSmall(piece) {
-                        // A signature-size icon from another host stays in the line.
-                        icons.append(url)
-                        buffer += iconMark + String(icons.count - 1) + mid
-                    } else {
-                        if inLink { buffer += end; inLink = false }
-                        flush()
-                        blocks.append(.image(image))
-                    }
+                if let url = outsideImage(from: piece, base: base) {
+                    // From another host: stays in the line, never loaded (icon, or a host chip).
+                    if inLink { buffer += end; inLink = false }
+                    icons.append((url, isSmall(piece)))
+                    buffer += iconMark + String(icons.count - 1) + mid
+                } else if let image = image(from: piece, base: base) {
+                    if inLink { buffer += end; inLink = false }
+                    flush()
+                    blocks.append(.image(image))
                 }
             case "br": buffer += "\n"
             case "li": if !closing { buffer += "\n• " }
@@ -102,7 +111,7 @@ public enum RichText {
     // then a scanner turns them into runs.
     private static let start = "\u{E000}", mid = "\u{E001}", end = "\u{E002}", iconMark = "\u{E003}"
 
-    private static func runs(from text: String, links: [URL], icons: [URL]) -> [RichRun] {
+    private static func runs(from text: String, links: [URL], icons: [(url: URL, small: Bool)]) -> [RichRun] {
         var out: [RichRun] = []
         var plain = "", label = ""
         var link: URL?
@@ -114,7 +123,10 @@ public enum RichText {
                 if String(ch) == mid {
                     let i = Int(r.digits) ?? -1
                     if r.icon {
-                        if icons.indices.contains(i) { emitPlain(); out.append(RichRun(icon: icons[i])) }
+                        if icons.indices.contains(i) {
+                            emitPlain()
+                            out.append(icons[i].small ? RichRun(icon: icons[i].url) : RichRun(outsideImage: icons[i].url))
+                        }
                     } else if links.indices.contains(i) {
                         emitPlain(); link = links[i]; label = ""
                     }
@@ -185,8 +197,15 @@ public enum RichText {
             let id = attribute("data-img-id", in: tag) ?? query.first { $0.name == "id" }?.value
             return id.flatMap(Int.init).map { .inline(id: String($0)) }
         }
-        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
-        return .external(url)
+        return nil
+    }
+
+    /// An http(s) image that isn't a pasted iTop image: from another host, so never loaded.
+    static func outsideImage(from tag: String, base: URL) -> URL? {
+        guard let src = attribute("src", in: tag), !src.lowercased().hasPrefix("data:"),
+              let url = resolve(src, base: base), let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else { return nil }
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return query.contains { $0.name == "operation" && $0.value == "download_inlineimage" } ? nil : url
     }
 }
 

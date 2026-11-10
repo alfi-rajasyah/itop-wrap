@@ -106,6 +106,13 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 - **Secondary:** People and Config items links with their counts, and a New ticket button prefilled with the org.
 - **Org filter:** a building-icon menu above My tickets and next to the menu bar's search. It's multi-select with "All organizations" to reset, and the button shows the chosen org(s) with a darker border when a filter is on. Empty sections hide while filtering. If none of your tickets match, it says so and links to the full org view.
 
+## Images, links and attachments in tickets
+
+- Pasted iTop images show inside the text, sized to the pane, loaded through REST (your iTop refuses the web image links). Click one for the full-size viewer, which fits the whole image and has "Actual size".
+- Images from other sites are never loaded. They stay where they were in the text: signature-size icons (40 px or less) as a grey photo symbol, larger ones as a one-line "🖼 host ↗" chip that opens them in the browser.
+- Links open in the browser; only web and email links are clickable.
+- Attachments: names under the description; click to download into a Save panel.
+
 ## Date range and sorting (all ticket lists)
 
 - **Range menu** (calendar icon) above My tickets, Team tickets, an organization's tickets and a person's tickets: "Open tickets" by default; "Opened in the last 7, 30 or 90 days" or "Any time"; and "Include resolved and closed", which can cover any time ("All tickets, any time"). Resolved and Closed get their own groups after the open ones. The label says what's shown: "Open tickets", "Open, last 30 days", "All, last 30 days".

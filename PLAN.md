@@ -191,7 +191,7 @@ Built 2026-11-10 on `task-5b-orgs-people`: 102 tests; click-through in the debug
 - [ ] The ticket's attachments are listed by name; each downloads on click into a Save panel, which shows the size once saved (your check: the Save panel can't be driven in the background). iTop can't send a size without the whole file, so the list has names only
 - [x] An image that fails to load shows "Couldn't load this image" plus "Open in iTop on the web"
 
-- [x] After your check: the full-size viewer fits the whole image to the window (with "Actual size" for 1:1), and small outside images such as email-signature icons stay in the line as a grey photo symbol instead of a big "Image from…" box
+- [x] After your check: the full-size viewer fits the whole image to the window (with "Actual size" for 1:1), and outside images stay in the text instead of a big "Image from…" box: signature-size ones as a grey photo symbol, larger ones (logos, banners) as a one-line "🖼 host ↗" chip that opens them in the browser
 - Attachments: not tested on real data, at your choice
 
 Probe result (2026-11-11): your iTop answers the web image links with 403 to HTTP Basic auth, and serves `InlineImage` contents through REST, so images load through REST only. Built on `task-5c-images-links`: 117 tests.

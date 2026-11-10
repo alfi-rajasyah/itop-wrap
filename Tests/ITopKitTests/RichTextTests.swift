@@ -44,10 +44,10 @@ struct RichTextTests {
         #expect(RichText.parse(html, base: base) == [.image(.inline(id: "42"))])
     }
 
-    @Test("An image from another host is never loaded: it's kept as an external image")
+    @Test("An image from another host is never loaded: it's an inline chip with its host and a link")
     func external() {
         let blocks = RichText.parse(#"<img src="https://cdn.example.net/pic.png" alt="diagram">"#, base: base)
-        #expect(blocks == [.image(.external(URL(string: "https://cdn.example.net/pic.png")!))])
+        #expect(blocks == [.text([RichRun(outsideImage: URL(string: "https://cdn.example.net/pic.png")!)])])
     }
 
     @Test("A small image from another host (a signature icon) stays in the line as an icon, still not loaded", arguments: [
@@ -59,12 +59,20 @@ struct RichTextTests {
         #expect(RichText.parse(html, base: base) == [.text([RichRun(icon: url), RichRun(text: " : +62 878")])])
     }
 
-    @Test("A large or unsized outside image is still its own block", arguments: [
-        #"<img src="https://cdn.example.net/pic.png" width="600" height="400">"#,
-        #"<img src="https://cdn.example.net/pic.png">"#,
+    @Test("A large or unsized outside image (a signature logo) stays in the text as a chip, not a block", arguments: [
+        #"<p><a href="https://www.example.com">www.example.com</a><br><img src="https://lh3.googleusercontent.com/logo" width="600" height="120"></p>"#,
+        #"<p><a href="https://www.example.com">www.example.com</a><br><img src="https://lh3.googleusercontent.com/logo"></p>"#,
     ])
-    func largeExternalIsBlock(_ html: String) {
-        #expect(RichText.parse(html, base: base) == [.image(.external(URL(string: "https://cdn.example.net/pic.png")!))])
+    func largeExternalIsInline(_ html: String) {
+        #expect(RichText.parse(html, base: base) == [.text([
+            RichRun(text: "www.example.com", link: URL(string: "https://www.example.com")), RichRun(text: "\n"),
+            RichRun(outsideImage: URL(string: "https://lh3.googleusercontent.com/logo")!),
+        ])])
+    }
+
+    @Test("The chip is labelled with the host")
+    func chipLabel() {
+        #expect(RichRun(outsideImage: URL(string: "https://lh6.googleusercontent.com/x")!).text == "lh6.googleusercontent.com")
     }
 
     @Test("A data: image is decoded in place, with no network")

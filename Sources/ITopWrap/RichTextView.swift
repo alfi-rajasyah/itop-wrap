@@ -45,6 +45,13 @@ struct RichTextView: View {
             if run.icon != nil {
                 flushPending()
                 result = Text("\(result)\(Text(Image(systemName: "photo")).foregroundStyle(Theme.secondary))")
+            } else if run.isOutsideImage, let url = run.link {
+                // "🖼 host ↗": opens the image in the browser; it's never loaded in the app.
+                flushPending()
+                var label = AttributedString("\(run.text) ↗")
+                label.link = url
+                label.foregroundColor = Theme.secondary
+                result = Text("\(result)\(Text(Image(systemName: "photo")).foregroundStyle(Theme.secondary)) \(Text(label))")
             } else {
                 var piece = AttributedString(run.text)
                 if let link = run.link {
@@ -71,16 +78,6 @@ struct RichImageView: View {
     var body: some View {
         Group {
             switch image {
-            case .external(let url):
-                HStack(spacing: 6) {
-                    Image(systemName: "photo").foregroundStyle(Theme.secondary)
-                    Text("Image from \(url.host() ?? "another site")").foregroundStyle(Theme.secondary).lineLimit(1)
-                    Link("Open in browser", destination: url).foregroundStyle(Theme.text)
-                }
-                .font(.system(size: 11))
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Theme.separator))
-                .help("Not loaded automatically: it's on another site")
             case .inline, .data:
                 if let loaded {
                     Button { fullSize = true } label: {
@@ -114,7 +111,6 @@ struct RichImageView: View {
 
     private func load() async {
         switch image {
-        case .external: return
         case .data(let data):
             loaded = NSImage(data: data)
             failed = loaded == nil
