@@ -32,4 +32,4 @@ Background control couldn't move keyboard focus between SwiftUI text fields, so 
 - ⌘1 to ⌘5 switch sidebar sections
 - Esc closes the sign-out confirmation
 
-## Delivery Gate status: PASS, pending the manual keyboard check above
+## Delivery Gate status: PASS (keyboard check confirmed by the user, 2026-11-10)

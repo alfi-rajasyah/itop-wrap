@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Task 0 and Task 1 done (2026-11-10).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0, 1 and 2 done; Checkpoint A passed (2026-11-10).
 
 ## Overview
 
@@ -96,11 +96,11 @@ Done 2026-11-10: `swift test` 20/20 passing, no warnings.
 
 **Dependencies:** 1, 0b · **Files:** `Sources/ITopKit/CurrentUser.swift`, `KeychainStore.swift`, `SessionService.swift`, `OQL.swift` (moved into ITopKit so they're testable), `Sources/ITopWrap/App.swift`, `LoginView.swift`, `ShellView.swift`, `SessionModel.swift`, `Theme.swift`, `Tests/ITopKitTests/AuthTests.swift` · **Scope:** M
 
-### Checkpoint A: Foundation
-- [ ] `swift test` passes, no warnings in ITopKit
-- [ ] antislop Delivery Gate PASS on sign in and shell (click-through, light and dark, keyboard only)
-- [ ] Real sign-in works against your server
-- [ ] You review before Phase 2
+### Checkpoint A: Foundation (passed 2026-11-10)
+- [x] `swift test` passes, no warnings in ITopKit (31 tests)
+- [x] antislop Delivery Gate PASS on sign in and shell (anti-slop/checkpoint-a-2026-11-10.md)
+- [x] Real sign-in works against your server
+- [x] You review before Phase 2
 
 ### Phase 2: Read-only features
 
