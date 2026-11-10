@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 built against the mock; real check pending.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Next: Task 8, lifecycle actions.
 
 ## Overview
 
@@ -225,7 +225,7 @@ Probe result (2026-11-11): your iTop answers the web image links with 403 to HTT
 **Description:** Team and agent pickers (agents filtered by the chosen team) that call `apply_stimulus` with `ev_assign` / `ev_reassign` and the new `team_id` / `agent_id`.
 
 **Acceptance criteria:**
-- [ ] Reassigning updates the ticket in iTop and refreshes the list (demo mock: done; real check pending)
+- [ ] Reassigning updates the ticket in iTop and refreshes the list (demo mock: done; merged 2026-11-11 without a real check, by your choice: do it the first time a real reassign happens)
 - [x] Only agents in the chosen team are offered (`lnkPersonToTeam` for the chosen team, active people only)
 - [x] "Assign to me" (row pill, ticket header, top of the Assign sheet) assigns the ticket to your own team and agent in one call, and the ticket moves to Assigned (demo: I-000088)
 - [x] If a colleague took it a moment ago, nothing changes and the app says who (UX-FLOWS F4; demo: R-000436)
