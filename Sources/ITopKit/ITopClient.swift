@@ -48,6 +48,9 @@ public struct ITopClient: Sendable {
             throw ITopError.unexpectedResponse
         }
         let message = body["message"]?.stringValue ?? ""
+        #if DEBUG
+        if Self.tracing { FileHandle.standardError.write(Data((Self.traceLine(operation, response: ITopResponse(body: body)) + "\n").utf8)) }
+        #endif
         switch code {
         case 0: return ITopResponse(body: body)
         case 1: throw Self.isPermissionMessage(message) ? ITopError.restNotAllowed : ITopError.invalidCredentials
@@ -78,6 +81,29 @@ public struct ITopClient: Sendable {
     /// RFC 3986 unreserved characters. Foundation's `.urlQueryAllowed` keeps `&`, `=` and `+`,
     /// which would split a password like "p&ss=w+rd" (TransportTests covers this).
     static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+
+    /// Debug builds only: `ITOPWRAP_TRACE=1` prints one line per call to the terminal.
+    static let tracing = ProcessInfo.processInfo.environment["ITOPWRAP_TRACE"] == "1"
+
+    /// Operation, class, query, iTop's code and message, and how many objects came back.
+    /// Never credentials, never field values.
+    static func traceLine(_ operation: RESTOperation, response: ITopResponse) -> String {
+        var parts = ["[iTop] \(operation.name)"]
+        switch operation {
+        case .get(let cls, let key, _, let limit):
+            parts[0] += " \(cls)"
+            parts.append(key + (limit.map { " (limit \($0))" } ?? ""))
+        case .getRelated(let cls, let key, let relation, _, let direction):
+            parts[0] += " \(cls)"
+            parts.append("\(key) \(relation) \(direction)")
+        default:
+            break
+        }
+        parts.append("code \(response.body["code"]?.intValue ?? -1)")
+        parts.append("\(response.objects.count) objects")
+        if let message = response.body["message"]?.stringValue, !message.isEmpty { parts.append(message) }
+        return parts.joined(separator: " | ")
+    }
 
     /// iTop answers code 1 both for a wrong password and for an account without REST rights;
     /// only the message tells them apart. The exact wording should be confirmed on the real server.

@@ -23,13 +23,7 @@ final class ListOptions {
     private let defaults: UserDefaults
 
     var range: Range { didSet { defaults.set(range.rawValue, forKey: "list.range") } }
-    var includeClosed: Bool {
-        didSet {
-            defaults.set(includeClosed, forKey: "list.includeClosed")
-            // Resolved and closed always come with a date range (TicketScope).
-            if includeClosed && range == .any { range = .month }
-        }
-    }
+    var includeClosed: Bool { didSet { defaults.set(includeClosed, forKey: "list.includeClosed") } }
     var sort: TicketSort { didSet { defaults.set(sort.rawValue, forKey: "list.sort") } }
 
     init(defaults: UserDefaults = .standard) {
@@ -37,7 +31,6 @@ final class ListOptions {
         range = Range(rawValue: defaults.integer(forKey: "list.range")) ?? .any
         includeClosed = defaults.bool(forKey: "list.includeClosed")
         sort = TicketSort(rawValue: defaults.string(forKey: "list.sort") ?? "") ?? .priority
-        if includeClosed && range == .any { range = .month }
     }
 
     var scope: TicketScope {
@@ -49,6 +42,7 @@ final class ListOptions {
         switch (includeClosed, range) {
         case (false, .any): "Open tickets"
         case (false, let r): "Open, \(r.title.lowercased())"
+        case (true, .any): "All tickets, any time"
         case (true, let r): "All, \(r.title.lowercased())"
         }
     }
@@ -64,7 +58,7 @@ struct ListOptionsMenus: View {
             Menu {
                 Picker("Opened", selection: $options.range) {
                     ForEach(ListOptions.Range.allCases) { r in
-                        Text(r.title).tag(r).disabled(r == .any && options.includeClosed)
+                        Text(r.title).tag(r)
                     }
                 }
                 .pickerStyle(.inline)

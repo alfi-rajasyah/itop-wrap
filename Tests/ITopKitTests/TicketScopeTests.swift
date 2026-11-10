@@ -22,10 +22,17 @@ struct TicketScopeTests {
             "status NOT IN ('resolved','closed') AND start_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)")
     }
 
-    @Test("Including resolved and closed drops the status test but always keeps a date range")
+    @Test("Including resolved and closed drops the status test")
     func withClosed() {
         #expect(TicketScope(includeClosed: true, openedWithinDays: 7).clause == "start_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)")
-        #expect(TicketScope(includeClosed: true, openedWithinDays: nil).openedWithinDays == 30, "no unbounded history")
+    }
+
+    @Test("All tickets, any time: a condition that's always true, so the queries stay valid OQL")
+    func everything() {
+        let all = TicketScope(includeClosed: true, openedWithinDays: nil)
+        #expect(all.openedWithinDays == nil)
+        #expect(all.clause == "id > 0")
+        #expect(OrgQueries.openTickets(.userRequest, orgID: "5", scope: all) == "SELECT UserRequest WHERE id > 0 AND org_id = 5")
     }
 
     @Test("The scope reaches every list query", arguments: [true, false])

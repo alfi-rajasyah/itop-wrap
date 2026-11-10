@@ -1,16 +1,16 @@
 import Foundation
 
 /// Which tickets a list covers over time: open ones by default, optionally only those opened
-/// recently, and optionally resolved and closed ones too. Including resolved and closed always
-/// keeps a date range (30 days by default): iTop's OQL can't order results, so an unbounded
-/// history couldn't be cut to the most recent ones.
+/// recently, and optionally resolved and closed ones too, for any time range. With resolved and
+/// closed over any time, a busy org's whole history is loaded: nothing is cut, because iTop's
+/// OQL can't order results and a cut couldn't keep the newest ones.
 public struct TicketScope: Sendable, Equatable, Hashable {
     public let includeClosed: Bool
     public let openedWithinDays: Int?
 
     public init(includeClosed: Bool, openedWithinDays: Int?) {
         self.includeClosed = includeClosed
-        self.openedWithinDays = includeClosed ? (openedWithinDays ?? 30) : openedWithinDays
+        self.openedWithinDays = openedWithinDays
     }
 
     public static let open = TicketScope(includeClosed: false, openedWithinDays: nil)
@@ -20,7 +20,8 @@ public struct TicketScope: Sendable, Equatable, Hashable {
         var parts: [String] = []
         if !includeClosed { parts.append(TicketQueries.open) }
         if let days = openedWithinDays { parts.append("start_date >= DATE_SUB(NOW(), INTERVAL \(days) DAY)") }
-        return parts.joined(separator: " AND ")
+        // Every ticket: an always-true condition keeps "WHERE … AND …" valid OQL.
+        return parts.isEmpty ? "id > 0" : parts.joined(separator: " AND ")
     }
 }
 
