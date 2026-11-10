@@ -128,6 +128,11 @@ public enum CMDBQueries {
         return "SELECT FunctionalCI WHERE name LIKE \(OQL.quote("%\(q)%"))"
     }
 
+    /// All CIs of one organization.
+    public static func inOrg(_ orgID: String) -> String? {
+        Int(orgID).map { "SELECT FunctionalCI WHERE org_id = \($0)" }
+    }
+
     /// Open tickets linked to a CI through lnkFunctionalCIToTicket.
     public static func openTickets(_ cls: TicketClass, ciID: String) -> String? {
         guard let id = Int(ciID) else { return nil }
@@ -147,6 +152,16 @@ public struct CMDBService: Sendable {
 
     public func search(_ text: String) async throws -> [ConfigItem] {
         guard let oql = CMDBQueries.search(text) else { return [] }
+        return try await items(oql)
+    }
+
+    /// The CIs of one organization (first 50), for the org view's Config items link.
+    public func items(inOrg orgID: String) async throws -> [ConfigItem] {
+        guard let oql = CMDBQueries.inOrg(orgID) else { return [] }
+        return try await items(oql)
+    }
+
+    private func items(_ oql: String) async throws -> [ConfigItem] {
         let response = try await client.send(.get(className: "FunctionalCI", key: oql,
                                                   outputFields: ["name", "finalclass", "org_id_friendlyname"],
                                                   limit: CMDBQueries.searchLimit))

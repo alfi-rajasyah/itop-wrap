@@ -4,6 +4,8 @@ import SwiftUI
 /// My tickets / Team tickets (DESIGN.md: Ticket list; wireframe Main.dc.html).
 struct TicketListView: View {
     @Bindable var model: TicketListModel
+    /// Opens the Organizations view; `nil` hides the org filter (Team tickets).
+    var openOrg: ((String, String) -> Void)? = nil
 
     var body: some View {
         content
@@ -54,6 +56,12 @@ struct TicketListView: View {
 
     private var list: some View {
         List(selection: $model.selection) {
+            if openOrg != nil, model.orgChoices.count > 1 || !model.orgFilter.isEmpty {
+                orgFilterMenu.listRowSeparator(.hidden)
+            }
+            if !model.orgFilter.isEmpty && model.visibleSections.isEmpty && !model.isSearching {
+                orgNoMatch.listRowSeparator(.hidden)
+            }
             if let error = model.refreshError {
                 Text("Couldn't refresh: \(error)")
                     .font(.system(size: 12)).foregroundStyle(Theme.warning)
@@ -90,6 +98,45 @@ struct TicketListView: View {
     private var isLookupPending: Bool {
         if case .searching = model.lookup { return true }
         return false
+    }
+
+    /// A building-icon menu: multi-select, "All organizations" resets, darker border when on (DESIGN.md).
+    private var orgFilterMenu: some View {
+        Menu {
+            Button { model.orgFilter = [] } label: {
+                if model.orgFilter.isEmpty { Label("All organizations", systemImage: "checkmark") } else { Text("All organizations") }
+            }
+            Divider()
+            ForEach(model.orgChoices, id: \.self) { name in
+                Button { model.toggleOrg(name) } label: {
+                    if model.orgFilter.contains(name) { Label(name, systemImage: "checkmark") } else { Text(name) }
+                }
+            }
+        } label: {
+            Label(model.orgFilter.isEmpty ? "All organizations" : model.orgFilter.sorted().joined(separator: ", "), systemImage: "building.2")
+                .font(.system(size: 12))
+                .lineLimit(1)
+                .padding(.horizontal, 9).frame(height: 24)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(model.orgFilter.isEmpty ? Theme.separator : Theme.text))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.visible)
+        .fixedSize()
+        .help("Filter by organization")
+        .accessibilityLabel("Filter by organization: \(model.orgFilter.isEmpty ? "all" : model.orgFilter.sorted().joined(separator: ", "))")
+    }
+
+    @ViewBuilder
+    private var orgNoMatch: some View {
+        let names = model.orgFilter.sorted()
+        VStack(alignment: .leading, spacing: 6) {
+            Text("None of your tickets are for \(ListFormatter.localizedString(byJoining: names)).").foregroundStyle(Theme.secondary)
+            if names.count == 1, let id = model.orgID(named: names[0]), let openOrg {
+                Button("See all of its tickets") { openOrg(id, names[0]) }
+                    .buttonStyle(.link).foregroundStyle(Theme.text)
+            }
+        }
     }
 
     /// The found ticket, as the list's only extra section.

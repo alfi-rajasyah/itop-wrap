@@ -8,6 +8,8 @@ struct ShellView: View {
     @State private var mine: TicketListModel
     @State private var team: TicketListModel
     @State private var cmdb: CMDBModel
+    @State private var orgs: OrgsModel
+    @State private var people: PeopleModel
     @State private var confirmSignOut = false
 
     init(session: Session) {
@@ -15,6 +17,8 @@ struct ShellView: View {
         _mine = State(initialValue: TicketListModel(view: .mine, session: session, source: DebugLaunch.demoSource(.mine)))
         _team = State(initialValue: TicketListModel(view: .team, session: session, source: DebugLaunch.demoSource(.team)))
         _cmdb = State(initialValue: CMDBModel(session: session, source: DebugLaunch.demoCMDB()))
+        _orgs = State(initialValue: OrgsModel(session: session, source: DebugLaunch.demoOrgs()))
+        _people = State(initialValue: PeopleModel(session: session, source: DebugLaunch.demoPeople()))
     }
 
     var body: some View {
@@ -36,10 +40,11 @@ struct ShellView: View {
         } content: {
             Group {
                 switch model.selection {
-                case .myTickets: TicketListView(model: mine)
+                case .myTickets: TicketListView(model: mine, openOrg: openOrg)
                 case .teamTickets: TicketListView(model: team)
                 case .configItems: CMDBListView(model: cmdb)
-                default: SectionPlaceholder(item: model.selection, session: session)
+                case .organizations: OrgsListView(model: orgs)
+                case .people: PeopleListView(model: people)
                 }
             }
             .navigationTitle(model.selection.title)
@@ -62,6 +67,21 @@ struct ShellView: View {
                             .foregroundStyle(Theme.secondary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
+                } else if model.selection == .organizations {
+                    if let org = orgs.selected {
+                        OrgDetailView(model: orgs, org: org, openTicket: openTicket,
+                                      openPeople: { o in people.showOrg(id: o.id, name: o.name); model.selection = .people },
+                                      openConfigItems: { o in cmdb.showOrg(id: o.id, name: o.name); model.selection = .configItems })
+                            .id(org.id)
+                    } else {
+                        placeholder("Select an organization to see its open tickets.")
+                    }
+                } else if model.selection == .people {
+                    if let p = people.selected {
+                        PersonDetailView(model: people, person: p, openTicket: openTicket, openOrg: openOrg).id(p.id)
+                    } else {
+                        placeholder("Select a person to see their details and tickets.")
+                    }
                 } else {
                     Color.clear
                 }
@@ -75,6 +95,17 @@ struct ShellView: View {
         } message: {
             Text("Your password is removed from the Keychain. Your username stays filled in.")
         }
+    }
+
+    private func placeholder(_ text: String) -> some View {
+        Text(text).foregroundStyle(Theme.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// "See all of its tickets" and a person's organization open the org view.
+    private func openOrg(_ id: String, _ name: String) {
+        orgs.query = ""
+        orgs.selectedID = id
+        model.selection = .organizations
     }
 
     /// A ticket's linked CI opens in Config items.
@@ -150,37 +181,6 @@ struct ShellView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .overlay(alignment: .top) { Divider() }
-    }
-}
-
-/// Stands in for each section until its task lands, and shows what sign-in loaded.
-struct SectionPlaceholder: View {
-    let item: SidebarItem
-    let session: Session
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("\(item.title) comes in the next build. Sign-in works: here's what iTop told the app about you.")
-                .foregroundStyle(Theme.secondary)
-            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-                GridRow { label("Signed in as"); Text("\(session.user.displayName) (\(session.user.login))") }
-                GridRow { label("Server"); Text(session.client.server.baseURL.absoluteString).font(.system(size: 12, design: .monospaced)) }
-                GridRow { label("Your teams"); Text(session.user.teams.isEmpty ? "None found" : session.user.teams.map(\.name).joined(separator: ", ")) }
-                GridRow { label("Profiles"); Text(session.user.profiles.joined(separator: ", ")).fixedSize(horizontal: false, vertical: true) }
-                GridRow { label("Changes to iTop"); Text(session.client.allowsWrites ? "On" : "Off (read-only build)") }
-            }
-            .padding(14)
-            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-            Spacer()
-        }
-        .font(.system(size: 13))
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
-    }
-
-    private func label(_ text: String) -> some View {
-        Text(text).foregroundStyle(Theme.secondary)
     }
 }
 

@@ -101,7 +101,8 @@ enum DebugLaunch {
                teamName: String = "Network", prio: Int = 3, hours: Double, caller: String, org: String = "Org A") -> Ticket {
             Ticket(key: String(ref.suffix(3)), ticketClass: ref.hasPrefix("I") ? .incident : .userRequest, ref: ref, title: title,
                    status: status, priority: prio, callerName: caller, orgName: org, teamID: team, teamName: teamName,
-                   agentID: agent, agentName: agentName, startDate: now.addingTimeInterval(-hours * 3600), lastUpdate: nil)
+                   agentID: agent, agentName: agentName, startDate: now.addingTimeInterval(-hours * 3600), lastUpdate: nil,
+                   orgID: ["Org A": "1", "Org B": "2", "Org C": "3"][org] ?? "0")
         }
         let mine = [
             t("R-000367", "Badge reader offline at the entrance", "escalated_ttr", agent: "2", team: "11", teamName: "Service desk", prio: 2, hours: 96, caller: "Caller 6"),
@@ -181,7 +182,51 @@ enum DebugLaunch {
             detail: { item in
                 try? await Task.sleep(for: .milliseconds(200))
                 return details[item.id] ?? ConfigItemDetail(item: item, fields: [], description: "", dependsOn: [], usedBy: [], openTickets: [])
-            })
+            },
+            inOrg: { id in id == "1" ? [app, gw1, gw2] : [] })
+        #else
+        return nil
+        #endif
+    }
+
+    /// Demo orgs: the wireframe's Org A/B/C, with tickets from every agent.
+    static func demoOrgs() -> OrgSource? {
+        #if DEBUG
+        guard env["ITOPWRAP_DEMO"] == "1", let tickets = demoSource(.team) else { return nil }
+        let ids = ["Org A": "1", "Org B": "2", "Org C": "3"]
+        return OrgSource(
+            list: {
+                let all = try await tickets.load()
+                return ids.sorted { $0.key < $1.key }.map { name, id in
+                    Organization(id: id, name: name, code: String(name.suffix(1)), openCount: all.filter { $0.orgName == name }.count)
+                }
+            },
+            tickets: { id in try await tickets.load().filter { ids[$0.orgName] == id } },
+            counts: { id in (id == "1" ? 6 : 3, id == "1" ? 3 : 0) })
+        #else
+        return nil
+        #endif
+    }
+
+    /// Demo people: callers and agents from the wireframe.
+    static func demoPeople() -> PeopleSource? {
+        #if DEBUG
+        guard env["ITOPWRAP_DEMO"] == "1", let tickets = demoSource(.team) else { return nil }
+        let people = [
+            Person(id: "2", displayName: "Demo Agent", orgID: "1", orgName: "Org A", email: "agent.demo@example.com", phone: "",
+                   function: "IT support", teams: [Team(id: "10", name: "Network"), Team(id: "11", name: "Service desk")]),
+            Person(id: "4", displayName: "Agent Four", orgID: "1", orgName: "Org A", email: "agent.four@example.com", phone: "",
+                   function: "Facilities", teams: [Team(id: "10", name: "Network")]),
+            Person(id: "21", displayName: "Caller One", orgID: "1", orgName: "Org A", email: "caller.one@example.com",
+                   phone: "+00 0000 0001", function: "Sales", teams: []),
+            Person(id: "22", displayName: "Caller Two", orgID: "2", orgName: "Org B", email: "caller.two@example.com", phone: "", function: "", teams: []),
+        ]
+        let callerOf = ["21": "Caller 1", "22": "Caller 2"]
+        return PeopleSource(
+            search: { q in people.filter { p in q.split(separator: " ").allSatisfy { p.displayName.localizedCaseInsensitiveContains($0) } } },
+            inOrg: { id in people.filter { $0.orgID == id } },
+            assigned: { id in try await tickets.load().filter { $0.agentID == id } },
+            reported: { id in try await tickets.load().filter { $0.callerName == callerOf[id] } })
         #else
         return nil
         #endif

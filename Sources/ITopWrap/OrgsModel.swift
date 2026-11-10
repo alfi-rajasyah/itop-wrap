@@ -1,0 +1,165 @@
+import Foundation
+import ITopKit
+import Observation
+
+struct OrgSource: Sendable {
+    var list: @Sendable () async throws -> [Organization]
+    var tickets: @Sendable (String) async throws -> [Ticket]
+    var counts: @Sendable (String) async throws -> (people: Int, configItems: Int)
+
+    static func live(_ session: Session) -> OrgSource {
+        let s = OrgService(client: session.client)
+        return OrgSource(list: { try await s.organizations() }, tickets: { try await s.openTickets(orgID: $0) },
+                         counts: { try await s.counts(orgID: $0) })
+    }
+}
+
+struct PeopleSource: Sendable {
+    var search: @Sendable (String) async throws -> [Person]
+    var inOrg: @Sendable (String) async throws -> [Person]
+    var assigned: @Sendable (String) async throws -> [Ticket]
+    var reported: @Sendable (String) async throws -> [Ticket]
+
+    static func live(_ session: Session) -> PeopleSource {
+        let s = OrgService(client: session.client)
+        return PeopleSource(search: { try await s.people(matching: $0) }, inOrg: { try await s.people(inOrg: $0) },
+                            assigned: { try await s.tickets(assignedTo: $0) }, reported: { try await s.tickets(reportedBy: $0) })
+    }
+}
+
+enum Loadable<Value: Equatable>: Equatable {
+    case idle, loading, loaded(Value), failed(String)
+}
+
+/// Organizations: the list with counts, and the selected org's open tickets.
+@MainActor @Observable
+final class OrgsModel {
+    let me: CurrentUser
+    private let source: OrgSource
+
+    private(set) var orgs: Loadable<[Organization]> = .idle
+    var query = ""
+    var selectedID: Organization.ID?
+    private(set) var tickets: Loadable<[Ticket]> = .idle
+    private(set) var counts: (people: Int, configItems: Int)?
+
+    init(session: Session, source: OrgSource? = nil) {
+        me = session.user
+        self.source = source ?? .live(session)
+    }
+
+    var visible: [Organization] {
+        guard case .loaded(let all) = orgs else { return [] }
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return q.isEmpty ? all : all.filter { ($0.name + " " + $0.code).lowercased().contains(q) }
+    }
+
+    var selected: Organization? {
+        guard case .loaded(let all) = orgs else { return nil }
+        return all.first { $0.id == selectedID }
+    }
+
+    func loadList() async {
+        if case .loaded = orgs { return }
+        orgs = .loading
+        do { orgs = .loaded(try await source.list()) } catch { orgs = .failed(error.localizedDescription) }
+    }
+
+    func reloadList() async {
+        orgs = .idle
+        await loadList()
+    }
+
+    func loadSelected() async {
+        guard let id = selectedID else { return }
+        tickets = .loading
+        counts = nil
+        do {
+            async let t = source.tickets(id)
+            async let c = source.counts(id)
+            tickets = .loaded(try await t)
+            counts = try? await c
+        } catch {
+            tickets = .failed(error.localizedDescription)
+        }
+    }
+}
+
+/// People: search (or one org's people), the selected person and their tickets.
+@MainActor @Observable
+final class PeopleModel {
+    enum Tab: Hashable { case assigned, reported }
+
+    let me: CurrentUser
+    private let source: PeopleSource
+
+    var query = ""
+    /// Set by the org view's People link; typing a search clears it.
+    private(set) var scope: (id: String, name: String)?
+    private(set) var results: Loadable<[Person]> = .idle
+    var selectedID: Person.ID?
+    var tab: Tab = .assigned
+    private(set) var assigned: Loadable<[Ticket]> = .idle
+    private(set) var reported: Loadable<[Ticket]> = .idle
+    private var searched: String?
+
+    init(session: Session, source: PeopleSource? = nil) {
+        me = session.user
+        self.source = source ?? .live(session)
+    }
+
+    var selected: Person? {
+        guard case .loaded(let all) = results else { return nil }
+        return all.first { $0.id == selectedID }
+    }
+
+    func showOrg(id: String, name: String) {
+        scope = (id, name)
+        query = ""
+        searched = nil
+        selectedID = nil
+    }
+
+    func clearScope() {
+        scope = nil
+        results = .idle
+        searched = nil
+    }
+
+    func search() async {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        if !q.isEmpty, scope != nil { scope = nil }
+        if let scope {
+            if searched == "org:\(scope.id)", case .loaded = results { return }
+            results = .loading
+            do { results = .loaded(try await source.inOrg(scope.id)); searched = "org:\(scope.id)" } catch { results = .failed(error.localizedDescription) }
+            return
+        }
+        guard q.count >= 2 else { results = .idle; searched = nil; return }
+        if q == searched, case .loaded = results { return }
+        let previous = results
+        results = .loading
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled else { results = previous; return }
+        do {
+            let people = try await source.search(q)
+            guard query.trimmingCharacters(in: .whitespaces) == q else { return }
+            results = .loaded(people)
+            searched = q
+        } catch {
+            results = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Agents open on "Assigned to them", callers on "Reported by them" (DESIGN.md: People).
+    func loadSelected() async {
+        guard let p = selected else { return }
+        tab = p.isAgent ? .assigned : .reported
+        assigned = .loading
+        reported = .loading
+        async let a = source.assigned(p.id)
+        async let r = source.reported(p.id)
+        do { assigned = .loaded(try await a) } catch { assigned = .failed(error.localizedDescription) }
+        do { reported = .loaded(try await r) } catch { reported = .failed(error.localizedDescription) }
+    }
+}

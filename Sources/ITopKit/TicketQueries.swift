@@ -126,6 +126,16 @@ public enum TicketList {
 }
 
 public enum TicketSearch {
+    /// The org filter: no orgs chosen means everything.
+    public static func filter(_ tickets: [Ticket], orgs: Set<String>) -> [Ticket] {
+        orgs.isEmpty ? tickets : tickets.filter { orgs.contains($0.orgName) }
+    }
+
+    /// The orgs the filter menu offers: the ones these tickets are for.
+    public static func orgs(in tickets: [Ticket]) -> [String] {
+        Set(tickets.map(\.orgName).filter { !$0.isEmpty }).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
     /// Every word must appear in the ref or the title. Order is kept.
     public static func filter(_ tickets: [Ticket], query: String) -> [Ticket] {
         let words = query.lowercased().split(separator: " ").map(String.init)

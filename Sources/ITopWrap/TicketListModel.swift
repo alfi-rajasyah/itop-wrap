@@ -48,6 +48,8 @@ final class TicketListModel {
     private(set) var lookup: Lookup = .none
     var query = ""
     var selection: Ticket.ID?
+    /// The org filter (DESIGN.md: Org filter); empty means all organizations.
+    var orgFilter: Set<String> = []
 
     init(view: TicketList.View, session: Session, source: TicketSource? = nil) {
         self.view = view
@@ -59,7 +61,18 @@ final class TicketListModel {
     var needCount: Int { tickets.filter { TicketList.needsYou($0, me: me) }.count }
 
     var visibleSections: [TicketSection] {
-        TicketList.groups(TicketSearch.filter(tickets, query: query), me: me, view: view)
+        TicketList.groups(TicketSearch.filter(TicketSearch.filter(tickets, orgs: orgFilter), query: query), me: me, view: view)
+    }
+
+    var orgChoices: [String] { TicketSearch.orgs(in: tickets) }
+
+    /// The org id behind a name, from any ticket for it, for "See all of its tickets".
+    func orgID(named name: String) -> String? {
+        tickets.first { $0.orgName == name && $0.orgID != "0" }?.orgID
+    }
+
+    func toggleOrg(_ name: String) {
+        if orgFilter.contains(name) { orgFilter.remove(name) } else { orgFilter.insert(name) }
     }
 
     var isSearching: Bool { !query.trimmingCharacters(in: .whitespaces).isEmpty }

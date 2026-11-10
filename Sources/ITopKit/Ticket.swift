@@ -20,6 +20,7 @@ public struct Ticket: Sendable, Equatable, Identifiable, Hashable {
     public let priority: Int
     public let callerName: String
     public let orgName: String
+    public let orgID: String
     public let teamID: String
     public let teamName: String
     public let agentID: String
@@ -29,7 +30,7 @@ public struct Ticket: Sendable, Equatable, Identifiable, Hashable {
 
     public init(key: String, ticketClass: TicketClass, ref: String, title: String, status: String, priority: Int,
                 callerName: String, orgName: String, teamID: String, teamName: String, agentID: String,
-                agentName: String, startDate: Date?, lastUpdate: Date?) {
+                agentName: String, startDate: Date?, lastUpdate: Date?, orgID: String = "0") {
         self.key = key
         self.ticketClass = ticketClass
         self.ref = ref
@@ -38,6 +39,7 @@ public struct Ticket: Sendable, Equatable, Identifiable, Hashable {
         self.priority = priority
         self.callerName = callerName
         self.orgName = orgName
+        self.orgID = orgID
         self.teamID = teamID
         self.teamName = teamName
         self.agentID = agentID
@@ -49,7 +51,7 @@ public struct Ticket: Sendable, Equatable, Identifiable, Hashable {
     public var isUnassigned: Bool { agentID == "0" || agentID.isEmpty }
 
     /// The fields the list needs, so iTop doesn't send logs and descriptions for every row.
-    static let listFields = ["ref", "title", "status", "priority", "caller_id_friendlyname", "org_id_friendlyname",
+    static let listFields = ["ref", "title", "status", "priority", "caller_id_friendlyname", "org_id", "org_id_friendlyname",
                              "team_id", "team_id_friendlyname", "agent_id", "agent_id_friendlyname",
                              "start_date", "last_update"]
 
@@ -62,7 +64,8 @@ public struct Ticket: Sendable, Equatable, Identifiable, Hashable {
                   priority: f["priority"]?.intValue ?? 4, callerName: text("caller_id_friendlyname"),
                   orgName: text("org_id_friendlyname"), teamID: ident("team_id"), teamName: text("team_id_friendlyname"),
                   agentID: ident("agent_id"), agentName: text("agent_id_friendlyname"),
-                  startDate: Self.parseDate(text("start_date")), lastUpdate: Self.parseDate(text("last_update")))
+                  startDate: Self.parseDate(text("start_date")), lastUpdate: Self.parseDate(text("last_update")),
+                  orgID: ident("org_id"))
     }
 
     /// iTop sends dates as "2026-11-09 11:00:32" without a time zone, in the server's zone.
