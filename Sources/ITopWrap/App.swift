@@ -163,8 +163,14 @@ enum DebugLaunch {
                 <p><b>Caller 1</b><br>Sales<br><img src="https://lh5.googleusercontent.com/phone-icon" width="16" height="16"> : +00 0000 0001<br><img src="https://lh6.googleusercontent.com/mail-icon" width="16" height="16"> : <a href="mailto:caller.one@example.com">caller.one@example.com</a></p>
                 """),
         ]
-        @Sendable func list(_ scope: TicketScope) -> [Ticket] {
-            let all = base + (scope.includeClosed ? closed : [])
+        let demoMe = demoSession?.user
+        @Sendable func list(_ scope: TicketScope, assigned: [String: DemoWrites.Assignment]) -> [Ticket] {
+            var all = (base + (scope.includeClosed ? closed : [])).map { DemoWrites.apply(assigned[$0.ref], to: $0) }
+            // My tickets after an assign: mine, or unassigned TTO in my teams (the real query's rule).
+            if view == .mine, let me = demoMe {
+                let myTeams = Set(me.teams.map(\.id))
+                all = all.filter { t in t.agentID == me.contactID || (t.status == "escalated_tto" && t.isUnassigned && myTeams.contains(t.teamID)) }
+            }
             guard let days = scope.openedWithinDays else { return all }
             return all.filter { ($0.startDate ?? now) >= now.addingTimeInterval(-Double(days) * 86400) }
         }
@@ -181,7 +187,13 @@ enum DebugLaunch {
             return NSBitmapImageRep(data: img.tiffRepresentation ?? Data())?.representation(using: .png, properties: [:]) ?? Data()
         }()
         // The demo's mock iTop for writes: added entries are kept in memory and show in the logs.
-        let mock = DemoWrites()
+        let mock = DemoWrites.shared
+        let demoTeams = [Team(id: "10", name: "Network"), Team(id: "11", name: "Service desk"), Team(id: "12", name: "Collaboration")]
+        let demoAgents: [String: [Agent]] = [
+            "10": [Agent(id: "2", name: "Demo Agent"), Agent(id: "4", name: "Agent 4")],
+            "11": [Agent(id: "2", name: "Demo Agent"), Agent(id: "3", name: "Agent 3")],
+            "12": [Agent(id: "5", name: "Agent 2")],
+        ]
         // ITOPWRAP_DEMO_STATE=empty|loading|error forces a list state for the Delivery Gate.
         let state = env["ITOPWRAP_DEMO_STATE"] ?? ""
         return TicketSource(load: { scope in
@@ -189,7 +201,7 @@ enum DebugLaunch {
                                 case "empty": return []
                                 case "loading": try? await Task.sleep(for: .seconds(3600)); return []
                                 case "error": throw ITopError.transport(URLError.Code.notConnectedToInternet.rawValue)
-                                default: try? await Task.sleep(for: .milliseconds(300)); return list(scope)
+                                default: try? await Task.sleep(for: .milliseconds(300)); return list(scope, assigned: await mock.assignments)
                                 }
                             },
                             lookup: { $0 == "R-000512" ? found : nil },
@@ -210,7 +222,24 @@ enum DebugLaunch {
                                 if text.localizedCaseInsensitiveContains("fail") { throw ITopError.server(code: 100, message: "Error: demo failure on request") }
                                 await mock.add(text.trimmingCharacters(in: .whitespacesAndNewlines), ref: t.ref, isPrivate: isPrivate)
                             },
-                            canWrite: { _ in true })
+                            canWrite: { _ in true },
+                            assign: { t, teamID, agentID in
+                                try? await Task.sleep(for: .milliseconds(400))
+                                guard let stimulus = TicketWrites.assignStimulus(for: t.status) else { throw TicketWrites.Failure.cannotAssign(status: t.status) }
+                                let team = demoTeams.first { $0.id == teamID }
+                                let agent = demoAgents[teamID]?.first { $0.id == agentID }
+                                guard let team, let agent else { throw ITopError.server(code: 100, message: "Error: agent_id: the agent is not in the team") }
+                                await mock.assign(t.ref, team: team, agent: agent, status: stimulus == "ev_assign" || t.status == "pending" ? "assigned" : t.status)
+                            },
+                            assignToMe: { t in
+                                try? await Task.sleep(for: .milliseconds(400))
+                                // R-000436 plays the race: a colleague took it a moment ago.
+                                if t.ref == "R-000436" { throw TicketWrites.Failure.alreadyTaken(by: "Agent 3") }
+                                let team = demoTeams.first { $0.id == t.teamID } ?? demoTeams[0]
+                                await mock.assign(t.ref, team: team, agent: Agent(id: "2", name: "Demo Agent"), status: "assigned")
+                            },
+                            teams: { try? await Task.sleep(for: .milliseconds(200)); return demoTeams },
+                            agents: { id in try? await Task.sleep(for: .milliseconds(200)); return demoAgents[id] ?? [] })
         #else
         return nil
         #endif
@@ -329,9 +358,30 @@ enum DebugLaunch {
     }
 }
 
-/// The demo's mock iTop for log entries (debug only).
+/// The demo's mock iTop for writes (debug only): log entries and assignments, shared by every list.
 actor DemoWrites {
+    static let shared = DemoWrites()
+
+    struct Assignment: Sendable {
+        let team: Team
+        let agent: Agent
+        let status: String
+        let date: Date
+    }
+
     private var added: [String: [(text: String, isPrivate: Bool, date: Date)]] = [:]
+    private(set) var assignments: [String: Assignment] = [:]
+
+    func assign(_ ref: String, team: Team, agent: Agent, status: String) {
+        assignments[ref] = Assignment(team: team, agent: agent, status: status, date: Date())
+    }
+
+    nonisolated static func apply(_ a: Assignment?, to t: Ticket) -> Ticket {
+        guard let a else { return t }
+        return Ticket(key: t.key, ticketClass: t.ticketClass, ref: t.ref, title: t.title, status: a.status, priority: t.priority,
+                      callerName: t.callerName, orgName: t.orgName, teamID: a.team.id, teamName: a.team.name, agentID: a.agent.id,
+                      agentName: a.agent.name, startDate: t.startDate, lastUpdate: a.date, orgID: t.orgID)
+    }
 
     func add(_ text: String, ref: String, isPrivate: Bool) {
         added[ref, default: []].append((text, isPrivate, Date()))

@@ -30,6 +30,8 @@ struct PeopleSource: Sendable {
 
 enum Loadable<Value: Equatable>: Equatable {
     case idle, loading, loaded(Value), failed(String)
+
+    var value: Value? { if case .loaded(let v) = self { v } else { nil } }
 }
 
 /// Organizations: the list with counts, and the selected org's open tickets.
