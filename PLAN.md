@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0, 1 and 2 done; Checkpoint A passed (2026-11-10).
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 3 done; Checkpoint A passed (2026-11-10).
 
 ## Overview
 
@@ -109,7 +109,7 @@ Done 2026-11-10: `swift test` 20/20 passing, no warnings.
 **Description:** Run `core/get` on `UserRequest` and `Incident`, filtered to open statuses and to `agent_id = me` (or `team_id IN myTeams`). Show a sortable table with ref, title, status, priority, caller and last update, plus search by ref or title and a refresh button.
 
 **Acceptance criteria:**
-- [ ] The list matches the web UI's "My open requests" for your account (your check against the real server)
+- [x] The list matches the web UI's "My open requests" for your account (confirmed by you against the real server)
 - [x] Search narrows the list; refresh (⌘R, and every 2 minutes) reloads it
 - [x] A full ref not in the list is fetched with `core/get` and shown as "Search result: not in your queue"; a ref you can't see or that doesn't exist says so
 - [x] Empty, loading and error states are shown
