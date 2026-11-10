@@ -41,7 +41,11 @@ final class SessionModel {
         case unreachable(String)
     }
 
-    private(set) var state: State = .restoring
+    private(set) var state: State = .restoring {
+        didSet { updateWorkspace() }
+    }
+    /// The lists and the timer for the signed-in session, shared by the window and the menu bar.
+    private(set) var workspace: Workspace?
     var selection: SidebarItem = .myTickets
     var server: String
     var user: String
@@ -85,6 +89,20 @@ final class SessionModel {
     /// Debug only: show the shell for a made-up session (see `DebugLaunch`).
     func showDemo(_ session: Session) {
         state = .signedIn(session)
+    }
+
+    private func updateWorkspace() {
+        if let session {
+            guard workspace?.session.user.userID != session.user.userID || workspace?.session.client.server != session.client.server else { return }
+            workspace?.stop()
+            workspace = Workspace(session: session)
+            workspace?.start()
+            AppDelegate.keepRunningWithoutWindows = true
+        } else {
+            workspace?.stop()
+            workspace = nil
+            AppDelegate.keepRunningWithoutWindows = false
+        }
     }
 
     func signOut() {

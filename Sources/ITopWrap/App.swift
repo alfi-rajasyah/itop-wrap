@@ -12,7 +12,8 @@ struct ITopWrapApp: App {
     }()
 
     var body: some Scene {
-        WindowGroup("iTop Wrap") {
+        // One main window; ⌘O or the menu bar brings it back after it's closed.
+        Window("iTop Wrap", id: "main") {
             RootView()
                 .environment(model)
                 .task { if model.session == nil { await model.restore() } }
@@ -20,6 +21,9 @@ struct ITopWrapApp: App {
         // The window follows its content: the small sign-in form, then the resizable shell.
         .windowResizability(.contentSize)
         .commands {
+            CommandGroup(replacing: .newItem) {
+                OpenMainWindowButton()
+            }
             CommandGroup(after: .sidebar) {
                 if model.session != nil {
                     Divider()
@@ -30,6 +34,58 @@ struct ITopWrapApp: App {
                 }
             }
         }
+        MenuBarScene(model: model)
+    }
+}
+
+/// The menu bar item (PLAN.md Task 8c), there while you're signed in, window open or not.
+struct MenuBarScene: Scene {
+    let model: SessionModel
+
+    var body: some Scene {
+        MenuBarExtra(isInserted: .constant(model.workspace != nil)) {
+            if let workspace = model.workspace {
+                MenuBarPanelHost(workspace: workspace, model: model)
+            }
+        } label: {
+            if let workspace = model.workspace {
+                MenuBarLabel(workspace: workspace)
+            } else {
+                Image(nsImage: MenuBarIcon.image)
+            }
+        }
+        .menuBarExtraStyle(.window)
+    }
+}
+
+/// Opens tickets from the panel in the main window, reopening it if it was closed.
+struct MenuBarPanelHost: View {
+    let workspace: Workspace
+    let model: SessionModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        MenuBarPanel(workspace: workspace) { ticket in
+            if let ticket {
+                model.selection = .myTickets
+                workspace.mine.query = ""
+                workspace.mine.selection = ticket.id
+            }
+            openWindow(id: "main")
+            NSApp.activate()
+        }
+    }
+}
+
+struct OpenMainWindowButton: View {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button("Open iTop Wrap") {
+            openWindow(id: "main")
+            NSApp.activate()
+        }
+        .keyboardShortcut("o", modifiers: .command)
     }
 }
 
@@ -46,8 +102,8 @@ struct RootView: View {
             LoginView(notice: notice)
         case .unreachable(let message):
             UnreachableView(message: message)
-        case .signedIn(let session):
-            ShellView(session: session)
+        case .signedIn:
+            if let workspace = model.workspace { ShellView(workspace: workspace) }
         }
     }
 }
@@ -61,7 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate()
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// Signed in, the menu bar item keeps working with the window closed (PLAN.md Task 8c).
+    /// Signed out there's nothing left to use, so closing the window quits.
+    @MainActor static var keepRunningWithoutWindows = false
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !Self.keepRunningWithoutWindows }
 }
 
 /// Switches for checking the UI without your real account. Debug builds only; release builds ignore them.
