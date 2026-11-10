@@ -7,12 +7,14 @@ struct ShellView: View {
     let session: Session
     @State private var mine: TicketListModel
     @State private var team: TicketListModel
+    @State private var cmdb: CMDBModel
     @State private var confirmSignOut = false
 
     init(session: Session) {
         self.session = session
         _mine = State(initialValue: TicketListModel(view: .mine, session: session, source: DebugLaunch.demoSource(.mine)))
         _team = State(initialValue: TicketListModel(view: .team, session: session, source: DebugLaunch.demoSource(.team)))
+        _cmdb = State(initialValue: CMDBModel(session: session, source: DebugLaunch.demoCMDB()))
     }
 
     var body: some View {
@@ -36,6 +38,7 @@ struct ShellView: View {
                 switch model.selection {
                 case .myTickets: TicketListView(model: mine)
                 case .teamTickets: TicketListView(model: team)
+                case .configItems: CMDBListView(model: cmdb)
                 default: SectionPlaceholder(item: model.selection, session: session)
                 }
             }
@@ -45,9 +48,17 @@ struct ShellView: View {
             Group {
                 if let list = currentList {
                     if let t = list.ticket(list.selection) {
-                        TicketDetailView(ticket: t, list: list).id(t.id)
+                        TicketDetailView(ticket: t, list: list, openCI: openCI).id(t.id)
                     } else {
                         Text("Select a ticket to see its details.")
+                            .foregroundStyle(Theme.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else if model.selection == .configItems {
+                    if let item = cmdb.current {
+                        CIDetailView(model: cmdb, item: item, openTicket: openTicket).id(item.id)
+                    } else {
+                        Text("Select a config item to see its details.")
                             .foregroundStyle(Theme.secondary)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -63,6 +74,28 @@ struct ShellView: View {
             Button("Sign out", role: .destructive) { model.signOut() }
         } message: {
             Text("Your password is removed from the Keychain. Your username stays filled in.")
+        }
+    }
+
+    /// A ticket's linked CI opens in Config items.
+    private func openCI(_ ci: LinkedCI) {
+        cmdb.open(ConfigItem(key: ci.id, className: ci.className, name: ci.name, orgName: ""))
+        model.selection = .configItems
+    }
+
+    /// A CI's open ticket opens in the list that has it, or as a search in My tickets.
+    private func openTicket(_ t: Ticket) {
+        if mine.tickets.contains(where: { $0.id == t.id }) {
+            mine.query = ""
+            mine.selection = t.id
+            model.selection = .myTickets
+        } else if team.tickets.contains(where: { $0.id == t.id }) {
+            team.query = ""
+            team.selection = t.id
+            model.selection = .teamTickets
+        } else {
+            mine.query = t.ref
+            model.selection = .myTickets
         }
     }
 

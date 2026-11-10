@@ -141,13 +141,17 @@ Done 2026-11-10 on `task-4-ticket-detail`: 63 tests; click-through in the debug 
 **Description:** Search `FunctionalCI` (with its real class shown) and `Person` by name. Selecting a CI shows its main fields and its open tickets, using `lnkFunctionalCIToTicket`.
 
 **Acceptance criteria:**
-- [ ] Searching for a known server by name finds it
-- [ ] A CI's open tickets match the web UI
-- [ ] Person search shows name, organisation, email and phone
+- [ ] Searching for a known server by name finds it (your check on the real server)
+- [ ] A CI's open tickets match the web UI (your check)
+- [ ] Relationships (Depends on, Used by) match iTop's impact analysis for that CI (your check; uses `core/get_related`, first time against your server)
+- [x] A ticket's linked CI opens in Config items, and a CI's open ticket opens in the ticket list
+- Moved: Person search goes to Task 5b with the People view, as the design has it. "New ticket on this CI" waits for Task 9 (it's a write).
+
+Built 2026-11-10 on `task-5-cmdb`: 73 tests; click-through in the debug demo.
 
 **Verification:** `swift test --filter CMDBQueryTests` · manual check
 
-**Dependencies:** 2 (can run in parallel with 3–4) · **Files:** `Sources/ITopKit/ConfigItem.swift`, `CMDBQueries.swift`, `Sources/ITopWrap/CMDBView.swift`, `CMDBModel.swift` · **Scope:** M
+**Dependencies:** 2 (can run in parallel with 3–4) · **Files:** `Sources/ITopKit/ConfigItem.swift` (with `CMDBQueries`, `CMDBService`), `RESTOperation.swift` (`getRelated`, `limit`), `Sources/ITopWrap/CMDBView.swift`, `CMDBModel.swift`, `Tests/ITopKitTests/CMDBQueryTests.swift` · **Scope:** M
 
 ## Task 5b: Organizations and People views, org filter
 
