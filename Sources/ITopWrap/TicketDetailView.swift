@@ -9,6 +9,9 @@ struct TicketDetailView: View {
     var openCI: (LinkedCI) -> Void
     @State private var model: TicketDetailModel
     @State private var showAssign = false
+    @State private var showPending = false
+    @State private var showResolve = false
+    @State private var confirmClose = false
 
     init(ticket: Ticket, list: TicketListModel, openCI: @escaping (LinkedCI) -> Void) {
         self.list = list
@@ -105,27 +108,21 @@ struct TicketDetailView: View {
                 }
             }
             Spacer(minLength: 0)
-            if ticket.isUnassigned && list.canAssign(ticket) {
-                let needsYou = TicketList.needsYou(ticket, me: list.me)
-                Button {
-                    Task { await list.assignToMe(ticket) }
-                } label: {
-                    HStack(spacing: 6) {
-                        if list.assigning == ticket.id { ProgressView().controlSize(.mini) }
-                        Text("Assign to me")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(needsYou ? Theme.accent : Theme.primaryFill)
-                .disabled(list.assigning != nil || !model.canWrite)
-                .help(model.canWrite ? "Assign \(ticket.ref) to you" : "Changes to iTop are switched off in this build")
-            }
+            primaryAction
             Menu {
-                if list.canAssign(ticket) {
+                let actions = TicketLifecycle.actions(for: ticket.status)
+                let busy = !model.canWrite || list.working != nil
+                if list.canAssign(ticket) && !(TicketLifecycle.primary(for: ticket.status) == .assign && !ticket.isUnassigned) {
                     Button(ticket.isUnassigned ? "Assign to someone else…" : "Reassign…") { showAssign = true }
-                        .disabled(!model.canWrite || list.assigning != nil)
-                    Divider()
+                        .disabled(busy)
                 }
+                if actions.contains(.pending) {
+                    Button("Set to pending…") { showPending = true }.disabled(busy)
+                }
+                if actions.contains(.close) {
+                    Button("Close ticket…") { confirmClose = true }.disabled(busy)
+                }
+                if !actions.isEmpty { Divider() }
                 Button("Copy ref \(ticket.ref)") {
                     Task { await model.copyRef { ref in
                         NSPasteboard.general.clearContents()
@@ -146,6 +143,59 @@ struct TicketDetailView: View {
         .sheet(isPresented: $showAssign) {
             AssignSheet(ticket: ticket, list: list)
         }
+        .sheet(isPresented: $showPending) {
+            PendingSheet(ticket: ticket, list: list)
+        }
+        .sheet(isPresented: $showResolve) {
+            ResolveSheet(ticket: ticket, list: list, detail: model.loadedDetail)
+        }
+        .confirmationDialog("Close \(ticket.ref)?", isPresented: $confirmClose) {
+            Button("Close ticket") { Task { await list.applyFromHeader(.close, to: ticket) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("A closed ticket can't be reopened from the app.")
+        }
+    }
+
+    /// The single main action for the state (DESIGN.md: Assign when new, Resolve when assigned,
+    /// Reopen when resolved). Teal only when the ticket needs you.
+    @ViewBuilder
+    private var primaryAction: some View {
+        let needsYou = TicketList.needsYou(ticket, me: list.me)
+        let disabled = list.working != nil || !model.canWrite
+        let help = model.canWrite ? nil : "Changes to iTop are switched off in this build"
+        switch TicketLifecycle.primary(for: ticket.status) {
+        case .assign?:
+            if ticket.isUnassigned {
+                actionButton("Assign to me", needsYou: needsYou, disabled: disabled, help: help ?? "Assign \(ticket.ref) to you") {
+                    Task { await list.assignToMe(ticket) }
+                }
+            } else {
+                actionButton("Assign ticket", needsYou: needsYou, disabled: disabled, help: help ?? "Choose a team and agent") { showAssign = true }
+            }
+        case .resolve?:
+            actionButton("Resolve ticket", needsYou: needsYou, disabled: disabled, help: help ?? "Resolve \(ticket.ref)") { showResolve = true }
+        case .reopen?:
+            actionButton("Reopen ticket", needsYou: false, disabled: disabled, help: help ?? "Reopen \(ticket.ref)") {
+                Task { await list.applyFromHeader(.reopen, to: ticket) }
+            }
+        default:
+            EmptyView()
+        }
+    }
+
+    private func actionButton(_ title: String, needsYou: Bool, disabled: Bool, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                if list.working == ticket.id { ProgressView().controlSize(.mini) }
+                Text(title)
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(needsYou ? Theme.accent : Theme.primaryFill)
+        .foregroundStyle(needsYou ? Color.white : Theme.onPrimary)
+        .disabled(disabled)
+        .help(help)
     }
 
     // MARK: Details strip

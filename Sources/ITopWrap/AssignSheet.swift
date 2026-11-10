@@ -15,7 +15,7 @@ struct AssignSheet: View {
     @State private var agent: Agent?
     @State private var error: String?
 
-    private var busy: Bool { list.assigning != nil }
+    private var busy: Bool { list.working != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {

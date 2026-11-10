@@ -23,9 +23,13 @@ public struct TicketDetail: Sendable, Equatable {
     public let linkedCIs: [LinkedCI]
     public let serviceName: String
     public let subcategoryName: String
+    /// Ids behind the names, to prefill Resolve. "0" or empty when not set.
+    public let serviceID: String
+    public let subcategoryID: String
 
     public init(description: String, publicLog: [LogEntry], privateLog: [LogEntry], linkedCIs: [LinkedCI],
-                serviceName: String = "", subcategoryName: String = "", descriptionHTML: String = "") {
+                serviceName: String = "", subcategoryName: String = "", descriptionHTML: String = "",
+                serviceID: String = "", subcategoryID: String = "") {
         self.description = description
         self.descriptionHTML = descriptionHTML
         self.publicLog = publicLog
@@ -33,10 +37,13 @@ public struct TicketDetail: Sendable, Equatable {
         self.linkedCIs = linkedCIs
         self.serviceName = serviceName
         self.subcategoryName = subcategoryName
+        self.serviceID = serviceID
+        self.subcategoryID = subcategoryID
     }
 
     static let fields = ["description", "public_log", "private_log", "functionalcis_list",
-                         "service_id_friendlyname", "servicesubcategory_id_friendlyname", "last_update"]
+                         "service_id", "service_id_friendlyname", "servicesubcategory_id",
+                         "servicesubcategory_id_friendlyname", "last_update"]
 
     init(object: ITopObject) {
         let f = object.fields
@@ -55,7 +62,9 @@ public struct TicketDetail: Sendable, Equatable {
                   linkedCIs: cis,
                   serviceName: f["service_id_friendlyname"]?.stringValue ?? "",
                   subcategoryName: f["servicesubcategory_id_friendlyname"]?.stringValue ?? "",
-                  descriptionHTML: f["description"]?.stringValue ?? "")
+                  descriptionHTML: f["description"]?.stringValue ?? "",
+                  serviceID: f["service_id"]?.stringValue ?? f["service_id"]?.intValue.map(String.init) ?? "",
+                  subcategoryID: f["servicesubcategory_id"]?.stringValue ?? f["servicesubcategory_id"]?.intValue.map(String.init) ?? "")
     }
 }
 
