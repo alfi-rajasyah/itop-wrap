@@ -107,8 +107,8 @@ Status 2026-11-11 (Task 11):
 - [x] `swift build` and `swift test` pass with zero warnings in `ITopKit`. (Clean debug, release and test builds: 0 warnings; 195 tests.)
 - [x] Wrong password shows a clear "invalid credentials" error; right password lands on My Tickets, and relaunching the app needs no re-login. (Task 2; the packaged app in Task 10.)
 - [x] My Tickets shows the same open tickets as the iTop web UI's "My open requests" for my account. (Tasks 3 and 5b, confirmed by you.)
-- [ ] A ticket created in the app appears in the web UI with the same fields. (Built and checked in the demo; real check on first use.)
-- [ ] A log entry, reassignment, and resolve done in the app show up in the ticket's history in the web UI. (Log entry checked 2026-11-11; reassignment and resolve on first use.)
+- [x] A ticket created in the app appears in the web UI with the same fields. (confirmed by you on your real iTop, 2026-11-11.)
+- [x] A log entry, reassignment, and resolve done in the app show up in the ticket's history in the web UI. (Log entry checked on a test ticket; reassignment and resolve confirmed by you on your real iTop, 2026-11-11.)
 - [x] CMDB search finds a known server by name and shows its open tickets. (Task 4, confirmed by you.)
 - [x] `./scripts/bundle-app.sh` produces an `.app` that launches from Finder. (Task 10, confirmed by you.)
 

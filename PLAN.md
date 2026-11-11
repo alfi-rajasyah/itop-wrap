@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Checkpoint C: Delivery Gate passed; real write checks open. Task 10 merged. Task 11 done except the real checks of create, reassign and resolve, which wait for first use. Next: Checkpoint D.
+Status: all tasks done; SPEC success criteria 7 of 7 met (2026-11-11). Released as v0.9.0. Real checks: log entry, time, create, reassign and resolve confirmed on your iTop; pending, reopen and close not yet reported. Next: Checkpoint D, your sign-off, then v1.0.0.
 
 ## Overview
 
@@ -225,7 +225,7 @@ Probe result (2026-11-11): your iTop answers the web image links with 403 to HTT
 **Description:** Team and agent pickers (agents filtered by the chosen team) that call `apply_stimulus` with `ev_assign` / `ev_reassign` and the new `team_id` / `agent_id`.
 
 **Acceptance criteria:**
-- [ ] Reassigning updates the ticket in iTop and refreshes the list (demo mock: done; merged 2026-11-11 without a real check, by your choice: do it the first time a real reassign happens)
+- [x] Reassigning updates the ticket in iTop and refreshes the list (confirmed by you on your real iTop, 2026-11-11)
 - [x] Only agents in the chosen team are offered (`lnkPersonToTeam` for the chosen team, active people only)
 - [x] "Assign to me" (row pill, ticket header, top of the Assign sheet) assigns the ticket to your own team and agent in one call, and the ticket moves to Assigned (demo: I-000088)
 - [x] If a colleague took it a moment ago, nothing changes and the app says who (UX-FLOWS F4; demo: R-000436)
@@ -241,7 +241,7 @@ Stimulus by state: New and Escalated TTO use `ev_assign`; Assigned, Escalated TT
 **Description:** Add `TicketLifecycle.swift` with a state-to-actions map for UserRequest and Incident. The detail view shows only valid actions. Set to pending asks for a reason (required, sent as `pending_reason` with `ev_pending`). Resolve asks for service and service subcategory (prefilled from the ticket, required, subcategory filtered by service), a resolution code and a solution (required), sent as `service_id`, `servicesubcategory_id`, `resolution_code` and `solution` with `ev_resolve`. Both block the action and show an inline error while the required field is empty, and both stop a running timer and save its time.
 
 **Acceptance criteria:**
-- [ ] Pending, resolve, reopen and close work on a test ticket and show in the history (demo mock: done; merged 2026-11-11 without a real check, by your choice: do it on the first ticket you really set to pending or resolve)
+- [ ] Pending, resolve, reopen and close work on a test ticket and show in the history (resolve confirmed by you on your real iTop, 2026-11-11; pending, reopen and close not yet reported)
 - [x] Pending without a reason, or resolve without a solution, is blocked before anything is sent (tests; demo: the empty solution was blocked)
 - [x] Invalid actions for the current state are not offered (`TicketLifecycle.actions(for:)`; the client refuses them too)
 - [x] iTop rejections (for example a missing required field) show iTop's message (tests; demo: a solution or reason containing "fail" is refused)
@@ -289,7 +289,7 @@ As built: the Stacked stubs icon is drawn in code as a template image (your choi
 **Description:** A New Ticket form (UserRequest or Incident) with searchable dropdowns (type to filter, or open the full list) for organisation and caller (caller filtered by organisation, searched with `core/get` on `Person` as you type), service (`service_id`, required, limited to services the organisation's contract covers) and service subcategory (`servicesubcategory_id`, required, filtered by service), impact and urgency, a title and a description. Submits with `core/create` and opens the new ticket.
 
 **Acceptance criteria:**
-- [ ] The created ticket shows the same fields in the web UI (demo: created R-000601 by keyboard; real check pending, needs ITOPWRAP_WRITE_TICKETS plus the new-ticket switch)
+- [x] The created ticket shows the same fields in the web UI (confirmed by you on your real iTop, 2026-11-11)
 - [x] Required fields are validated before sending (tests; demo: an empty form turned every Required label red and sent nothing)
 - [x] Pick lists come from iTop, not hard-coded (organizations, callers, services, subcategories); impact and urgency use iTop's standard values, since REST can't list them
 
@@ -303,7 +303,7 @@ DropdownField rebuilt to DESIGN.md "Dropdowns (one component everywhere)" during
 
 ### Checkpoint C: Write features
 - [x] antislop Delivery Gate PASS on every sheet and action (anti-slop/checkpoint-c-2026-11-11.md: 7 findings, all fixed)
-- [ ] Every write in SPEC user stories 4, 5, 7 and 8 is verified in the web UI history (log entry, time and menu bar done; reassign, lifecycle and create open, planned as one run on a new test ticket with ITOPWRAP_WRITE_NEW=1)
+- [ ] Every write in SPEC user stories 4, 5, 7 and 8 is verified in the web UI history (log entry, time, menu bar, create, reassign and resolve confirmed on your iTop, 2026-11-11; pending, reopen and close not yet reported)
 - [ ] No test data is left that you didn't want (you'll delete the test entries on your test ticket in the web UI)
 
 ### Phase 4: Ship
@@ -324,7 +324,7 @@ As built: `scripts/bundle-app.sh` (release build, `Resources/Info.plist`, ad-hoc
 
 **Description:** Go through the SPEC success criteria, get to zero warnings, and write a short README (install, sign in, troubleshooting TLS and REST access).
 
-**Acceptance criteria:** [ ] All SPEC success criteria are checked off (5 of 7 met; create, reassignment and resolve wait for their first real use)
+**Acceptance criteria:** [x] All SPEC success criteria are checked off (7 of 7; create, reassignment and resolve confirmed by you on your real iTop, 2026-11-11)
 
 **Verification:** `swift build -c release` · `swift test` · run through the success criteria
 
@@ -333,7 +333,7 @@ As built (2026-11-11): zero warnings in debug, release and test builds; README.m
 **Dependencies:** all · **Files:** `README.md`, `SPEC.md` · **Scope:** S
 
 ### Checkpoint D: Complete
-- [ ] All SPEC success criteria are met, and you sign off
+- [ ] All SPEC success criteria are met, and you sign off (all 7 met 2026-11-11; waiting for your sign-off)
 
 ## Risks and Mitigations
 
