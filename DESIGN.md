@@ -76,7 +76,8 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 | Status item | Monochrome template version of the Stacked stubs icon, then the running timer (`0:12`) when one runs, then the Needs you count | macOS menu bar items are monochrome; the timer and count are the two things worth a glance |
 | Focal point | The running timer lives on its ticket's row: the row is tinted, its time shows the live `00:12:34` counter in bold, and its button becomes Stop. | No separate timer card: the time belongs to the ticket, and one control per ticket avoids two stop buttons |
 | List | Grouped by iTop status, escalated first: Escalated TTR, Escalated TTO, Assigned, Pending. Each row has the ref, title, time and a start/stop icon button; a teal dot still marks tickets waiting on you. Clicking the title opens the ticket in the main window | The groups match the states you work with in iTop, so the panel reads like your iTop queue |
-| Footer | Icon buttons: New ticket (⌘N), Refresh (⌘R), Open iTop Wrap (⌘O), with "Updated 1 min ago" between them | Quick actions without opening the window |
+| Top row | Search field, then a labelled "New ticket" button (⌘N) | Creating a ticket while someone's on the phone is the panel's other main job; as an icon in the footer it went unnoticed (changed 2026-11-11) |
+| Footer | Icon buttons: Refresh (⌘R) and Open iTop Wrap (⌘O), with "Updated 1 min ago" between them | Quick actions without opening the window |
 | Teal | Only the Needs you dots | Same single meaning as in the main window |
 | Timer | The same timer as the main window: starting one in either place stops the other | One source of truth for time spent |
 

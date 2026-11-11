@@ -37,9 +37,18 @@ struct MenuBarPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            TextField("Search my tickets", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .padding(10)
+            // New ticket sits next to search, labelled: as an icon in the footer it went unnoticed.
+            HStack(spacing: 8) {
+                TextField("Search my tickets", text: $query)
+                    .textFieldStyle(.roundedBorder)
+                Button { workspace.requestNewTicket(); openTicket(nil) } label: {
+                    Label("New ticket", systemImage: "square.and.pencil")
+                }
+                .buttonStyle(.bordered)
+                .keyboardShortcut("n", modifiers: .command)
+                .help("New ticket (⌘N)")
+            }
+            .padding(10)
             if let n = timer.notice {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "stopwatch").accessibilityHidden(true)
@@ -151,11 +160,6 @@ struct MenuBarPanel: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Button { workspace.requestNewTicket(); openTicket(nil) } label: { Image(systemName: "square.and.pencil") }
-                .buttonStyle(.borderless)
-                .keyboardShortcut("n", modifiers: .command)
-                .help("New ticket (⌘N)")
-                .accessibilityLabel("New ticket")
             Button { Task { await mine.refresh() } } label: { Image(systemName: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .keyboardShortcut("r", modifiers: .command)
