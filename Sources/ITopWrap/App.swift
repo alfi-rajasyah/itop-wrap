@@ -149,10 +149,12 @@ enum DebugLaunch {
     static var env: [String: String] { ProcessInfo.processInfo.environment }
 
     ///   ITOPWRAP_WRITE_TICKETS=R-079999,R-080001   switch writes on for these tickets only (testing on a real iTop)
+    ///   ITOPWRAP_WRITE_NEW=1                       also allow creating tickets, and writes on the ones created
     @MainActor static var service: SessionService {
         #if DEBUG
         let refs = (env["ITOPWRAP_WRITE_TICKETS"] ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).uppercased() }.filter { !$0.isEmpty }
-        let access: WriteAccess = refs.isEmpty ? .off : .tickets(refs)
+        let newTickets = env["ITOPWRAP_WRITE_NEW"] == "1"
+        let access: WriteAccess = refs.isEmpty && !newTickets ? .off : .tickets(refs, newTickets: newTickets)
         if let suite = env["ITOPWRAP_SETTINGS"], let defaults = UserDefaults(suiteName: "ITopWrap.debug.\(suite)") {
             return SessionService(secrets: KeychainStore(service: "iTop Wrap debug \(suite)"), settings: SessionSettings(defaults: defaults), writeAccess: access)
         }

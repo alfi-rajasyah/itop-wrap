@@ -61,6 +61,7 @@ extension TicketWrites {
         guard let key = response.objects.first?.key, Self.isID(key) else {
             throw ITopError.server(code: 0, message: "iTop didn't return the new ticket.")
         }
+        client.allowCreatedTicket("\(t.ticketClass.rawValue)::\(key)")
         let read = try await client.send(.get(className: t.ticketClass.rawValue, key: "SELECT \(t.ticketClass.rawValue) WHERE id = \(key)",
                                               outputFields: Ticket.listFields, limit: 1))
         guard let object = read.objects.first, let ticket = Ticket(object: object) else {

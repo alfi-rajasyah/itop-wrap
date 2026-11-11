@@ -99,6 +99,25 @@ struct CreateTests {
         #expect(allowed.requests.first?.jsonData["operation"] as? String == "core/create")
     }
 
+    @Test("A ticket created under the new-ticket switch joins the allowlist, so it can be worked on; others stay closed")
+    func createdJoinsAllowlist() async throws {
+        let s = StubServer { r in
+            switch r.jsonData["operation"] as? String {
+            case "core/create": return createdReply
+            case "core/get": return readBack
+            default: return .json(#"{"code":0,"message":"","objects":{"UserRequest::900":{"class":"UserRequest","key":"900","code":0,"message":"","fields":{"id":"900"}}}}"#)
+            }
+        }
+        let c = try client(s, allow: [], newTickets: true)
+        #expect(!c.canWrite(className: "UserRequest", key: "900"))
+        let ticket = try await TicketWrites(client: c).create(draft())
+
+        #expect(c.canWrite(className: "UserRequest", key: "900"))
+        try await TicketWrites(client: c).addLogEntry(to: ticket, text: "Test entry", isPrivate: true)
+        #expect(s.requests.last?.jsonData["operation"] as? String == "core/update")
+        #expect(!c.canWrite(className: "UserRequest", key: "901"))
+    }
+
     @Test("Creating tickets never works with writes off, whatever else is set")
     func writesOff() async throws {
         let s = stub()
