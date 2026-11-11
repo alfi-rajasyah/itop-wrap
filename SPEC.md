@@ -97,18 +97,20 @@ Conventions: one type per file in `ITopKit`; views own no networking — they ca
 
 - **Always:** run `swift test` before each commit; keep the password only in the Keychain; use HTTPS URLs (warn on `http://`); send write operations with a `comment` so changes are traceable in iTop history.
 - **Ask first:** adding any dependency; changing the minimum macOS version.
-- **Read-only against the real server (until you say otherwise):** during development the app only reads (`core/get`, `core/check_credentials`, `list_operations`). Every write (create, update, stimulus, TimeSpent) is built and tested against a recorded mock transport. Real writes are switched on only when you say so.
+- **Read-only against the real server (until you say otherwise):** during development the app only reads (`core/get`, `core/check_credentials`, `list_operations`). Every write (create, update, stimulus, TimeSpent) is built and tested against a recorded mock transport. Real writes are switched on only when you say so. **Switched on 2026-11-11 by you for release builds** (every ticket your account may edit); debug builds stay read-only unless a test switch names tickets (`ITOPWRAP_WRITE_TICKETS`, `ITOPWRAP_WRITE_NEW`).
 - **Never:** commit credentials, server URLs or real ticket data to the repo or fixtures; disable TLS validation; delete objects in iTop (`core/delete` is not used at all).
 
 ## Success Criteria
 
-- [ ] `swift build` and `swift test` pass with zero warnings in `ITopKit`.
-- [ ] Wrong password shows a clear "invalid credentials" error; right password lands on My Tickets, and relaunching the app needs no re-login.
-- [ ] My Tickets shows the same open tickets as the iTop web UI's "My open requests" for my account.
-- [ ] A ticket created in the app appears in the web UI with the same fields.
-- [ ] A log entry, reassignment, and resolve done in the app show up in the ticket's history in the web UI.
-- [ ] CMDB search finds a known server by name and shows its open tickets.
-- [ ] `./scripts/bundle-app.sh` produces an `.app` that launches from Finder.
+Status 2026-11-11 (Task 11):
+
+- [x] `swift build` and `swift test` pass with zero warnings in `ITopKit`. (Clean debug, release and test builds: 0 warnings; 195 tests.)
+- [x] Wrong password shows a clear "invalid credentials" error; right password lands on My Tickets, and relaunching the app needs no re-login. (Task 2; the packaged app in Task 10.)
+- [x] My Tickets shows the same open tickets as the iTop web UI's "My open requests" for my account. (Tasks 3 and 5b, confirmed by you.)
+- [ ] A ticket created in the app appears in the web UI with the same fields. (Built and checked in the demo; real check on first use.)
+- [ ] A log entry, reassignment, and resolve done in the app show up in the ticket's history in the web UI. (Log entry checked 2026-11-11; reassignment and resolve on first use.)
+- [x] CMDB search finds a known server by name and shows its open tickets. (Task 4, confirmed by you.)
+- [x] `./scripts/bundle-app.sh` produces an `.app` that launches from Finder. (Task 10, confirmed by you.)
 
 ## Answers (2026-11-10)
 

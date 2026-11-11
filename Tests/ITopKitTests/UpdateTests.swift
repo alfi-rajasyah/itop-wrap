@@ -151,6 +151,26 @@ struct WriteAccessTests {
         let session = try await service.signIn(server: "itop.example.com", user: "agent", password: "pw")
         #expect(session.client.allowsWrites == false)
     }
+
+    @Test("Writes on everywhere (release builds, from 2026-11-11): no allowlist, creating tickets allowed; iTop's own rights still apply")
+    func allOn() async throws {
+        let stub = StubServer { request in
+            switch (request.jsonData["operation"] as? String, request.jsonData["class"] as? String) {
+            case ("core/check_credentials", _): return .fixture("check_credentials")
+            case ("core/get", "User"): return .fixture("user")
+            default: return .fixture("person")
+            }
+        }
+        let service = SessionService(secrets: MemoryStore(), settings: SessionSettings(defaults: UserDefaults(suiteName: UUID().uuidString)!),
+                                     writeAccess: .all) {
+            ITopClient(server: $0, credentials: $1, session: stub.session)
+        }
+        let session = try await service.signIn(server: "itop.example.com", user: "agent", password: "pw")
+        #expect(session.client.allowsWrites)
+        #expect(session.client.writeAllowlist == nil)
+        #expect(session.client.canWrite(className: "Incident", key: "12345"))
+        #expect(session.client.canCreateTickets)
+    }
 }
 
 private final class MemoryStore: SecretStore, @unchecked Sendable {
