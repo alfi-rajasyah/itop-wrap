@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Checkpoint C: Delivery Gate passed; real write checks open. Task 10 merged. Next: Task 11, final pass.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Checkpoint C: Delivery Gate passed; real write checks open. Task 10 merged. Task 11 done except the real checks of create, reassign and resolve, which wait for first use. Next: Checkpoint D.
 
 ## Overview
 
@@ -324,9 +324,11 @@ As built: `scripts/bundle-app.sh` (release build, `Resources/Info.plist`, ad-hoc
 
 **Description:** Go through the SPEC success criteria, get to zero warnings, and write a short README (install, sign in, troubleshooting TLS and REST access).
 
-**Acceptance criteria:** [ ] All SPEC success criteria are checked off
+**Acceptance criteria:** [ ] All SPEC success criteria are checked off (5 of 7 met; create, reassignment and resolve wait for their first real use)
 
 **Verification:** `swift build -c release` · `swift test` · run through the success criteria
+
+As built (2026-11-11): zero warnings in debug, release and test builds; README.md (install, sign in, what it does, troubleshooting TLS, REST access and errors, development switches); the resolve solution now goes to iTop as HTML paragraphs, as SPEC answer 7 says (it was plain text); release builds have writes on for every ticket your account may edit (your decision, without the remaining real checks), debug builds stay read-only unless a test switch names tickets.
 
 **Dependencies:** all · **Files:** `README.md`, `SPEC.md` · **Scope:** S
 

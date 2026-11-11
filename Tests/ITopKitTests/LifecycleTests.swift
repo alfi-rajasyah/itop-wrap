@@ -78,7 +78,17 @@ struct LifecycleWriteTests {
         #expect(f?["service_id"] as? String == "3")
         #expect(f?["servicesubcategory_id"] as? String == "12")
         #expect(f?["resolution_code"] as? String == "assistance")
-        #expect(f?["solution"] as? String == "Raised the gateway timeout.")
+        #expect(f?["solution"] as? String == "<p>Raised the gateway timeout.</p>", "SPEC answer 7: the solution is HTML")
+    }
+
+    @Test("The solution keeps its paragraphs and line breaks, with markup escaped")
+    func solutionHTML() async throws {
+        let stub = StubServer(ok)
+        var r = resolution
+        r.solution = "Raised the timeout to 8 h.\nAsked the caller to test.\n\nClose if quiet <24h> & stable."
+        try await TicketWrites(client: client(stub)).apply(.resolve(r), to: t("assigned"))
+        let f = try #require(stub.requests.first).jsonData["fields"] as? [String: Any]
+        #expect(f?["solution"] as? String == "<p>Raised the timeout to 8 h.<br>Asked the caller to test.</p><p>Close if quiet &lt;24h&gt; &amp; stable.</p>")
     }
 
     @Test("Reopen and close send their stimulus with no fields", arguments: [

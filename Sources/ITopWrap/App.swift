@@ -160,7 +160,9 @@ enum DebugLaunch {
         }
         return SessionService(writeAccess: access)
         #else
-        return SessionService()
+        // Release: writes on (your decision, 2026-11-11). Debug builds stay read-only unless a
+        // test switch above names tickets.
+        return SessionService(writeAccess: .all)
         #endif
     }
 

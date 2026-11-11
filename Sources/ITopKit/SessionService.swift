@@ -34,6 +34,9 @@ public struct Session: Sendable {
 /// Whether the session may change anything in iTop (SPEC.md, Boundaries: read-only until you say so).
 public enum WriteAccess: Sendable, Equatable {
     case off
+    /// Writes on for every ticket your account may edit; iTop's own rights still apply.
+    /// Release builds, switched on by you on 2026-11-11.
+    case all
     /// Writes only on these tickets, given by ref ("R-079999"), for testing on a real iTop;
     /// `newTickets` also allows creating tickets.
     case tickets([String], newTickets: Bool = false)
@@ -94,6 +97,7 @@ public struct SessionService: Sendable {
         let client = makeClient(address, credentials)
         guard try await client.checkCredentials() else { throw ITopError.invalidCredentials }
         let me = try await CurrentUser.load(login: credentials.user, client: client)
+        if writeAccess == .all { return Session(client: client.allowingWrites(only: nil), user: me) }
         guard case .tickets(let refs, let newTickets) = writeAccess else { return Session(client: client, user: me) }
         // Resolve each ref to its exact object; refs that don't exist stay out of the allowlist.
         let service = TicketService(client: client)

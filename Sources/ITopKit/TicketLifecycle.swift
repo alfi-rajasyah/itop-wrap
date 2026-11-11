@@ -89,7 +89,7 @@ extension TicketWrites {
             let solution = r.solution.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !solution.isEmpty else { throw Failure.missing("solution") }
             fields = ["service_id": .string(r.serviceID), "servicesubcategory_id": .string(r.subcategoryID),
-                      "resolution_code": .string(r.code), "solution": .string(solution)]
+                      "resolution_code": .string(r.code), "solution": .string(NewTicket.html(solution))]  // HTML (SPEC answer 7)
         case .reopen, .close:
             break
         }
