@@ -16,6 +16,8 @@ enum Theme {
     static let accent = dynamic(light: 0x0F6E56, dark: 0x5DCAA5)
     static let accentTint = dynamic(light: 0xE1F5EE, dark: 0x085041)
     static let accentText = dynamic(light: 0x0F6E56, dark: 0x9FE1CB)
+    /// One height for the ticket header's controls (timer, main action, More).
+    static let headerControlHeight: CGFloat = 26
     /// Text on a teal button: white on the dark light-mode teal (6.2:1), near-black on the
     /// bright dark-mode teal (8.4:1); white there was 2.0:1 (Checkpoint C).
     static let onAccent = dynamic(light: 0xFFFFFF, dark: 0x1D1D1F)
@@ -56,8 +58,24 @@ struct MainActionStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(text)
-            .padding(.horizontal, 11).frame(height: 24)
+            .padding(.horizontal, 12).frame(height: Theme.headerControlHeight)
             .background(fill.opacity(configuration.isPressed ? 0.85 : (isEnabled ? 1 : 0.5)), in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// The neutral controls next to the main action (timer, More): the same height and corner
+/// radius as `MainActionStyle`, on the chip colour, so the three read as one row.
+struct HeaderControlStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Theme.text.opacity(isEnabled ? 1 : 0.4))
+            .padding(.horizontal, 9)
+            .frame(minWidth: Theme.headerControlHeight + 8, minHeight: Theme.headerControlHeight, maxHeight: Theme.headerControlHeight)
+            .background(Theme.chip.opacity(configuration.isPressed ? 1 : 0.8), in: RoundedRectangle(cornerRadius: 6))
             .contentShape(RoundedRectangle(cornerRadius: 6))
     }
 }

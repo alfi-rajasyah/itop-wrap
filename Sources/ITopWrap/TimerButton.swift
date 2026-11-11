@@ -21,6 +21,7 @@ struct TimerButton: View {
                         }
                     }
                 }
+                .buttonStyle(HeaderControlStyle())
                 .help("Stop timer: saves its time (⌘T)")
                 .accessibilityLabel("Stop timer")
             } else if let since = timer.webStopwatches[ticket.id] {
@@ -33,6 +34,7 @@ struct TimerButton: View {
                 Button { Task { await timer.start(ticket) } } label: {
                     Image(systemName: "stopwatch")
                 }
+                .buttonStyle(HeaderControlStyle())
                 .accessibilityLabel("Start timer")
                 .disabled(!canWrite || timer.saving)
                 .help(canWrite ? (timer.running.map { "Start timer: stops the one on \($0.ref) and saves its time (⌘T)" } ?? "Start timer (⌘T)")
