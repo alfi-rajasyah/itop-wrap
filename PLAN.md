@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: all tasks done; SPEC success criteria 7 of 7 met (2026-11-11). Released as v0.9.0. Real checks: log entry, time, create, reassign and resolve confirmed on your iTop; pending, reopen and close not yet reported. Next: Checkpoint D, your sign-off, then v1.0.0.
+Status: complete. All tasks done, SPEC success criteria 7 of 7 met, Checkpoint D signed off by you (2026-11-11). Released as v1.0.0. Open: set to pending, reopen and close not yet reported on your iTop.
 
 ## Overview
 
@@ -333,7 +333,7 @@ As built (2026-11-11): zero warnings in debug, release and test builds; README.m
 **Dependencies:** all · **Files:** `README.md`, `SPEC.md` · **Scope:** S
 
 ### Checkpoint D: Complete
-- [ ] All SPEC success criteria are met, and you sign off (all 7 met 2026-11-11; waiting for your sign-off)
+- [x] All SPEC success criteria are met, and you sign off (all 7 met; signed off by you 2026-11-11; released as v1.0.0)
 
 ## Risks and Mitigations
 

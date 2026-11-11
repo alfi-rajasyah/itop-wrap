@@ -1,6 +1,6 @@
 # Spec: iTop Wrap — native macOS client for iTop
 
-Status: APPROVED 2026-11-10 — open questions still to answer before build
+Status: APPROVED 2026-11-10; delivered as v1.0.0, signed off 2026-11-11
 
 ## Objective
 

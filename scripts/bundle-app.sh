@@ -31,5 +31,6 @@ mkdir -p build
 rm -rf "$APP"
 mv "$STAGE/iTop Wrap.app" "$APP"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" >/dev/null 2>&1 || true
-echo "Built $APP (version 0.9, build $BUILD)" >&2
-printf '{"app":"%s","version":"0.9","build":"%s"}\n' "$APP" "$BUILD"
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
+echo "Built $APP (version $VERSION, build $BUILD)" >&2
+printf '{"app":"%s","version":"%s","build":"%s"}\n' "$APP" "$VERSION" "$BUILD"
