@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Next: Checkpoint C.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Checkpoint C: Delivery Gate passed; real write checks open.
 
 ## Overview
 
@@ -302,9 +302,9 @@ As built: opens from ⌘N, the menu bar, an organization's header, or a CI ("New
 DropdownField rebuilt to DESIGN.md "Dropdowns (one component everywhere)" during Task 9 (2026-11-11; the Task 7 version used a popover with a filter box on every list and no arrow keys). Now: Organization and Caller take typing in the field with a magnifier; short lists have no search box and jump by first letter; ↓/↑ open and move, ↩ picks, Esc closes the list before it would cancel the sheet; one open at a time, drawn above the sheet and flipped above the field when there's no room below; VoiceOver reads each by its field name, the highlighted item as its value and announced as you move. Checked by keyboard and mouse in New ticket, Resolve and Assign. Differences from the spec: with one list open, clicking another field first closes the open one (a second click opens it); macOS has no combobox role in SwiftUI, so short lists are read as buttons with a hint.
 
 ### Checkpoint C: Write features
-- [ ] antislop Delivery Gate PASS on every sheet and action
-- [ ] Every write in SPEC user stories 4, 5, 7 and 8 is verified in the web UI history
-- [ ] No test data is left that you didn't want
+- [x] antislop Delivery Gate PASS on every sheet and action (anti-slop/checkpoint-c-2026-11-11.md: 7 findings, all fixed)
+- [ ] Every write in SPEC user stories 4, 5, 7 and 8 is verified in the web UI history (log entry, time and menu bar done; reassign, lifecycle and create open, planned as one run on a new test ticket with ITOPWRAP_WRITE_NEW=1)
+- [ ] No test data is left that you didn't want (you'll delete the test entries on your test ticket in the web UI)
 
 ### Phase 4: Ship
 

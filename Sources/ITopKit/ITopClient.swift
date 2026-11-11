@@ -1,4 +1,21 @@
 import Foundation
+import Synchronization
+
+/// The write allowlist, shared by every copy of a session's client, so a ticket the app
+/// creates under the new-ticket switch can be worked on straight away.
+final class AllowlistBox: Sendable {
+    private let keys: Mutex<Set<String>>
+
+    init(_ keys: Set<String>) {
+        self.keys = Mutex(keys)
+    }
+
+    var current: Set<String> { keys.withLock { $0 } }
+
+    func insert(_ key: String) {
+        _ = keys.withLock { $0.insert(key) }
+    }
+}
 
 /// The single entry point to iTop's REST API (PLAN.md, Architecture Decisions).
 public struct ITopClient: Sendable {
@@ -7,7 +24,8 @@ public struct ITopClient: Sendable {
     public let allowsWrites: Bool
     /// When set, writes are allowed only on these objects ("UserRequest::7"), and nothing can be
     /// created: the safety net for testing writes on chosen tickets of a real iTop.
-    public let writeAllowlist: Set<String>?
+    private let allowlistBox: AllowlistBox?
+    public var writeAllowlist: Set<String>? { allowlistBox?.current }
     /// With an allowlist, also allow creating new tickets (UserRequest, Incident): for testing
     /// New ticket on a real iTop without opening writes to every existing ticket.
     public let allowsTicketCreation: Bool
@@ -21,7 +39,7 @@ public struct ITopClient: Sendable {
         self.credentials = credentials
         self.session = session
         self.allowsWrites = allowsWrites
-        self.writeAllowlist = writeAllowlist
+        allowlistBox = writeAllowlist.map(AllowlistBox.init)
         self.allowsTicketCreation = allowsTicketCreation
     }
 
@@ -29,6 +47,12 @@ public struct ITopClient: Sendable {
     public func allowingWrites(only allowlist: Set<String>?, newTickets: Bool = false) -> ITopClient {
         ITopClient(server: server, credentials: credentials, session: session, allowsWrites: true, writeAllowlist: allowlist,
                    allowsTicketCreation: newTickets)
+    }
+
+    /// After creating a ticket under the new-ticket switch: allow writes on it too.
+    func allowCreatedTicket(_ key: String) {
+        guard allowsTicketCreation else { return }
+        allowlistBox?.insert(key)
     }
 
     /// Whether New ticket would be sent.

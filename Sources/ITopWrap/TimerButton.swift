@@ -11,13 +11,17 @@ struct TimerButton: View {
     var body: some View {
         Group {
             if let running = timer.running, running.ticketID == ticket.id {
+                // DESIGN.md: a stop icon and the live 00:12:34 counter, bold, in SF Mono.
                 Button { Task { await timer.stop() } } label: {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
-                        Label("Stop \(TimerModel.elapsed(since: running.start, now: context.date))", systemImage: "stop.fill")
-                            .monospacedDigit()
+                        HStack(spacing: 5) {
+                            Image(systemName: "stop.fill")
+                            Text(TimeFormat.counter(Int(context.date.timeIntervalSince(running.start))))
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        }
                     }
                 }
-                .help("Stop the timer and save its time (⌘T)")
+                .help("Stop timer: saves its time (⌘T)")
                 .accessibilityLabel("Stop timer")
             } else if let since = timer.webStopwatches[ticket.id] {
                 Label("Web stopwatch since \(TimerModel.time(since))", systemImage: "globe")
@@ -25,11 +29,13 @@ struct TimerButton: View {
                     .foregroundStyle(Theme.secondary)
                     .help("Your stopwatch in iTop's web UI is running on this ticket, so the app doesn't start its own")
             } else if timer.canStart(ticket) {
+                // DESIGN.md: an icon-only stopwatch next to the main action.
                 Button { Task { await timer.start(ticket) } } label: {
-                    Label(timer.running == nil ? "Start timer" : "Switch timer here", systemImage: "play.fill")
+                    Image(systemName: "stopwatch")
                 }
+                .accessibilityLabel("Start timer")
                 .disabled(!canWrite || timer.saving)
-                .help(canWrite ? (timer.running.map { "Stops the timer on \($0.ref), saves its time, and starts one here (⌘T)" } ?? "Start the timer (⌘T)")
+                .help(canWrite ? (timer.running.map { "Start timer: stops the one on \($0.ref) and saves its time (⌘T)" } ?? "Start timer (⌘T)")
                                : "Changes to iTop are switched off in this build")
             }
         }

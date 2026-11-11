@@ -70,6 +70,16 @@ struct TimerTests {
         #expect(TimeFormat.clock(seconds) == text)
     }
 
+    @Test("Totals read like DESIGN.md's rows: 1h 20m", arguments: [(0, "0m"), (59, "0m"), (60, "1m"), (2700, "45m"), (3600, "1h"), (4800, "1h 20m"), (36000 + 300, "10h 5m")] as [(Int, String)])
+    func total(seconds: Int, text: String) {
+        #expect(TimeFormat.total(seconds) == text)
+    }
+
+    @Test("The live counter reads 00:12:34", arguments: [(0, "00:00:00"), (754, "00:12:34"), (36000 + 61, "10:01:01")] as [(Int, String)])
+    func counter(seconds: Int, text: String) {
+        #expect(TimeFormat.counter(seconds) == text)
+    }
+
     @Test("A running timer survives a restart: it's saved and read back, and cleared")
     func persistence() throws {
         let defaults = try #require(UserDefaults(suiteName: "ITopWrapTests.timer.\(UUID().uuidString)"))

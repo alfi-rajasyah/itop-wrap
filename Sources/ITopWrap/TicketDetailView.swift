@@ -206,9 +206,7 @@ struct TicketDetailView: View {
                 Text(title)
             }
         }
-        .buttonStyle(.borderedProminent)
-        .tint(needsYou ? Theme.accent : Theme.primaryFill)
-        .foregroundStyle(needsYou ? Color.white : Theme.onPrimary)
+        .buttonStyle(MainActionStyle(fill: needsYou ? Theme.accent : Theme.primaryFill, text: needsYou ? Theme.onAccent : Theme.onPrimary))
         .disabled(disabled)
         .help(help)
     }
@@ -222,7 +220,7 @@ struct TicketDetailView: View {
             item("person.2", ticket.teamName.isEmpty ? "No team" : ticket.teamName, help: "Team")
             agent
             if let spent = list.timer?.totals[ticket.id], spent > 0 {
-                item("timer", "\(TimeFormat.clock(spent)) spent", help: "Time spent")
+                item("stopwatch", "\(TimeFormat.total(spent)) spent", help: "Time spent")
             }
             if case .loaded(let detail) = model.phase {
                 ForEach(detail.linkedCIs) { ci in
@@ -425,7 +423,7 @@ struct LogComposer: View {
                 } label: {
                     HStack(spacing: 6) {
                         if model.sending { ProgressView().controlSize(.mini) }
-                        Text(isPrivate ? "Add to private log" : "Add to public log")
+                        Label(isPrivate ? "Add to private log" : "Add to public log", systemImage: "paperplane")
                     }
                 }
                 .buttonStyle(.borderedProminent)
