@@ -1,6 +1,6 @@
 # Implementation Plan: iTop Wrap
 
-Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Checkpoint C: Delivery Gate passed; real write checks open.
+Status: in progress. Implements [SPEC.md](SPEC.md). Tasks 0 to 5c done; Checkpoints A and B passed (2026-11-11). Task 6 done (checked on one allowlisted test ticket). Task 7 merged (real reassign check still open). Task 8 merged (real lifecycle check still open). Task 8b done (checked on one allowlisted test ticket). Task 8c merged. Task 9 merged (real create check still open). Checkpoint C: Delivery Gate passed; real write checks open. Task 10 merged. Next: Task 11, final pass.
 
 ## Overview
 
@@ -312,7 +312,9 @@ DropdownField rebuilt to DESIGN.md "Dropdowns (one component everywhere)" during
 
 **Description:** `scripts/bundle-app.sh` runs a release build, wraps it with an `Info.plist` and an icon into `build/iTop Wrap.app`, and ad-hoc signs it.
 
-**Acceptance criteria:** [ ] The app launches from Finder and keeps the Keychain login
+**Acceptance criteria:** [x] The app launches from Finder and keeps the Keychain login (checked by you 2026-11-11: version 0.9, build 60)
+
+As built: `scripts/bundle-app.sh` (release build, `Resources/Info.plist`, ad-hoc signature, registers the app) and `scripts/make-app-icon.sh` (the Stacked stubs mark from the menu bar icon, white on the dark teal tile, at every size; your choice). Without a Developer ID, each new build asks once for Keychain access ("Always Allow"). Release builds have writes off, as SPEC says; switching them on for daily use is your call (Task 11).
 
 **Verification:** run the script, then open the app from Finder
 
