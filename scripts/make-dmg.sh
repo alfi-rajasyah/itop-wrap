@@ -4,7 +4,8 @@
 # Usage: scripts/make-dmg.sh
 set -e
 cd "$(dirname "$0")/.."
-scripts/bundle-app.sh >/dev/null
+# Always ad hoc: a development signature would publish your name and Apple ID email.
+SIGN=adhoc scripts/bundle-app.sh >/dev/null
 APP="build/iTop Wrap.app"
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
 DMG="build/iTop-Wrap-$VERSION.0.dmg"

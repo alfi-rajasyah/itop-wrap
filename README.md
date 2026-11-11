@@ -32,11 +32,14 @@ choose **Open**, or open it once, then go to System Settings > Privacy & Securit
 scripts/bundle-app.sh
 ```
 
-This builds a release, adds the icon and `Info.plist`, signs it ad hoc and puts it at
+This builds a release, adds the icon and `Info.plist`, signs it and puts it at
 `build/iTop Wrap.app`. `scripts/make-dmg.sh` wraps that into `build/iTop-Wrap-<version>.dmg`.
 
-Without a Developer ID, macOS treats each new build as a new app: the first time a build opens it asks
-for your login keychain password to use the password saved there. Choose **Always Allow**.
+If you have an Apple Development certificate (free: add your Apple ID in Xcode > Settings >
+Accounts), the app is signed with it, so the Keychain's **Always Allow** lasts across rebuilds.
+Without one it's signed ad hoc, and macOS treats each new build as a new app: the first time a build
+opens it asks for your login keychain password. Choose **Always Allow**. `SIGN=adhoc` forces ad hoc;
+`make-dmg.sh` always uses it, since a development signature carries your name and Apple ID email.
 
 ## Sign in
 
