@@ -144,7 +144,15 @@ struct TicketDetailView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.text)
+                    .frame(width: Theme.headerControlHeight + 8, height: Theme.headerControlHeight)
+                    .background(Theme.chip.opacity(0.8), in: RoundedRectangle(cornerRadius: 6))
+                    .contentShape(RoundedRectangle(cornerRadius: 6))
             }
+            // A plain menu, so the label above is the whole look: same size as the timer button.
+            .menuStyle(.button)
+            .buttonStyle(.plain)
             .menuIndicator(.hidden)
             .fixedSize()
             .help("More actions")
