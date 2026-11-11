@@ -17,15 +17,26 @@ Not affiliated with Combodo. The spec, plan and design live in [SPEC.md](SPEC.md
 
 ## Install
 
+**From a release:** download `iTop-Wrap-<version>.dmg` from
+[Releases](https://github.com/alfi-rajasyah/itop-wrap/releases), open it and drag **iTop Wrap** to
+Applications.
+
+The app isn't signed with a Developer ID or notarized by Apple, so the first time you open it macOS
+says it can't check it for malicious software. Open it anyway: in Finder, Control-click iTop Wrap and
+choose **Open**, or open it once, then go to System Settings > Privacy & Security and click
+**Open Anyway**. You only do this once per version.
+
+**From source:**
+
 ```bash
 scripts/bundle-app.sh
 ```
 
 This builds a release, adds the icon and `Info.plist`, signs it ad hoc and puts it at
-`build/iTop Wrap.app`. Drag it to Applications if you like, then open it from Finder.
+`build/iTop Wrap.app`. `scripts/make-dmg.sh` wraps that into `build/iTop-Wrap-<version>.dmg`.
 
-The app isn't signed with a Developer ID, so macOS treats each new build as a new app: the first time a
-build opens it asks to use the password saved in your Keychain. Choose **Always Allow**.
+Without a Developer ID, macOS treats each new build as a new app: the first time a build opens it asks
+for your login keychain password to use the password saved there. Choose **Always Allow**.
 
 ## Sign in
 
@@ -97,3 +108,7 @@ SwiftUI app. Debug builds read these switches (release builds ignore them):
 `scripts/probe-itop.py`, `scripts/probe-images.py` and `scripts/probe-stopwatch.py` are read-only
 probes that save redacted summaries to `Tests/ITopKitTests/Fixtures/`. Never commit credentials,
 server addresses or real ticket data.
+
+## License
+
+[MIT](LICENSE). iTop is a trademark of Combodo; this app isn't affiliated with or endorsed by Combodo.
