@@ -9,10 +9,7 @@ struct MenuBarLabel: View {
     var body: some View {
         let status = MenuBarStatus(needCount: workspace.mine.needCount, timer: workspace.timer.running)
         let title = status.title(now: workspace.clock)
-        HStack(spacing: 4) {
-            Image(nsImage: MenuBarIcon.image)
-            if !title.isEmpty { Text(title).monospacedDigit() }
-        }
+        Image(nsImage: MenuBarIcon.label(title))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(status.accessibilityLabel(now: workspace.clock))
     }
