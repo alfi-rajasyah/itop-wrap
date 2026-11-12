@@ -37,8 +37,11 @@ struct NewTicketStart: Identifiable, Equatable {
 struct NewTicketSheet: View {
     let workspace: Workspace
     let start: NewTicketStart
-    let opened: (Ticket) -> Void
+    /// The created ticket, and whether to assign it to you once it's open.
+    let opened: (Ticket, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
+    /// Most tickets you log are your own work, so it stays on until you turn it off.
+    @AppStorage("newTicket.assignToMe") private var assignToMe = true
 
     @State private var draft = NewTicket(ticketClass: .userRequest)
     @State private var orgs: Loadable<[ServiceRef]> = .loading
@@ -113,6 +116,9 @@ struct NewTicketSheet: View {
             RequiredLabel("Description", missing: tried && descriptionEmpty)
             NoteEditor(text: $draft.description, placeholder: "What the caller reports, and anything you've already checked.", height: 100)
                 .accessibilityLabel("Description, required")
+            Toggle("Assign to me", isOn: $assignToMe)
+                .toggleStyle(.checkbox)
+                .padding(.top, 2)
             if tried, let first = firstMissing { FieldError("Fill in the \(first) first.") }
             if let error { FieldError(error) }
             if !source.canCreate {
@@ -267,7 +273,7 @@ struct NewTicketSheet: View {
             let ticket = try await source.create(filled())
             workspace.newTicketDraft = nil
             dismiss()
-            opened(ticket)
+            opened(ticket, assignToMe)
         } catch let failure {
             error = TicketListModel.actionError(failure, ticket: Ticket(key: "0", ticketClass: draft.ticketClass, ref: "the ticket", title: "",
                                                                       status: "", priority: 0, callerName: "", orgName: "", teamID: "0",

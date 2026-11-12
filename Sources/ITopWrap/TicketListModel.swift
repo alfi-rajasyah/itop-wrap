@@ -144,6 +144,7 @@ final class TicketListModel {
             updatedAt = Date()
             phase = .loaded
             refreshError = nil
+            await refreshLookup()
             if let s = selection, ticket(s) == nil { selection = nil }
             if let timer {
                 if view == .mine { await timer.myTicketsChanged(tickets) }
@@ -152,6 +153,19 @@ final class TicketListModel {
             }
         } catch {
             if phase == .loaded { refreshError = ErrorText.describe(error) } else { phase = .failed(ErrorText.describe(error)) }
+        }
+    }
+
+    /// A ticket opened outside the list (a new ticket, a full-ref search) keeps the copy it was
+    /// found with, so after a change it would still show the old state (Assign to me on a ticket
+    /// that's already yours). After each reload: the list's copy wins once it has the ticket;
+    /// otherwise the ticket is read again.
+    private func refreshLookup() async {
+        guard case .found(let found) = lookup else { return }
+        if tickets.contains(where: { $0.id == found.id }) {
+            lookup = .none
+        } else if let fresh = try? await source.lookup(found.ref), case .found(let still) = lookup, still.id == fresh.id {
+            lookup = .found(fresh)
         }
     }
 
@@ -208,6 +222,17 @@ final class TicketListModel {
         } catch {
             notice = Notice(text: Self.assignError(error, ticket: t), isError: true)
             if case TicketWrites.Failure.alreadyTaken = error { await refresh() }
+        }
+    }
+
+    /// New ticket with "Assign to me" on: the ticket is already open; assign it and say both.
+    /// If assigning fails, the ticket still exists and the notice says why.
+    func assignNew(_ t: Ticket) async {
+        await assignToMe(t)
+        if notice?.isError == false {
+            notice = Notice(text: "\(t.ref) is created and assigned to you.", isError: false)
+        } else if let why = notice?.text {
+            notice = Notice(text: "\(t.ref) is created, but not assigned to you. \(why)", isError: true)
         }
     }
 
