@@ -30,7 +30,7 @@ private final class FakeITop: Sendable {
             image: { _ in throw CancellationError() },
             attachments: { _ in [] },
             download: { _ in throw CancellationError() },
-            addEntry: { _, _, _ in },
+            addEntry: { _, _, _, _ in },
             canWrite: { _ in true },
             assign: { [self] _, _, _ in assigned.withLock { $0 = true } },
             assignToMe: { [self] _ in
