@@ -8,7 +8,8 @@ public enum RESTOperation: Sendable, Equatable {
     case get(className: String, key: String, outputFields: [String], limit: Int? = nil)
     /// Objects linked through a relation, e.g. "impacts" up (what this depends on) or down (what uses it).
     case getRelated(className: String, key: String, relation: String, depth: Int, direction: String)
-    case create(className: String, fields: [String: JSONValue], comment: String)
+    /// `outputFields` are the fields iTop sends back for the new object (an InlineImage's `secret`).
+    case create(className: String, fields: [String: JSONValue], comment: String, outputFields: [String] = ["id"])
     case update(className: String, key: String, fields: [String: JSONValue], comment: String)
     case applyStimulus(className: String, key: String, stimulus: String, fields: [String: JSONValue], comment: String)
 
@@ -52,11 +53,11 @@ public enum RESTOperation: Sendable, Equatable {
             o["depth"] = .number(Double(depth))
             o["direction"] = .string(direction)
             o["redundancy"] = .bool(false)
-        case .create(let className, let fields, let comment):
+        case .create(let className, let fields, let comment, let outputFields):
             o["class"] = .string(className)
             o["fields"] = .object(fields)
             o["comment"] = .string(comment)
-            o["output_fields"] = .string("id")
+            o["output_fields"] = .string(outputFields.joined(separator: ","))
         case .update(let className, let key, let fields, let comment):
             o["class"] = .string(className)
             o["key"] = .string(key)

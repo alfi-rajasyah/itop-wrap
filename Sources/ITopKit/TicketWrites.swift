@@ -26,6 +26,8 @@ public struct TicketWrites: Sendable {
         case missing(String)
         /// The ticket's state doesn't offer this action.
         case notAllowed(status: String)
+        /// More images than `LogImage.maxPerEntry` in one entry.
+        case tooManyImages(max: Int)
     }
 
     public static func allowlistKey(for ticket: Ticket) -> String {
