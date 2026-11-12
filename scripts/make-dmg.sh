@@ -8,7 +8,9 @@ cd "$(dirname "$0")/.."
 SIGN=adhoc scripts/bundle-app.sh >/dev/null
 APP="build/iTop Wrap.app"
 VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP/Contents/Info.plist")
-DMG="build/iTop-Wrap-$VERSION.0.dmg"
+# "1.0" is named 1.0.0, like the release tag; "1.0.1" stays as it is.
+[[ "$VERSION" == *.*.* ]] || VERSION="$VERSION.0"
+DMG="build/iTop-Wrap-$VERSION.dmg"
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
