@@ -1,9 +1,9 @@
-// Draws the app icon: the Stacked stubs mark (MenuBarIcon.draw) in white on a rounded tile in the
-// app's dark teal, at every size macOS wants, then builds Resources/AppIcon.icns with iconutil.
+// Draws the app icon: the Stacked stubs mark (MenuBarIcon.draw) in white on a black rounded tile
+// (black and white since 2026-11-12, so teal stays the "needs you" colour), at every size macOS wants, then builds Resources/AppIcon.icns with iconutil.
 // Usage: scripts/make-app-icon.sh   (or run this with an output folder and an optional preview path)
 import AppKit
 
-let teal = NSColor(srgbRed: 0x0F / 255, green: 0x6E / 255, blue: 0x56 / 255, alpha: 1)
+let tileColor = NSColor.black
 
 /// The mark alone, white on transparent, at `side` pixels.
 func mark(_ side: CGFloat) -> NSImage {
@@ -34,7 +34,7 @@ func icon(_ pixels: Int) -> NSBitmapImageRep {
     shadow.shadowBlurRadius = s * 18 / 1024
     NSGraphicsContext.saveGraphicsState()
     shadow.set()
-    teal.setFill()
+    tileColor.setFill()
     NSBezierPath(roundedRect: tile, xRadius: s * 185 / 1024, yRadius: s * 185 / 1024).fill()
     NSGraphicsContext.restoreGraphicsState()
     let side = tile.width * 0.62

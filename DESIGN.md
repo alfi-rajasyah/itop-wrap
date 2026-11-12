@@ -194,6 +194,8 @@ Full keyboard access with system focus rings. ⌘N new ticket · ⌘R refresh ·
 
 ## App icon: 2. Stacked stubs (chosen 2026-11-10)
 
+**Now black and white (2026-11-12):** the shipped icon is the white stubs mark on a black tile, as you asked. The teal tile below is the original concept.
+
 Three offset ticket stubs on a teal tile (`#0F6E56`): the back two in lighter teals (`#5DCAA5`, `#9FE1CB`), the front one white with a teal check mark. It says "work through your queue". The wireframe's Icons artboard shows it at 220, 64 and 32 px.
 
 **Why this one (R-31):** it still reads at 32 px, where the "R-" text in the Ref stub concept becomes illegible, and it uses only the approved teal palette.
