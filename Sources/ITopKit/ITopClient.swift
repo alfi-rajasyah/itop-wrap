@@ -70,7 +70,7 @@ public struct ITopClient: Sendable {
     private func permits(_ operation: RESTOperation, ticket: String?) -> Bool {
         switch operation {
         case .update(let cls, let key, _, _), .applyStimulus(let cls, let key, _, _, _): return canWrite(className: cls, key: key)
-        case .create(let cls, _, _):
+        case .create(let cls, _, _, _):
             guard allowsWrites else { return false }
             guard let allowlist = writeAllowlist else { return true }
             if let ticket { return allowlist.contains(ticket) }

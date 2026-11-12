@@ -114,6 +114,17 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 - Links open in the browser; only web and email links are clickable.
 - Attachments: names under the description; click to download into a Save panel.
 
+## Images in the log composer (added 2026-11-12)
+
+| Element | Decision | Reason (R-31) |
+|---|---|---|
+| Adding | ⌘V or Edit ▸ Paste, drop on the entry box, or the paperclip button (SF Symbol `paperclip`) left of the status line | Paste and drop are how screenshots move on a Mac; the paperclip is the visible, keyboard-reachable way in |
+| Storage | Each image becomes an `InlineImage` on the ticket and the entry is sent as HTML, like a web paste (probe 2026-11-12) | The image shows inside the entry on the web and in the app, not off in the attachments list |
+| Before sending | 56 pt thumbnails in the entry box, each with a small dark remove button; filename and size in the tooltip and VoiceOver name | You see exactly what goes out; neutral chrome keeps teal for "needs you" |
+| Limits | PNG, JPEG or GIF, 4 MB each, 5 per entry, checked as you add them. TIFF becomes PNG, other types JPEG at most 2560 px | Under PHP's default upload size; refusing early beats a failed send |
+| Drop target | The entry box's tint and border darken while an image is over it | Shows where the drop lands without new colour |
+| Errors | iTop's message in the status line, draft and images kept; Tab leaves the entry box for the buttons | Same error pattern as the rest of the app (Copy, Errors) |
+
 ## Date range and sorting (all ticket lists)
 
 - **Range menu** (calendar icon) above My tickets, Team tickets, an organization's tickets and a person's tickets: "Open tickets" by default; "Opened in the last 7, 30 or 90 days" or "Any time"; and "Include resolved and closed", which can cover any time ("All tickets, any time"). Resolved and Closed get their own groups after the open ones. The label says what's shown: "Open tickets", "Open, last 30 days", "All, last 30 days".
