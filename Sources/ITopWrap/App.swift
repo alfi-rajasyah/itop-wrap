@@ -301,15 +301,28 @@ enum DebugLaunch {
                             },
                             image: { id in
                                 try? await Task.sleep(for: .milliseconds(400))
-                                guard id == "900" else { throw InlineImageLoader.Failure.notFound }
-                                return InlineImageLoader.Image(data: demoPNG, mimetype: "image/png")
+                                if id == "900" { return InlineImageLoader.Image(data: demoPNG, mimetype: "image/png") }
+                                guard let uploaded = await mock.image(id) else { throw InlineImageLoader.Failure.notFound }
+                                return InlineImageLoader.Image(data: uploaded.data, mimetype: uploaded.mimetype)
                             },
                             attachments: { t in t.ref == "R-000412" ? [AttachmentRef(id: "1", name: "vpn-client.log"), AttachmentRef(id: "2", name: "gateway-config.txt")] : [] },
                             download: { a in AttachmentFile(data: Data("Demo attachment \(a.name)\n".utf8), filename: a.name, mimetype: "text/plain") },
-                            addEntry: { t, text, isPrivate in
-                                try? await Task.sleep(for: .milliseconds(400))
+                            addEntry: { t, text, images, isPrivate in
+                                // A fake upload: about a second per image. "fail" in the text fails the entry;
+                                // "refuse" fails the image upload with an iTop-style message.
+                                try? await Task.sleep(for: .milliseconds(400 + 900 * images.count))
                                 if text.localizedCaseInsensitiveContains("fail") { throw ITopError.server(code: 100, message: "Error: demo failure on request") }
-                                await mock.add(text.trimmingCharacters(in: .whitespacesAndNewlines), ref: t.ref, isPrivate: isPrivate)
+                                if !images.isEmpty, text.localizedCaseInsensitiveContains("refuse") {
+                                    throw ITopError.server(code: 100, message: "Error: contents: demo refusal, the image was not stored")
+                                }
+                                guard !images.isEmpty else {
+                                    await mock.add(text.trimmingCharacters(in: .whitespacesAndNewlines), ref: t.ref, isPrivate: isPrivate)
+                                    return
+                                }
+                                var uploaded: [TicketWrites.UploadedImage] = []
+                                for image in images { uploaded.append(await mock.upload(image)) }
+                                let html = TicketWrites.entryHTML(text: text, images: uploaded, base: URL(string: "https://itop.example.com")!)
+                                await mock.add(text.trimmingCharacters(in: .whitespacesAndNewlines), html: html, ref: t.ref, isPrivate: isPrivate)
                             },
                             canWrite: { _ in true },
                             assign: { t, teamID, agentID in
@@ -541,7 +554,18 @@ actor DemoWrites {
         let date: Date
     }
 
-    private var added: [String: [(text: String, isPrivate: Bool, date: Date)]] = [:]
+    private var added: [String: [(text: String, html: String?, isPrivate: Bool, date: Date)]] = [:]
+    /// Images "uploaded" in the demo, by InlineImage id (901 on; 900 is the canned one).
+    private var images: [String: LogImage] = [:]
+    private var lastImage = 900
+
+    func upload(_ image: LogImage) -> TicketWrites.UploadedImage {
+        lastImage += 1
+        images[String(lastImage)] = image
+        return TicketWrites.UploadedImage(id: String(lastImage), secret: String(repeating: "0", count: 32), image: image)
+    }
+
+    func image(_ id: String) -> LogImage? { images[id] }
     private(set) var assignments: [String: Assignment] = [:]
     /// Status changes from lifecycle actions; they win over an assignment's status when newer.
     private(set) var statuses: [String: (String, Date)] = [:]
@@ -575,15 +599,15 @@ actor DemoWrites {
                       startDate: t.startDate, lastUpdate: max(s?.1 ?? .distantPast, a?.date ?? .distantPast), orgID: t.orgID)
     }
 
-    func add(_ text: String, ref: String, isPrivate: Bool) {
-        added[ref, default: []].append((text, isPrivate, Date()))
+    func add(_ text: String, html: String? = nil, ref: String, isPrivate: Bool) {
+        added[ref, default: []].append((text, html, isPrivate, Date()))
     }
 
     func merged(_ base: TicketDetail, ref: String) -> TicketDetail {
         let extra = added[ref] ?? []
         func entries(_ priv: Bool, from start: Int) -> [LogEntry] {
             extra.filter { $0.isPrivate == priv }.enumerated().map { i, e in
-                LogEntry(id: start + i, date: e.date, author: "Demo Agent", text: e.text)
+                LogEntry(id: start + i, date: e.date, author: "Demo Agent", text: e.html.map(HTMLText.plain) ?? e.text, html: e.html)
             }
         }
         return TicketDetail(description: base.description, publicLog: base.publicLog + entries(false, from: 1000),

@@ -385,41 +385,85 @@ struct FlowLayout: Layout {
 struct LogComposer: View {
     let model: TicketDetailModel
     let list: TicketListModel
-    @FocusState private var focused: Bool
+    @State private var focused = false
+    @State private var dropTarget = false
+    @State private var choosing = false
 
     private var isPrivate: Bool { model.tab == .private }
     private var key: String { "\(model.ticket.id)|\(isPrivate ? "private" : "public")" }
     private var draft: Binding<String> {
         Binding(get: { list.drafts[key] ?? "" }, set: { list.drafts[key] = $0 })
     }
+    private var images: [LogImage] { list.draftImages[key] ?? [] }
     private var canSend: Bool {
-        model.canWrite && !model.sending && !(list.drafts[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        model.canWrite && !model.sending
+            && (!(list.drafts[key] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !images.isEmpty)
+    }
+    private var canAddImages: Bool { model.canWrite && !model.sending && images.count < LogImage.maxPerEntry }
+
+    private func add(_ items: [ImageIntake.Item]) {
+        let accepted = model.intake(items, existing: images.count)
+        if !accepted.isEmpty { list.draftImages[key] = images + accepted }
+    }
+
+    private func remove(_ image: LogImage) {
+        let rest = images.filter { $0.id != image.id }
+        list.draftImages[key] = rest.isEmpty ? nil : rest
+        model.clearError()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: draft)
-                    .font(.system(size: 13))
-                    .scrollContentBackground(.hidden)
-                    .focused($focused)
-                    .frame(height: 64)
-                    .disabled(!model.canWrite)
-                    .accessibilityLabel(isPrivate ? "Private entry" : "Public entry")
-                if (list.drafts[key] ?? "").isEmpty {
-                    Text(isPrivate ? "Write a private entry, only agents see it" : "Write a public entry, the caller sees it")
-                        .foregroundStyle(Theme.secondary)
-                        .padding(.leading, 5).padding(.top, 1)
-                        .allowsHitTesting(false)
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack(alignment: .topLeading) {
+                    ComposerTextView(text: draft, isEditable: model.canWrite,
+                                     accessibilityLabel: isPrivate ? "Private entry" : "Public entry",
+                                     onImages: { add($0) }, onFocus: { focused = $0 }, onDropTarget: { dropTarget = $0 })
+                        .frame(height: 64)
+                    if (list.drafts[key] ?? "").isEmpty {
+                        Text(isPrivate ? "Write a private entry, only agents see it" : "Write a public entry, the caller sees it")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.secondary)
+                            .padding(.leading, 5).padding(.top, 1)
+                            .allowsHitTesting(false)
+                            .accessibilityHidden(true)
+                    }
+                }
+                if !images.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(images) { image in
+                                DraftImageThumbnail(image: image, disabled: model.sending) { remove(image) }
+                            }
+                        }
+                        .padding(.top, 8).padding(.trailing, 10)
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(images.count == 1 ? "1 image to add" : "\(images.count) images to add")
                 }
             }
             .padding(8)
-            .background(Theme.chip.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(focused ? Theme.text.opacity(0.5) : Theme.separator))
+            .background(Theme.chip.opacity(dropTarget ? 0.7 : 0.35), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(focused || dropTarget ? Theme.text.opacity(0.5) : Theme.separator,
+                                                               lineWidth: dropTarget ? 2 : 1))
 
             HStack(spacing: 8) {
+                Button { choosing = true } label: {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 13, weight: .medium))
+                        .frame(width: 26, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .disabled(!canAddImages)
+                .help(canAddImages ? "Add images. You can also paste or drop them in the entry. PNG, JPEG or GIF, up to \(LogImage.maxBytes / 1_048_576) MB each."
+                                   : images.count >= LogImage.maxPerEntry ? "An entry can have up to \(LogImage.maxPerEntry) images" : "Adding images is switched off")
+                .accessibilityLabel("Add images")
                 if let error = model.sendError {
                     Text(error).font(.system(size: 12)).foregroundStyle(Theme.warning).fixedSize(horizontal: false, vertical: true)
+                } else if model.sending && !images.isEmpty {
+                    Text(images.count == 1 ? "Uploading the image to iTop" : "Uploading \(images.count) images to iTop")
+                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
                 } else if !model.canWrite {
                     Text("Adding entries is switched off in this build, so nothing is sent to iTop.")
                         .font(.system(size: 12)).foregroundStyle(Theme.secondary)
@@ -427,7 +471,14 @@ struct LogComposer: View {
                 Spacer(minLength: 8)
                 Button {
                     let text = list.drafts[key] ?? ""
-                    Task { if await model.send(text) { list.drafts[key] = nil } }
+                    let pending = images
+                    let sentKey = key
+                    Task {
+                        if await model.send(text, images: pending) {
+                            list.drafts[sentKey] = nil
+                            list.draftImages[sentKey] = nil
+                        }
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         if model.sending { ProgressView().controlSize(.mini) }
@@ -439,10 +490,78 @@ struct LogComposer: View {
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(!canSend)
                 .help(model.canWrite ? "Add the entry (⌘↩)" : "Changes to iTop are switched off in this build")
+                // A long status line wraps; it never squeezes the button's label (found 2026-11-12).
+                .fixedSize()
             }
         }
         .padding(.horizontal, 24).padding(.vertical, 12)
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
+        .fileImporter(isPresented: $choosing, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
+            guard case .success(let urls) = result else { return }
+            add(urls.map { url in
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                guard size <= ImageIntake.maxFileBytes, let data = try? Data(contentsOf: url) else {
+                    return ImageIntake.Item(data: Data(), filename: url.lastPathComponent, oversize: size > ImageIntake.maxFileBytes)
+                }
+                return ImageIntake.Item(data: data, filename: url.lastPathComponent)
+            })
+        }
+    }
+}
+
+/// One image waiting to go with the entry, with a button to take it out.
+struct DraftImageThumbnail: View {
+    let image: LogImage
+    let disabled: Bool
+    let onRemove: () -> Void
+
+    private static let cache = NSCache<NSUUID, NSImage>()
+
+    private var preview: NSImage? {
+        if let cached = Self.cache.object(forKey: image.id as NSUUID) { return cached }
+        guard let made = NSImage(data: image.data) else { return nil }
+        Self.cache.setObject(made, forKey: image.id as NSUUID)
+        return made
+    }
+
+    private var sizeText: String {
+        ByteCountFormatter.string(fromByteCount: Int64(image.data.count), countStyle: .file)
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let preview {
+                    Image(nsImage: preview).resizable().scaledToFill()
+                } else {
+                    Image(systemName: "photo").foregroundStyle(Theme.secondary)
+                }
+            }
+            .frame(width: 56, height: 56)
+            .background(Theme.chip)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.separator))
+            .help("\(image.filename), \(sizeText)")
+            .accessibilityElement()
+            .accessibilityLabel("\(image.filename), \(sizeText)")
+            .accessibilityAddTraits(.isImage)
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 15))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(Color.white, Color.black.opacity(0.7))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .offset(x: 8, y: -8)
+            .disabled(disabled)
+            .help("Remove \(image.filename)")
+            .accessibilityLabel("Remove \(image.filename)")
+        }
     }
 }

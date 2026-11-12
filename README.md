@@ -59,6 +59,10 @@ sidebar) removes the password from the Keychain.
 - **Changes:** log entries, assign and reassign, set to pending, resolve (service, subcategory,
   resolution code, solution), reopen, close, and New ticket (⌘N). Every change carries the comment
   "iTop Wrap" in the ticket's history.
+- **Images in log entries:** paste (⌘V), drop or pick (paperclip) up to 5 PNG, JPEG or GIF images,
+  4 MB each, and check the thumbnails before sending. They're stored the way the web UI stores a
+  pasted image, so they show inside the entry on the web too. Other image types (a HEIC photo, a
+  TIFF screenshot) are converted. If iTop refuses an image, its message shows and your draft stays.
 - **Time:** one timer (⌘T) on Assigned tickets of yours. Each stop saves a time entry like iTop's own
   stopwatch. Starting another timer stops and saves the first; pending and resolve stop it too; it
   keeps running if you quit. If your web stopwatch is already running on a ticket, the app shows it

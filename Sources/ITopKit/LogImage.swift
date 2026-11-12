@@ -73,12 +73,12 @@ extension TicketWrites {
         guard images.count <= LogImage.maxPerEntry else { throw Failure.tooManyImages(max: LogImage.maxPerEntry) }
         guard client.canWrite(className: ticket.ticketClass.rawValue, key: ticket.key) else { throw ITopError.writesDisabled }
 
-        var markup: [String] = []
+        var uploaded: [UploadedImage] = []
         for image in images {
             let (id, secret) = try await upload(image, to: ticket)
-            markup.append(Self.imageHTML(id: id, secret: secret, image: image, base: client.server.baseURL))
+            uploaded.append(UploadedImage(id: id, secret: secret, image: image))
         }
-        let message = Self.html(text) + markup.joined()
+        let message = Self.entryHTML(text: text, images: uploaded, base: client.server.baseURL)
         let field = isPrivate ? "private_log" : "public_log"
         try await update(ticket, fields: [field: .object(["add_item": .object(["message": .string(message), "format": .string("html")])])])
     }
@@ -110,6 +110,24 @@ extension TicketWrites {
     static func newSecret() -> String {
         var rng = SystemRandomNumberGenerator()
         return (0..<16).map { _ in String(format: "%02x", UInt8.random(in: 0...255, using: &rng)) }.joined()
+    }
+
+    /// An image already stored in iTop as an InlineImage.
+    public struct UploadedImage: Sendable, Equatable {
+        public let id: String
+        public let secret: String
+        public let image: LogImage
+
+        public init(id: String, secret: String, image: LogImage) {
+            self.id = id
+            self.secret = secret
+            self.image = image
+        }
+    }
+
+    /// The entry's HTML: the text, then each image the way a web paste shows it.
+    public static func entryHTML(text: String, images: [UploadedImage], base: URL) -> String {
+        html(text) + images.map { imageHTML(id: $0.id, secret: $0.secret, image: $0.image, base: base) }.joined()
     }
 
     /// The text as one HTML paragraph, escaped, with `<br>` for each line break. Empty for blank text.

@@ -10,7 +10,7 @@ struct TicketSource: Sendable {
     var image: @Sendable (String) async throws -> InlineImageLoader.Image
     var attachments: @Sendable (Ticket) async throws -> [AttachmentRef]
     var download: @Sendable (AttachmentRef) async throws -> AttachmentFile
-    var addEntry: @Sendable (Ticket, String, Bool) async throws -> Void
+    var addEntry: @Sendable (Ticket, String, [LogImage], Bool) async throws -> Void
     var canWrite: @Sendable (Ticket) -> Bool
     var assign: @Sendable (Ticket, String, String) async throws -> Void
     var assignToMe: @Sendable (Ticket) async throws -> Void
@@ -35,7 +35,7 @@ struct TicketSource: Sendable {
             image: { try await loader.image(id: $0) },
             attachments: { try await loader.attachments(of: $0) },
             download: { try await loader.download($0) },
-            addEntry: { try await writes.addLogEntry(to: $0, text: $1, isPrivate: $2) },
+            addEntry: { try await writes.addLogEntry(to: $0, text: $1, images: $2, isPrivate: $3) },
             canWrite: { client.canWrite(className: $0.ticketClass.rawValue, key: $0.key) },
             assign: { try await writes.assign($0, teamID: $1, agentID: $2) },
             assignToMe: { try await writes.assignToMe($0, me: me) },
@@ -85,6 +85,8 @@ final class TicketListModel {
     var timer: TimerModel?
     /// Unsent log entries per ticket and log, kept across ticket switches and failed sends.
     var drafts: [String: String] = [:]
+    /// Images waiting in the composer, by the same key as `drafts`.
+    var draftImages: [String: [LogImage]] = [:]
 
     /// The page shown; back to 1 whenever what's listed changes.
     var page = 1 { didSet { if page != oldValue { UITrace.log("\(view) list: page \(page)") } } }
