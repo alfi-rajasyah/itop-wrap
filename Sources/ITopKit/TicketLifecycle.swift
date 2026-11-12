@@ -29,10 +29,11 @@ public enum TicketLifecycle {
         }
     }
 
-    /// The one action shown as a button in the header (DESIGN.md: Ticket detail).
+    /// The one action shown as a button in the header (DESIGN.md: Ticket detail). A resolved
+    /// ticket's is Close, the usual next step; Reopen is in the More menu.
     public static func primary(for status: String) -> TicketAction? {
         let actions = actions(for: status)
-        for candidate in [TicketAction.assign, .resolve, .reopen] where actions.contains(candidate) { return candidate }
+        for candidate in [TicketAction.assign, .resolve, .close] where actions.contains(candidate) { return candidate }
         return nil
     }
 }

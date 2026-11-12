@@ -54,8 +54,9 @@ sidebar) removes the password from the Keychain.
   that need you: escalated TTR assigned to you, or escalated TTO unassigned in one of your teams.
   The View menu sets the date range, resolved and closed tickets, sorting and page size.
 - **Ticket detail:** description with links and pasted images, attachments, public and private logs,
-  linked CIs. The main action follows the state (Assign to me, Resolve ticket, Reopen ticket); the
-  rest is in the "…" menu. Type a full ref in the search field to open a ticket outside your queue.
+  linked CIs. The main action follows the state (Assign to me, Resolve ticket, Close ticket); the
+  rest, Reopen included, is in the "…" menu. A ticket you resolve stays open so you can close it
+  next, even when resolved tickets are hidden. Type a full ref in the search field to open a ticket outside your queue.
 - **Changes:** log entries, assign and reassign, set to pending, resolve (service, subcategory,
   resolution code, solution), reopen, close, and New ticket (⌘N), which assigns the ticket to you
   unless you untick **Assign to me**. Every change carries the comment

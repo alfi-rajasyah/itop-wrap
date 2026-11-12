@@ -172,7 +172,7 @@ struct TicketListView: View {
     @ViewBuilder
     private var lookupSection: some View {
         if case .found(let t) = model.lookup {
-            Section("Search result: not in your queue") {
+            Section(model.justChanged == t.id ? "\(TicketGroup.statusLabel(t.status)) just now" : "Search result: not in your queue") {
                 TicketRow(ticket: t, me: model.me, showAgent: true, assignToMe: assignAction(t)).tag(t.id)
             }
         }
