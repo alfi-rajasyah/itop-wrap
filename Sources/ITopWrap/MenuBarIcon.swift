@@ -14,19 +14,33 @@ enum MenuBarIcon {
         return image
     }()
 
-    /// The icon and the title drawn as one template image. A MenuBarExtra label drops font modifiers,
-    /// so a Text title used proportional digits and shifted every second; drawn here with fixed-width
-    /// digits it stays put.
-    static func label(_ title: String) -> NSImage {
-        guard !title.isEmpty else { return image }
+    private static let gap: CGFloat = 4
+
+    private static func text(_ title: String) -> NSAttributedString {
         let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.menuBarFont(ofSize: 0).pointSize, weight: .regular)
-        let text = NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: NSColor.black])
+        return NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: NSColor.black])
+    }
+
+    /// The room the title takes right of the icon, gap included; 0 with no title.
+    static func textWidth(_ title: String) -> CGFloat {
+        title.isEmpty ? 0 : gap + ceil(text(title).size().width)
+    }
+
+    /// The icon, then the title, drawn as one template image. A MenuBarExtra label drops font
+    /// modifiers, so a Text title used proportional digits and shifted every second; drawn here
+    /// with fixed-width digits it stays put. `visible` (0 up to `textWidth`) shows only the part
+    /// of the title nearest the icon, so the time can slide out of the icon and back in.
+    static func label(_ title: String, visible: CGFloat? = nil) -> NSImage {
+        let full = textWidth(title)
+        let shown = min(max(visible ?? full, 0), full)
+        guard shown > 0 else { return image }
+        let text = text(title)
         let textSize = text.size()
-        let gap: CGFloat = 4
         let height = max(image.size.height, ceil(textSize.height))
-        let size = NSSize(width: image.size.width + gap + ceil(textSize.width), height: height)
+        let size = NSSize(width: image.size.width + shown, height: height)
         let label = NSImage(size: size, flipped: false) { _ in
             image.draw(in: NSRect(x: 0, y: (height - image.size.height) / 2, width: image.size.width, height: image.size.height))
+            // The text's start sits against the icon; what doesn't fit yet is past the right edge.
             text.draw(at: NSPoint(x: image.size.width + gap, y: (height - textSize.height) / 2))
             return true
         }

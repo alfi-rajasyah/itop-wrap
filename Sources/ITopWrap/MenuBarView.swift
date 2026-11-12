@@ -2,16 +2,50 @@ import AppKit
 import ITopKit
 import SwiftUI
 
-/// The menu bar item's label: the Stacked stubs icon, the running timer, the Needs you count.
+/// The menu bar item's label: the icon, then the running timer and the Needs you count. When
+/// the text's width changes (a timer starts or stops) it slides out of, or back into, the icon.
 struct MenuBarLabel: View {
     let workspace: Workspace
+    /// While sliding: how much of the text shows, and the text drawn (the old one when shrinking).
+    @State private var visible: CGFloat?
+    @State private var sliding: String?
+    @State private var slide: Task<Void, Never>?
 
     var body: some View {
         let status = MenuBarStatus(needCount: workspace.mine.needCount, timer: workspace.timer.running)
         let title = status.title(now: workspace.clock)
-        Image(nsImage: MenuBarIcon.label(title))
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(status.accessibilityLabel(now: workspace.clock))
+        Image(nsImage: MenuBarIcon.label(sliding ?? title, visible: visible))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(status.accessibilityLabel(now: workspace.clock))
+            .onChange(of: title) { old, new in animate(from: old, to: new) }
+    }
+
+    private func animate(from old: String, to new: String) {
+        let from = visible ?? MenuBarIcon.textWidth(old), to = MenuBarIcon.textWidth(new)
+        guard from != to, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        slide?.cancel()
+        // Growing shows the new text as it comes out; shrinking keeps the old text going back in.
+        sliding = to < from ? (sliding ?? old) : nil
+        slide = Task { @MainActor in
+            for width in MenuBarSlide.steps(from: from, to: to, count: 12) {
+                visible = width
+                try? await Task.sleep(for: .milliseconds(18))
+                if Task.isCancelled { return }
+            }
+            visible = nil
+            sliding = nil
+        }
+    }
+}
+
+/// The widths the menu bar text passes through while it slides: eased out, ending on the target.
+enum MenuBarSlide {
+    static func steps(from: CGFloat, to: CGFloat, count: Int) -> [CGFloat] {
+        (1...count).map { i in
+            let t = CGFloat(i) / CGFloat(count)
+            let eased = 1 - pow(1 - t, 3)
+            return i == count ? to : from + (to - from) * eased
+        }
     }
 }
 
