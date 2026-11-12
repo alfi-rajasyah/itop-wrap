@@ -73,7 +73,7 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 
 | Element | Decision | Reason (R-31) |
 |---|---|---|
-| Status item | Monochrome template version of the Stacked stubs icon, then the running timer (`00:12:34`, ticking by the second) when one runs, then the Needs you count | macOS menu bar items are monochrome; the timer and count are the two things worth a glance |
+| Status item | Monochrome template version of the Stacked stubs icon, then the running timer (`00:12:34`, ticking by the second) when one runs, then the Needs you count. When a timer starts the time slides out of the icon, and slides back into it when the timer stops (off with Reduce Motion) | macOS menu bar items are monochrome; the timer and count are the two things worth a glance |
 | Focal point | The running timer lives on its ticket's row, moved to the top of the panel under "Running": the row is tinted, its time shows the live `00:12:34` counter in bold, and its button becomes Stop. | No separate timer card: the time belongs to the ticket, and one control per ticket avoids two stop buttons |
 | List | Grouped by iTop status, escalated first: Escalated TTR, Escalated TTO, Assigned, Pending. Each row has the ref, title, time and a start/stop icon button; a teal dot still marks tickets waiting on you. Clicking the title opens the ticket in the main window | The groups match the states you work with in iTop, so the panel reads like your iTop queue |
 | Top row | Search field, then a labelled "New ticket" button (⌘N) | Creating a ticket while someone's on the phone is the panel's other main job; as an icon in the footer it went unnoticed (changed 2026-11-11) |
