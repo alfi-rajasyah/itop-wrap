@@ -56,8 +56,12 @@ final class Workspace {
         guard refreshLoop == nil else { return }
         clockLoop = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(15))
-                self?.clock = Date()
+                // Every second while a timer runs, so the menu bar counter ticks; otherwise
+                // every 15 s is enough, and skipping the update spares the redraw.
+                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                let now = Date()
+                if self.timer.running != nil || now.timeIntervalSince(self.clock) >= 15 { self.clock = now }
             }
         }
         refreshLoop = Task { [weak self] in

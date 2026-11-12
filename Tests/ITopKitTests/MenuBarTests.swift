@@ -14,7 +14,7 @@ private func timer() -> RunningTimer {
 @Suite("Menu bar status")
 struct MenuBarTests {
     @Test("The item shows the running timer, then the needs-you count, each only when there is one", arguments: [
-        (0, false, ""), (2, false, "2"), (0, true, "0:12"), (3, true, "0:12  3"),
+        (0, false, ""), (2, false, "2"), (0, true, "00:12:40"), (3, true, "00:12:40  3"),
     ] as [(Int, Bool, String)])
     func title(count: Int, running: Bool, expected: String) {
         let status = MenuBarStatus(needCount: count, timer: running ? timer() : nil)

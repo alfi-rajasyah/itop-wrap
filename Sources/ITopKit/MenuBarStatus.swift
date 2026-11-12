@@ -18,9 +18,11 @@ public struct MenuBarStatus: Sendable, Equatable {
         TimeFormat.clock(Int(max(0, now.timeIntervalSince(timer.start))))
     }
 
+    /// The title ticks by the second (`00:12:40`), like the window's counter, so a running timer
+    /// visibly runs; VoiceOver keeps hours and minutes.
     public func title(now: Date = Date()) -> String {
         var parts: [String] = []
-        if let timer { parts.append(elapsed(timer, now: now)) }
+        if let timer { parts.append(TimeFormat.counter(Int(max(0, now.timeIntervalSince(timer.start))))) }
         if needCount > 0 { parts.append(String(needCount)) }
         return parts.joined(separator: "  ")
     }
