@@ -20,6 +20,7 @@ struct MenuBarLabel: View {
 /// counter. Shares the timer and list with the main window.
 struct MenuBarPanel: View {
     let workspace: Workspace
+    let newTicket: () -> Void
     let openTicket: (Ticket?) -> Void
     @State private var query = ""
 
@@ -43,7 +44,7 @@ struct MenuBarPanel: View {
             HStack(spacing: 8) {
                 TextField("Search my tickets", text: $query)
                     .textFieldStyle(.roundedBorder)
-                Button { workspace.requestNewTicket(); openTicket(nil) } label: {
+                Button { newTicket() } label: {
                     Label("New ticket", systemImage: "square.and.pencil")
                 }
                 .buttonStyle(.bordered)
