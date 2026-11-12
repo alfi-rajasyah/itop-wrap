@@ -296,8 +296,8 @@ enum DebugLaunch {
                             },
                             lookup: { ref in
                                 if ref == "R-000512" { return found }
-                                // Tickets made with New ticket in this run, with their changes.
-                                guard let t = await mock.created.first(where: { $0.ref == ref }) else { return nil }
+                                // Any demo ticket, including ones made with New ticket in this run, with their changes.
+                                guard let t = (base + closed + (await mock.created)).first(where: { $0.ref == ref }) else { return nil }
                                 return DemoWrites.apply(await mock.assignments[ref], await mock.statuses[ref], to: t)
                             },
                             detail: { t in

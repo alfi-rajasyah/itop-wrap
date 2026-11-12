@@ -76,7 +76,12 @@ final class TicketListModel {
     private(set) var refreshing = false
     private var refreshAgain = false
     private(set) var refreshError: String?
-    private(set) var lookup: Lookup = .none
+    private(set) var lookup: Lookup = .none {
+        didSet { if case .found(let t) = lookup, t.id == justChanged {} else { justChanged = nil } }
+    }
+    /// A ticket you just resolved or closed while it was open: kept on screen even when the view
+    /// hides resolved and closed tickets, so you can close it next without searching for it.
+    private(set) var justChanged: Ticket.ID?
     var query = ""
     var selection: Ticket.ID?
     /// The org filter (DESIGN.md: Org filter): one organization, or `nil` for all.
@@ -164,7 +169,9 @@ final class TicketListModel {
     /// otherwise the ticket is read again.
     private func refreshLookup() async {
         guard case .found(let found) = lookup else { return }
-        if tickets.contains(where: { $0.id == found.id }) {
+        if justChanged == found.id && selection != found.id {
+            lookup = .none
+        } else if tickets.contains(where: { $0.id == found.id }) {
             lookup = .none
         } else if let fresh = try? await source.lookup(found.ref), case .found(let still) = lookup, still.id == fresh.id {
             lookup = .found(fresh)
@@ -279,6 +286,10 @@ final class TicketListModel {
             case .close: done = "closed"
             }
             notice = Notice(text: "\(t.ref) is \(done).", isError: false)
+            if selection == t.id, change.action == .resolve || change.action == .close {
+                lookup = .found(t)
+                justChanged = t.id
+            }
             await refresh()
             return nil
         } catch {

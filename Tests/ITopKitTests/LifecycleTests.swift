@@ -33,9 +33,9 @@ struct LifecycleTests {
         #expect(TicketLifecycle.actions(for: status) == expected)
     }
 
-    @Test("The main action: Assign when unowned, Resolve when being worked, Reopen when resolved", arguments: [
+    @Test("The main action: Assign when unowned, Resolve when being worked, Close when resolved", arguments: [
         ("new", TicketAction?.some(.assign)), ("escalated_tto", .assign), ("assigned", .resolve), ("escalated_ttr", .resolve),
-        ("pending", .resolve), ("resolved", .reopen), ("closed", nil),
+        ("pending", .resolve), ("resolved", .close), ("closed", nil),
     ] as [(String, TicketAction?)])
     func primary(status: String, expected: TicketAction?) {
         #expect(TicketLifecycle.primary(for: status) == expected)

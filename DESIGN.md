@@ -142,7 +142,7 @@ Reading this as: a glanceable companion to the main window, same dials (ENERGY 1
 |---|---|---|
 | Sign in | The "Sign in to iTop" button | Small centred window: server URL, username, password. An `http://` URL shows an inline warning |
 | Ticket list | Tickets with the teal "needs you" dot, counted in the sidebar | Grouped by iTop status, the same as the menu bar, escalated first: Escalated TTR → Escalated TTO → Assigned → Pending. Row: needs-you dot, ref (motif), priority mark, age, title, caller, time spent |
-| Ticket detail | Title plus the single primary action for the current state (Assign when new, Resolve when assigned, Reopen when resolved) | Header: ref · type · title · primary action, other actions in a More menu. Fields: caller, organisation, team/agent, linked CIs as links. Activity: Public/Private segmented control, entries oldest to newest, composer pinned at the bottom |
+| Ticket detail | Title plus the single primary action for the current state (Assign when new, Resolve when assigned, Close when resolved, with Reopen in the More menu). A ticket you resolve or close stays open, under "Resolved just now", even when the view hides resolved tickets, until you pick another ticket | Header: ref · type · title · primary action, other actions in a More menu. Fields: caller, organisation, team/agent, linked CIs as links. Activity: Public/Private segmented control, entries oldest to newest, composer pinned at the bottom |
 | CMDB | The search field | Search on top, results list (name, class, organisation, status), detail with main fields and an "Open tickets" section |
 | Sheets (New ticket, Assign, Resolve, Set to pending) | The confirming button, named for its action | Short single-column forms; Escape cancels; ⌘↩ confirms |
 

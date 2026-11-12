@@ -129,8 +129,8 @@ struct TicketDetailView: View {
                 if actions.contains(.pending) {
                     Button("Set to pending…") { showPending = true }.disabled(busy)
                 }
-                if actions.contains(.close) {
-                    Button("Close ticket…") { confirmClose = true }.disabled(busy)
+                if actions.contains(.reopen) {
+                    Button("Reopen ticket") { Task { await list.applyFromHeader(.reopen, to: ticket) } }.disabled(busy)
                 }
                 if !actions.isEmpty { Divider() }
                 Button("Copy ref \(ticket.ref)") {
@@ -181,7 +181,7 @@ struct TicketDetailView: View {
     }
 
     /// The single main action for the state (DESIGN.md: Assign when new, Resolve when assigned,
-    /// Reopen when resolved). Teal only when the ticket needs you.
+    /// Close when resolved). Teal only when the ticket needs you.
     @ViewBuilder
     private var primaryAction: some View {
         let needsYou = TicketList.needsYou(ticket, me: list.me)
@@ -198,10 +198,8 @@ struct TicketDetailView: View {
             }
         case .resolve?:
             actionButton("Resolve ticket", needsYou: needsYou, disabled: disabled, help: help ?? "Resolve \(ticket.ref)") { showResolve = true }
-        case .reopen?:
-            actionButton("Reopen ticket", needsYou: false, disabled: disabled, help: help ?? "Reopen \(ticket.ref)") {
-                Task { await list.applyFromHeader(.reopen, to: ticket) }
-            }
+        case .close?:
+            actionButton("Close ticket", needsYou: false, disabled: disabled, help: help ?? "Close \(ticket.ref)") { confirmClose = true }
         default:
             EmptyView()
         }
