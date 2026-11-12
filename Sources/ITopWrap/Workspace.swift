@@ -16,7 +16,8 @@ final class Workspace {
     let people: PeopleModel
     let timer: TimerModel
     let newTickets: NewTicketSource
-    /// Set to show New ticket in the main window (from ⌘N, the menu bar, an org or a CI).
+    /// Set to show New ticket in the main window (from ⌘N, an org or a CI). The menu bar opens
+    /// its own New Ticket window instead.
     var newTicketStart: NewTicketStart?
     /// What you typed in New ticket before cancelling, offered again next time.
     var newTicketDraft: NewTicket?
@@ -44,6 +45,12 @@ final class Workspace {
         mine.timer = timer
         team.timer = timer
         newTickets = DebugLaunch.demoNewTickets() ?? NewTicketSource.live(session)
+    }
+
+    /// A ticket made with New ticket: opened in My tickets, and assigned to you if you asked.
+    func created(_ ticket: Ticket, assign: Bool) {
+        mine.show(ticket, notice: "\(ticket.ref) is created.")
+        if assign { Task { await mine.assignNew(ticket) } }
     }
 
     func requestNewTicket(_ start: NewTicketStart = NewTicketStart()) {

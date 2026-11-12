@@ -37,7 +37,35 @@ struct ITopWrapApp: App {
                 }
             }
         }
+        // New ticket from the menu bar opens on its own, without the main window.
+        Window("New Ticket", id: "newTicket") {
+            NewTicketWindow().environment(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
+        // File > New Ticket… already covers it; keep it out of the Window menu.
+        .commandsRemoved()
         MenuBarScene(model: model)
+    }
+}
+
+/// New ticket as its own small window. Creating or cancelling closes it; the new ticket is
+/// opened in My tickets for when you next open the main window.
+struct NewTicketWindow: View {
+    @Environment(SessionModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        if let workspace = model.workspace {
+            NewTicketSheet(workspace: workspace, start: NewTicketStart()) { ticket, assign in
+                model.selection = .myTickets
+                workspace.created(ticket, assign: assign)
+            }
+        } else {
+            Color.clear.frame(width: 1, height: 1).onAppear { dismiss() }
+        }
     }
 }
 
@@ -68,7 +96,10 @@ struct MenuBarPanelHost: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        MenuBarPanel(workspace: workspace) { ticket in
+        MenuBarPanel(workspace: workspace, newTicket: {
+            openWindow(id: "newTicket")
+            NSApp.activate()
+        }) { ticket in
             if let ticket {
                 model.selection = .myTickets
                 workspace.mine.query = ""
