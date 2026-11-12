@@ -36,4 +36,28 @@ struct MenuBarTests {
     func order() {
         #expect(MenuBarStatus.groupOrder == [.escalatedTTR, .escalatedTTO, .assigned, .pending])
     }
+
+    @Test("The ticket with the running timer moves to the top, out of its group; a group it empties goes")
+    func runningFirst() {
+        func t(_ id: String, _ status: String) -> Ticket {
+            Ticket(key: id, ticketClass: .userRequest, ref: "R-000\(id)", title: "", status: status, priority: 3, callerName: "",
+                   orgName: "", teamID: "10", teamName: "", agentID: "2", agentName: "", startDate: nil, lastUpdate: nil)
+        }
+        let sections = [TicketSection(group: .assigned, tickets: [t("405", "assigned"), t("412", "assigned")]),
+                        TicketSection(group: .pending, tickets: [t("398", "pending")])]
+
+        let pinned = MenuBarStatus.pinRunning(sections, runningID: "UserRequest::412")
+        #expect(pinned.running?.ref == "R-000412")
+        #expect(pinned.sections.map(\.group) == [.assigned, .pending])
+        #expect(pinned.sections[0].tickets.map(\.ref) == ["R-000405"])
+
+        let alone = MenuBarStatus.pinRunning(sections, runningID: "UserRequest::398")
+        #expect(alone.running?.ref == "R-000398")
+        #expect(alone.sections.map(\.group) == [.assigned], "Pending had only the running ticket")
+
+        let none = MenuBarStatus.pinRunning(sections, runningID: nil)
+        #expect(none.running == nil && none.sections == sections)
+        let elsewhere = MenuBarStatus.pinRunning(sections, runningID: "UserRequest::999")
+        #expect(elsewhere.running == nil && elsewhere.sections == sections, "a timer on a ticket not listed changes nothing")
+    }
 }

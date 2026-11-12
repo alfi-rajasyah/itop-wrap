@@ -14,6 +14,19 @@ public struct MenuBarStatus: Sendable, Equatable {
     /// The panel's groups, escalated first.
     public static let groupOrder: [TicketGroup] = [.escalatedTTR, .escalatedTTO, .assigned, .pending]
 
+    /// The ticket whose timer runs goes to the top of the panel, out of its group, so you see what
+    /// you're timing first. A group it leaves empty is dropped; a timer on a ticket that isn't
+    /// listed (filtered out, or not yours) changes nothing.
+    public static func pinRunning(_ sections: [TicketSection], runningID: Ticket.ID?) -> (running: Ticket?, sections: [TicketSection]) {
+        guard let runningID,
+              let running = sections.lazy.flatMap(\.tickets).first(where: { $0.id == runningID }) else { return (nil, sections) }
+        let rest = sections.compactMap { s -> TicketSection? in
+            let tickets = s.tickets.filter { $0.id != runningID }
+            return tickets.isEmpty ? nil : TicketSection(group: s.group, tickets: tickets)
+        }
+        return (running, rest)
+    }
+
     func elapsed(_ timer: RunningTimer, now: Date) -> String {
         TimeFormat.clock(Int(max(0, now.timeIntervalSince(timer.start))))
     }

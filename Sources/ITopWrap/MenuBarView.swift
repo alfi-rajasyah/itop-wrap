@@ -35,6 +35,11 @@ struct MenuBarPanel: View {
         return MenuBarStatus.groupOrder.compactMap { g in groups.first { $0.group == g } }
     }
 
+    /// The running ticket sits on top under its own heading (you asked to see what's timing first).
+    private var pinned: (running: Ticket?, sections: [TicketSection]) {
+        MenuBarStatus.pinRunning(sections, runningID: timer.running?.ticketID)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // New ticket sits next to search, labelled: as an icon in the footer it went unnoticed.
@@ -82,6 +87,7 @@ struct MenuBarPanel: View {
             }
             .font(.system(size: 12)).frame(maxWidth: .infinity).padding(20)
         case .loaded:
+            let pinned = pinned
             if sections.isEmpty {
                 Text(query.isEmpty ? "Nothing waiting on you. New assignments show up here." : "No tickets of yours match “\(query)”.")
                     .font(.system(size: 12)).foregroundStyle(Theme.secondary)
@@ -89,11 +95,12 @@ struct MenuBarPanel: View {
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(sections, id: \.group) { section in
-                            Text("\(section.group.title)  \(section.tickets.count)")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Theme.secondary)
-                                .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 4)
+                        if let running = pinned.running {
+                            heading("Timer running")
+                            row(running)
+                        }
+                        ForEach(pinned.sections, id: \.group) { section in
+                            heading("\(section.group.title)  \(section.tickets.count)")
                             ForEach(section.tickets) { t in row(t) }
                         }
                     }
@@ -101,9 +108,17 @@ struct MenuBarPanel: View {
                 }
                 // A scroll view in a menu bar panel has no height of its own and collapses to
                 // nothing, so it gets one: its rows, up to 420 points.
-                .frame(height: min(420, CGFloat(sections.count) * 30 + CGFloat(sections.reduce(0) { $0 + $1.tickets.count }) * 48 + 6))
+                .frame(height: min(420, CGFloat(pinned.sections.count + (pinned.running == nil ? 0 : 1)) * 30
+                                   + CGFloat(sections.reduce(0) { $0 + $1.tickets.count }) * 48 + 6))
             }
         }
+    }
+
+    private func heading(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Theme.secondary)
+            .padding(.horizontal, 12).padding(.top, 10).padding(.bottom, 4)
     }
 
     private func row(_ t: Ticket) -> some View {
