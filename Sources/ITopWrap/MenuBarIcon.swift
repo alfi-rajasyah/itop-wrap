@@ -14,6 +14,26 @@ enum MenuBarIcon {
         return image
     }()
 
+    /// The icon and the title drawn as one template image. A MenuBarExtra label drops font modifiers,
+    /// so a Text title used proportional digits and shifted every second; drawn here with fixed-width
+    /// digits it stays put.
+    static func label(_ title: String) -> NSImage {
+        guard !title.isEmpty else { return image }
+        let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.menuBarFont(ofSize: 0).pointSize, weight: .regular)
+        let text = NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: NSColor.black])
+        let textSize = text.size()
+        let gap: CGFloat = 4
+        let height = max(image.size.height, ceil(textSize.height))
+        let size = NSSize(width: image.size.width + gap + ceil(textSize.width), height: height)
+        let label = NSImage(size: size, flipped: false) { _ in
+            image.draw(in: NSRect(x: 0, y: (height - image.size.height) / 2, width: image.size.width, height: image.size.height))
+            text.draw(at: NSPoint(x: image.size.width + gap, y: (height - textSize.height) / 2))
+            return true
+        }
+        label.isTemplate = true
+        return label
+    }
+
     /// A stub: a rounded rectangle with a half-circle notch on each short side.
     static func stubRect(_ rect: NSRect) -> NSBezierPath {
         NSBezierPath(roundedRect: rect, xRadius: 1.4, yRadius: 1.4)
