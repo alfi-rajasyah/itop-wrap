@@ -87,9 +87,10 @@ struct ShellView: View {
             .frame(minWidth: 380, minHeight: 520)
         }
         .sheet(item: $workspace.newTicketStart) { start in
-            NewTicketSheet(workspace: workspace, start: start) { ticket in
+            NewTicketSheet(workspace: workspace, start: start) { ticket, assign in
                 model.selection = .myTickets
                 mine.show(ticket, notice: "\(ticket.ref) is created.")
+                if assign { Task { await mine.assignNew(ticket) } }
             }
         }
         .confirmationDialog("Sign out of \(host)?", isPresented: $confirmSignOut) {

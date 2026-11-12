@@ -246,8 +246,9 @@ enum DebugLaunch {
                 serviceID: "3", subcategoryID: "12"),
         ]
         let demoMe = demoSession?.user
-        @Sendable func list(_ scope: TicketScope, assigned: [String: DemoWrites.Assignment], statuses: [String: (String, Date)]) -> [Ticket] {
-            var all = (base + closed).map { DemoWrites.apply(assigned[$0.ref], statuses[$0.ref], to: $0) }
+        @Sendable func list(_ scope: TicketScope, assigned: [String: DemoWrites.Assignment], statuses: [String: (String, Date)],
+                            created: [Ticket] = []) -> [Ticket] {
+            var all = (base + closed + created).map { DemoWrites.apply(assigned[$0.ref], statuses[$0.ref], to: $0) }
                 .filter { scope.includeClosed || !["resolved", "closed"].contains($0.status) }
             // My tickets after an assign: mine, or unassigned TTO in my teams (the real query's rule).
             if view == .mine, let me = demoMe {
@@ -290,10 +291,15 @@ enum DebugLaunch {
                                 case "empty": return []
                                 case "loading": try? await Task.sleep(for: .seconds(3600)); return []
                                 case "error": throw ITopError.transport(URLError.Code.notConnectedToInternet.rawValue)
-                                default: try? await Task.sleep(for: .milliseconds(300)); return list(scope, assigned: await mock.assignments, statuses: await mock.statuses)
+                                default: try? await Task.sleep(for: .milliseconds(300)); return list(scope, assigned: await mock.assignments, statuses: await mock.statuses, created: await mock.created)
                                 }
                             },
-                            lookup: { $0 == "R-000512" ? found : nil },
+                            lookup: { ref in
+                                if ref == "R-000512" { return found }
+                                // Tickets made with New ticket in this run, with their changes.
+                                guard let t = await mock.created.first(where: { $0.ref == ref }) else { return nil }
+                                return DemoWrites.apply(await mock.assignments[ref], await mock.statuses[ref], to: t)
+                            },
                             detail: { t in
                                 try? await Task.sleep(for: .milliseconds(300))
                                 let base = details[t.ref] ?? TicketDetail(description: "Demo ticket without a description.", publicLog: [], privateLog: [], linkedCIs: [])
@@ -403,9 +409,9 @@ enum DebugLaunch {
                 let n = await counter.nextTicketNumber()
                 let org = orgs.first { $0.id == t.orgID }?.name ?? ""
                 let caller = callers[t.orgID]?.first { $0.id == t.callerID }?.name ?? ""
-                return Ticket(key: String(n), ticketClass: t.ticketClass, ref: (t.ticketClass == .incident ? "I-" : "R-") + String(format: "%06d", n),
+                return await counter.remember(Ticket(key: String(n), ticketClass: t.ticketClass, ref: (t.ticketClass == .incident ? "I-" : "R-") + String(format: "%06d", n),
                               title: t.title.trimmingCharacters(in: .whitespacesAndNewlines), status: "new", priority: 4, callerName: caller,
-                              orgName: org, teamID: "0", teamName: "", agentID: "0", agentName: "", startDate: Date(), lastUpdate: Date(), orgID: t.orgID)
+                              orgName: org, teamID: "0", teamName: "", agentID: "0", agentName: "", startDate: Date(), lastUpdate: Date(), orgID: t.orgID))
             },
             organizations: { try? await Task.sleep(for: .milliseconds(200)); return orgs },
             callers: { id in try? await Task.sleep(for: .milliseconds(200)); return callers[id] ?? [] },
@@ -553,6 +559,14 @@ actor DemoWrites {
 
     private(set) var time: [String: Int] = [:]
     private var lastTicket = 600
+
+    /// Tickets made with New ticket, so lists and ref search find them like iTop would.
+    private(set) var created: [Ticket] = []
+
+    func remember(_ t: Ticket) -> Ticket {
+        created.append(t)
+        return t
+    }
 
     func nextTicketNumber() -> Int {
         lastTicket += 1

@@ -57,7 +57,8 @@ sidebar) removes the password from the Keychain.
   linked CIs. The main action follows the state (Assign to me, Resolve ticket, Reopen ticket); the
   rest is in the "…" menu. Type a full ref in the search field to open a ticket outside your queue.
 - **Changes:** log entries, assign and reassign, set to pending, resolve (service, subcategory,
-  resolution code, solution), reopen, close, and New ticket (⌘N). Every change carries the comment
+  resolution code, solution), reopen, close, and New ticket (⌘N), which assigns the ticket to you
+  unless you untick **Assign to me**. Every change carries the comment
   "iTop Wrap" in the ticket's history.
 - **Time:** one timer (⌘T) on Assigned tickets of yours. Each stop saves a time entry like iTop's own
   stopwatch. Starting another timer stops and saves the first; pending and resolve stop it too; it

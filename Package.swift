@@ -16,5 +16,6 @@ let package = Package(
             dependencies: ["ITopKit"],
             resources: [.copy("Fixtures")]
         ),
+        .testTarget(name: "ITopWrapTests", dependencies: ["ITopWrap", "ITopKit"]),
     ]
 )
