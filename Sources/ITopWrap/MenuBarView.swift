@@ -96,7 +96,7 @@ struct MenuBarPanel: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         if let running = pinned.running {
-                            heading("Timer running")
+                            heading("Running")
                             row(running)
                         }
                         ForEach(pinned.sections, id: \.group) { section in
