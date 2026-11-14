@@ -121,7 +121,10 @@ public struct ITopClient: Sendable {
         #endif
         switch code {
         case 0: return ITopResponse(body: body)
-        case 1: throw Self.isPermissionMessage(message) ? ITopError.restNotAllowed : ITopError.invalidCredentials
+        case 1:
+            if Self.isRESTProfileMessage(message) { throw ITopError.restNotAllowed }
+            if Self.isPermissionMessage(message) { throw ITopError.notAllowed(message: message) }
+            throw ITopError.invalidCredentials
         default: throw ITopError.server(code: code, message: message)
         }
     }
@@ -175,6 +178,12 @@ public struct ITopClient: Sendable {
 
     /// iTop answers code 1 both for a wrong password and for an account without REST rights;
     /// only the message tells them apart. The exact wording should be confirmed on the real server.
+    /// Code 1 that's about using REST at all, not about one request.
+    static func isRESTProfileMessage(_ message: String) -> Bool {
+        let m = message.lowercased()
+        return m.contains("rest services") || m.contains("rest service") || m.contains("web services")
+    }
+
     static func isPermissionMessage(_ message: String) -> Bool {
         let m = message.lowercased()
         return m.contains("permission") || m.contains("rest services") || m.contains("not allowed")

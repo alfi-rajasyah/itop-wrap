@@ -139,6 +139,30 @@ struct ResponseTests {
         }
     }
 
+    @Test("Code 1 about the REST services means the account has no REST profile")
+    func noRESTProfile() async throws {
+        let (client, _) = try client(.json(#"{"code":1,"message":"Error: The current user does not have enough permissions for using the REST services"}"#))
+        await #expect(throws: ITopError.restNotAllowed) {
+            _ = try await client.send(.listOperations)
+        }
+    }
+
+    @Test("Code 1 refusing one change keeps iTop's message, not 'no REST profile'",
+          arguments: ["Error: You are not allowed to create objects of class TimeSpent", "Error: not enough permissions to modify this object"])
+    func notAllowed(message: String) async throws {
+        let (client, _) = try client(.json(#"{"code":1,"message":"\#(message)"}"#))
+        await #expect(throws: ITopError.notAllowed(message: message)) {
+            _ = try await client.send(.listOperations)
+        }
+    }
+
+    @Test("A refused change says what iTop said and doesn't blame the REST profile")
+    func notAllowedText() {
+        let text = ITopError.notAllowed(message: "Error: You are not allowed to create objects of class TimeSpent").localizedDescription
+        #expect(text == "iTop didn't allow it: You are not allowed to create objects of class TimeSpent.")
+        #expect(!text.contains("REST"))
+    }
+
     @Test("Other iTop codes keep their number and message",
           arguments: [(3, "Error: Missing json_data"), (11, "Error: Unknown operation"), (100, "Error: Internal error")])
     func serverErrors(code: Int, message: String) async throws {
