@@ -1743,6 +1743,8 @@ dependencies = [
 name = "itop-wrap"
 version = "1.0.2"
 dependencies = [
+ "async-trait",
+ "base64 0.22.1",
  "chrono",
  "itop-kit",
  "security-framework",

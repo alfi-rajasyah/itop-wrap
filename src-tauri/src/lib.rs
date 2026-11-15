@@ -4,6 +4,7 @@ pub mod error;
 pub mod hub;
 pub mod models;
 pub mod native;
+pub mod router;
 
 pub fn run() {
     tauri::Builder::default()

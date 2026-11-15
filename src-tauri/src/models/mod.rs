@@ -1,1 +1,25 @@
 //! The app's models: Rust ports of the Swift view models (contract.md §3, §5).
+
+pub mod app_router;
+pub mod debug;
+pub mod detail;
+pub mod format;
+pub mod list;
+pub mod menubar;
+pub mod options;
+pub mod prefs;
+pub mod records;
+pub mod seams;
+pub mod session;
+pub mod sheets;
+pub mod shell;
+pub mod timer;
+pub mod workspace;
+
+pub use app_router::{AppConfig, AppRouter, session_service};
+pub use workspace::{Standalone, StandaloneFactory, Workspace};
+
+#[cfg(test)]
+mod testkit;
+#[cfg(test)]
+mod tests;
