@@ -61,7 +61,7 @@ pub use case_log::{CaseLog, DateLocale, HtmlText, LogDate, LogEntry};
 pub use config_item::{
     CIField, CIRef, CMDBQueries, CMDBService, ConfigItem, ConfigItemDetail, Direction,
 };
-pub use menu_bar_status::PinnedSections;
+pub use menu_bar_status::{MenuBarStatus, PinnedSections};
 pub use organization::{OrgCounts, OrgQueries, OrgService, Organization, PeoplePage, Person};
 pub use rich_text::{
     AttachmentFile, AttachmentRef, InlineImage, InlineImageError, InlineImageFailure,

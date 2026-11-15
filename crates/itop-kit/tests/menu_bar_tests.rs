@@ -1,16 +1,78 @@
 //! Port of Tests/ITopKitTests/MenuBarTests.swift.
 
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use itop_kit::menu_bar_status::{GROUP_ORDER, pin_running};
-use itop_kit::{Ticket, TicketClass, TicketGroup, TicketSection};
+use itop_kit::{MenuBarStatus, RunningTimer, Ticket, TicketClass, TicketGroup, TicketSection};
 
-// NOT PORTED here: MenuBarTests.title ("The item shows the running timer, then the needs-you
-// count, each only when there is one") and MenuBarTests.spoken ("VoiceOver reads it as one
-// sentence"). Both build a `MenuBarStatus` with a `RunningTimer` and format it with
-// `TimeFormat`, which come from TimeTracking.swift, ported in its own module. Port them with
-// `MenuBarStatus` once that module is merged.
+fn start() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 11, 10, 9, 0, 0).unwrap()
+}
+
+fn timer() -> RunningTimer {
+    let ticket = Ticket {
+        key: "412".into(),
+        ticket_class: TicketClass::UserRequest,
+        r#ref: "R-000412".into(),
+        title: "VPN drops".into(),
+        status: "assigned".into(),
+        priority: 3,
+        caller_name: String::new(),
+        org_name: String::new(),
+        org_id: "0".into(),
+        team_id: "10".into(),
+        team_name: String::new(),
+        agent_id: "2".into(),
+        agent_name: String::new(),
+        start_date: None,
+        last_update: None,
+    };
+    RunningTimer::new(&ticket, start())
+}
 
 mod menu_bar_tests {
     use super::*;
+
+    /// The item shows the running timer, then the needs-you count, each only when there is one
+    #[test]
+    fn title() {
+        for (count, running, expected) in [
+            (0, false, ""),
+            (2, false, "2"),
+            (0, true, "00:12:40"),
+            (3, true, "00:12:40  3"),
+        ] {
+            let status = MenuBarStatus::new(count, running.then(timer));
+            assert_eq!(
+                status.title(start() + Duration::seconds(12 * 60 + 40)),
+                expected
+            );
+        }
+    }
+
+    /// VoiceOver reads it as one sentence
+    #[test]
+    fn spoken() {
+        for (count, running, expected) in [
+            (
+                2,
+                true,
+                "iTop Wrap: 2 tickets need you, timer 0:12 on R-000412",
+            ),
+            (1, false, "iTop Wrap: 1 ticket needs you"),
+            (0, false, "iTop Wrap: nothing needs you"),
+            (
+                0,
+                true,
+                "iTop Wrap: nothing needs you, timer 0:12 on R-000412",
+            ),
+        ] {
+            let status = MenuBarStatus::new(count, running.then(timer));
+            assert_eq!(
+                status.accessibility_label(start() + Duration::seconds(12 * 60 + 40)),
+                expected
+            );
+        }
+    }
 
     /// The panel's groups put escalated first, as DESIGN.md's menu bar table says
     #[test]

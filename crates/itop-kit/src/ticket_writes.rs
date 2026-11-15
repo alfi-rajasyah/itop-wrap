@@ -6,8 +6,6 @@
 //! [`WriteError`], which carries either one unchanged; callers match on it the way the Swift app
 //! catches `TicketWrites.Failure.x` or `ITopError.x`.
 
-use std::cmp::Ordering;
-
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -375,127 +373,13 @@ pub(crate) fn friendly_name(object: &crate::client::ITopObject, class_name: &str
 
 // MARK: - Natural sort
 
-/// An approximation of Foundation's `localizedStandardCompare` (Finder order), used for every
-/// picker list: case-insensitive, digit runs compared as numbers ("Team 2" before "Team 10"),
-/// spaces before punctuation before digits before letters (ICU root order), and accents only
-/// breaking ties ("e" before "é" before "f").
-///
-/// Not a full ICU collation: letters outside Latin-1 / Latin Extended-A keep their own code point
-/// as their base, and ligatures (æ, ß) are not expanded. iTop names are almost always plain Latin.
-pub(crate) fn localized_standard_compare(a: &str, b: &str) -> Ordering {
-    let ka = collation_elements(a);
-    let kb = collation_elements(b);
-    let primary = ka
-        .iter()
-        .map(Element::primary)
-        .cmp(kb.iter().map(Element::primary));
-    primary.then_with(|| {
-        ka.iter()
-            .map(Element::secondary)
-            .cmp(kb.iter().map(Element::secondary))
-    })
-}
-
-#[derive(Debug)]
-enum Element {
-    /// A run of ASCII digits, leading zeros dropped.
-    Number(String),
-    /// One character: its class, its base letter (lowercase, accent removed), and itself in
-    /// lowercase (for the accent tie-break).
-    Char { class: u8, base: char, lower: char },
-}
-
-/// The primary-level value within a class (digits are class 2).
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-enum PrimaryValue<'a> {
-    /// Compared by length first, then digits: the numeric value.
-    Number(usize, &'a str),
-    Char(char),
-}
-
-impl Element {
-    fn primary(&self) -> (u8, PrimaryValue<'_>) {
-        match self {
-            Element::Number(d) => (2, PrimaryValue::Number(d.len(), d)),
-            Element::Char { class, base, .. } => (*class, PrimaryValue::Char(*base)),
-        }
-    }
-
-    fn secondary(&self) -> Option<char> {
-        match self {
-            Element::Number(_) => None,
-            Element::Char { lower, .. } => Some(*lower),
-        }
-    }
-}
-
-fn collation_elements(s: &str) -> Vec<Element> {
-    let mut out = Vec::new();
-    let mut chars = s.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c.is_ascii_digit() {
-            let mut digits = String::from(c);
-            while let Some(&d) = chars.peek() {
-                if !d.is_ascii_digit() {
-                    break;
-                }
-                digits.push(d);
-                chars.next();
-            }
-            let trimmed = digits.trim_start_matches('0');
-            out.push(Element::Number(if trimmed.is_empty() {
-                "0".to_string()
-            } else {
-                trimmed.to_string()
-            }));
-            continue;
-        }
-        let lower = c.to_lowercase().next().unwrap_or(c);
-        let class = if c.is_whitespace() {
-            0
-        } else if c.is_alphanumeric() {
-            3
-        } else {
-            1
-        };
-        out.push(Element::Char {
-            class,
-            base: fold_accent(lower),
-            lower,
-        });
-    }
-    out
-}
-
-/// The base letter of an accented lowercase Latin letter.
-fn fold_accent(c: char) -> char {
-    match c {
-        'à'..='å' | 'ā' | 'ă' | 'ą' => 'a',
-        'ç' | 'ć' | 'ĉ' | 'ċ' | 'č' => 'c',
-        'ď' | 'đ' => 'd',
-        'è'..='ë' | 'ē' | 'ĕ' | 'ė' | 'ę' | 'ě' => 'e',
-        'ĝ' | 'ğ' | 'ġ' | 'ģ' => 'g',
-        'ĥ' | 'ħ' => 'h',
-        'ì'..='ï' | 'ĩ' | 'ī' | 'ĭ' | 'į' | 'ı' => 'i',
-        'ĵ' => 'j',
-        'ķ' => 'k',
-        'ĺ' | 'ļ' | 'ľ' | 'ŀ' | 'ł' => 'l',
-        'ñ' | 'ń' | 'ņ' | 'ň' => 'n',
-        'ò'..='ö' | 'ø' | 'ō' | 'ŏ' | 'ő' => 'o',
-        'ŕ' | 'ŗ' | 'ř' => 'r',
-        'ś' | 'ŝ' | 'ş' | 'š' => 's',
-        'ţ' | 'ť' | 'ŧ' => 't',
-        'ù'..='ü' | 'ũ' | 'ū' | 'ŭ' | 'ů' | 'ű' | 'ų' => 'u',
-        'ŵ' => 'w',
-        'ý' | 'ÿ' | 'ŷ' => 'y',
-        'ź' | 'ż' | 'ž' => 'z',
-        other => other,
-    }
-}
+// One natural sort for the whole crate: the pickers here use the same order as the lists.
+pub(crate) use crate::ticket_queries::localized_standard_compare;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cmp::Ordering;
 
     #[test]
     fn natural_order() {
@@ -509,7 +393,8 @@ mod tests {
                 "", "ann", "e", "Émile", "Eve", "Team 2", "Team 02x", "team 10", "Zoe"
             ]
         );
-        assert_eq!(localized_standard_compare("ABC", "abc"), Ordering::Equal);
+        // Checked against Foundation on macOS 27: lowercase sorts first.
+        assert_eq!(localized_standard_compare("ABC", "abc"), Ordering::Greater);
         assert_eq!(localized_standard_compare("e", "é"), Ordering::Less);
         assert_eq!(localized_standard_compare("éa", "eb"), Ordering::Less);
     }

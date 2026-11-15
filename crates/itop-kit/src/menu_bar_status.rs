@@ -1,21 +1,13 @@
-//! Port of `MenuBarStatus.swift`, the parts that don't need the timer types.
-//!
-//! The `MenuBarStatus` struct itself (`need_count`, `timer`, `title`, `accessibility_label`)
-//! holds a `RunningTimer` and formats with `TimeFormat`, both from TimeTracking.swift, which is
-//! ported in its own module (`time_tracking`). It belongs here once that module exists:
-//!
-//! - `title(now)`: `TimeFormat::counter(elapsed)` when a timer runs, then the count when > 0,
-//!   joined by two spaces ("00:12:40  3").
-//! - `accessibility_label(now)`: "iTop Wrap: " + "nothing needs you" / "1 ticket needs you" /
-//!   "<n> tickets need you", plus ", timer <TimeFormat::clock(elapsed)> on <ref>" when running.
-//!
-//! Elapsed is `max(0, now - timer.start)` in whole seconds, rounded down.
+//! Port of `MenuBarStatus.swift`: what the menu bar item says, and the panel's sections.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use chrono::{DateTime, Utc};
+
 use crate::ticket::Ticket;
 use crate::ticket_queries::{TicketGroup, TicketSection};
+use crate::time_tracking::{RunningTimer, TimeFormat};
 
 /// The panel's groups, escalated first (Swift's `MenuBarStatus.groupOrder`).
 pub const GROUP_ORDER: [TicketGroup; 4] = [
@@ -62,5 +54,54 @@ pub fn pin_running(sections: &[TicketSection], running_id: Option<&str>) -> Pinn
     PinnedSections {
         running: Some(running),
         sections: rest,
+    }
+}
+
+/// What the menu bar item says (DESIGN.md: Menu bar item): the running timer, then the Needs
+/// you count, each only when there is one.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MenuBarStatus {
+    pub need_count: i64,
+    pub timer: Option<RunningTimer>,
+}
+
+impl MenuBarStatus {
+    pub fn new(need_count: i64, timer: Option<RunningTimer>) -> Self {
+        Self { need_count, timer }
+    }
+
+    /// Whole seconds since the timer started, never negative.
+    fn seconds(timer: &RunningTimer, now: DateTime<Utc>) -> i64 {
+        (now - timer.start).num_seconds().max(0)
+    }
+
+    /// The title ticks by the second (`00:12:40`), like the window's counter, so a running timer
+    /// visibly runs; VoiceOver keeps hours and minutes.
+    pub fn title(&self, now: DateTime<Utc>) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(timer) = &self.timer {
+            parts.push(TimeFormat::counter(Self::seconds(timer, now)));
+        }
+        if self.need_count > 0 {
+            parts.push(self.need_count.to_string());
+        }
+        parts.join("  ")
+    }
+
+    pub fn accessibility_label(&self, now: DateTime<Utc>) -> String {
+        let mut text = String::from("iTop Wrap: ");
+        match self.need_count {
+            0 => text += "nothing needs you",
+            1 => text += "1 ticket needs you",
+            n => text += &format!("{n} tickets need you"),
+        }
+        if let Some(timer) = &self.timer {
+            text += &format!(
+                ", timer {} on {}",
+                TimeFormat::clock(Self::seconds(timer, now)),
+                timer.r#ref
+            );
+        }
+        text
     }
 }
