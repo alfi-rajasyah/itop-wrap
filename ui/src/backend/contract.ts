@@ -1142,7 +1142,9 @@ export interface PeopleResultsMap {
 // menubar (tray title and the panel)
 // ---------------------------------------------------------------------------------------------
 
-export type MenuRowRight = { type: 'none' } | { type: 'running' } | { type: 'spent'; text: string }
+/** `running.counter`: the live HH:MM:SS as of this snapshot (re-sent every second), so the row
+ *  shows it before the `timer` snapshot arrives (MB-13). */
+export type MenuRowRight = { type: 'none' } | { type: 'running'; counter: string } | { type: 'spent'; text: string }
 
 export type MenuRowButton =
   | { type: 'stop' }

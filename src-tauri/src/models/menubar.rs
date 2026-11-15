@@ -23,8 +23,14 @@ pub struct MenuState {
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum MenuRowRight {
     None,
-    Running,
-    Spent { text: String },
+    /// The live "HH:MM:SS" at the time of this snapshot (re-sent every second while it runs),
+    /// so the row shows its counter even before the `timer` snapshot arrives (MB-13).
+    Running {
+        counter: String,
+    },
+    Spent {
+        text: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -108,7 +114,7 @@ pub enum MenuBarIntent {
 }
 
 impl Workspace {
-    fn menu_row(&self, st: &State, t: &itop_kit::Ticket) -> MenuRow {
+    fn menu_row(&self, st: &State, t: &itop_kit::Ticket, now: DateTime<Utc>) -> MenuRow {
         let me = self.me();
         let timer = &st.timer;
         let id = t.id();
@@ -120,7 +126,11 @@ impl Workspace {
             needs_you: TicketList::needs_you(t, me),
             is_running: running,
             right: if running {
-                MenuRowRight::Running
+                MenuRowRight::Running {
+                    counter: timer.running.as_ref().map_or_else(String::new, |r| {
+                        TimeFormat::counter((now - r.start).num_seconds().max(0))
+                    }),
+                }
             } else {
                 match timer.totals.get(&id) {
                     Some(&s) if s > 0 => MenuRowRight::Spent {
@@ -198,14 +208,18 @@ impl Workspace {
                             + 6,
                     );
                     MenuContent::List {
-                        running: pinned.running.as_ref().map(|t| self.menu_row(st, t)),
+                        running: pinned.running.as_ref().map(|t| self.menu_row(st, t, now)),
                         sections: pinned
                             .sections
                             .iter()
                             .map(|s| MenuSection {
                                 group: s.group.into(),
                                 title: format!("{}  {}", s.group.title(), s.tickets.len()),
-                                rows: s.tickets.iter().map(|t| self.menu_row(st, t)).collect(),
+                                rows: s
+                                    .tickets
+                                    .iter()
+                                    .map(|t| self.menu_row(st, t, now))
+                                    .collect(),
                             })
                             .collect(),
                         height,

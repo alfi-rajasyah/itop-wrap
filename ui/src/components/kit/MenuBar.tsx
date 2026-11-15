@@ -7,7 +7,6 @@ import { NewTicketIcon, OpenWindowIcon, RefreshIcon, StopIcon, StopwatchIcon } f
 import { IconButton } from "./IconButton";
 import { Duration, Ref } from "./Ref";
 import { SearchField } from "./SearchField";
-import { Spinner } from "./Spinner";
 import { formatCounter, useElapsedSeconds } from "./time";
 import { Tooltip } from "./Tooltip";
 
@@ -101,7 +100,7 @@ export function MenuBarTicketRow({
   return (
     <div
       data-mb-row
-      className={cn("relative z-10 flex h-12 items-center gap-2 rounded-[8px] pl-1.5 pr-1", running && "bg-hover-2")}
+      className={cn("relative z-10 flex h-12 items-center gap-2 rounded-[8px] pl-1.5 pr-1", running && "bg-field")}
     >
       <Tooltip content={`Open ${ticketRef} in iTop Wrap`} describe={false} className="min-w-0 flex-1">
         <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 flex-col items-start rounded-[6px] px-1 py-0.5 text-left">
@@ -164,7 +163,7 @@ export function MenuBarFooter({
       <IconButton
         label="Refresh"
         tooltip="Refresh (⌘R)"
-        icon={refreshing ? <Spinner size={14} /> : <RefreshIcon />}
+        icon={<RefreshIcon />}
         size="md"
         disabled={refreshing}
         onClick={onRefresh}

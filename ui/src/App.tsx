@@ -1,4 +1,5 @@
-import { useModel } from '@/backend'
+import { useEffect, useRef } from 'react'
+import { isTauri, useModel } from '@/backend'
 import { useSystemTheme } from '@/hooks/useSystemTheme'
 import { usePreventReload } from '@/lib/keys'
 import LoginScreen from '@/screens/LoginScreen'
@@ -24,14 +25,35 @@ function MainWindow() {
   return session.type === 'signedIn' ? <ShellScreen /> : <LoginScreen />
 }
 
-/** Bare chrome: a draggable strip clear of the traffic lights, then the form. */
+/** New Ticket is 480 pt wide (W/NewTicketView.swift:141). */
+const NEW_TICKET_WIDTH = 480
+
+/**
+ * The New Ticket window (NEW-2): it has the system title bar, so no drag strip of its own, and
+ * like `.windowResizability(.contentSize)` its height follows the form at 480 pt wide.
+ */
 function NewTicketWindow() {
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = root.current
+    if (!el || typeof ResizeObserver === 'undefined' || !isTauri()) return
+    let cancelled = false
+    const observer = new ResizeObserver(() => {
+      const height = Math.ceil(el.getBoundingClientRect().height)
+      if (height <= 0) return
+      void import('@tauri-apps/api/window').then(({ getCurrentWindow, LogicalSize }) => {
+        if (!cancelled) void getCurrentWindow().setSize(new LogicalSize(NEW_TICKET_WIDTH, height))
+      })
+    })
+    observer.observe(el)
+    return () => {
+      cancelled = true
+      observer.disconnect()
+    }
+  }, [])
   return (
-    <div className="flex h-screen flex-col bg-surface text-ink">
-      <div data-tauri-drag-region className="h-7 shrink-0" />
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <NewTicketForm instance="window" />
-      </div>
+    <div ref={root} className="bg-surface text-ink" style={{ width: NEW_TICKET_WIDTH }}>
+      <NewTicketForm instance="window" />
     </div>
   )
 }

@@ -103,7 +103,9 @@ describe('TicketDetail: header', () => {
     const spy = vi.spyOn(mock, 'dispatch')
     await userEvent.click(await screen.findByRole('button', { name: 'R-000412, copy ref' }))
     expect(spy).toHaveBeenCalledWith('detail:mine', { type: 'copyRef' })
-    expect(await screen.findByText('Copied R-000412')).toBeInTheDocument()
+    const chip = await screen.findByText('Copied R-000412')
+    // Under the title, like the Swift header stack.
+    expect(chip.previousElementSibling?.tagName).toBe('H2')
   })
 
   it('opens a linked CI in Config items (DET-28, SHELL-11)', async () => {
@@ -131,7 +133,11 @@ describe('TicketDetail: header', () => {
     const button = await screen.findByRole('button', { name: 'Assign to me' })
     expect(button.className).toMatch(/bg-need/)
     expect(screen.getByText('Needs you')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Agent: unassigned' })).toBeInTheDocument()
+    const unassigned = screen.getByRole('img', { name: 'Agent: unassigned' })
+    // DET-26: no "Agent" tooltip on an unassigned agent.
+    await userEvent.hover(unassigned)
+    await new Promise((r) => setTimeout(r, 700))
+    expect(screen.queryByRole('tooltip', { name: 'Agent' })).toBeNull()
     await userEvent.click(button)
     expect(spy).toHaveBeenCalledWith('detail:mine', { type: 'assignToMe' })
     expect(await screen.findByRole('button', { name: 'Resolve ticket' })).toBeInTheDocument()

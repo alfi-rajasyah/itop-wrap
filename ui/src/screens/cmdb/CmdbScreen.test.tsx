@@ -67,7 +67,8 @@ describe('CmdbScreen (section 11)', () => {
     expect(spy).toHaveBeenCalledWith('shell', expect.objectContaining({ type: 'newTicketForCI', key: '55', name: 'vpn-gw-01' }))
 
     await userEvent.click(screen.getByRole('button', { name: 'Copy name' }))
-    expect(await screen.findByText('Copied vpn-gw-01')).toBeInTheDocument()
+    const chip = await screen.findByText('Copied vpn-gw-01')
+    expect(chip.previousElementSibling?.tagName).toBe('H2')
   })
 
   it('a ticket row opens that ticket in My tickets, detail included (SHELL-9)', async () => {

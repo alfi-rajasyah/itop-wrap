@@ -2669,7 +2669,7 @@ export class MockBackend implements Backend {
       const spent = this.timer.totals[id] ?? 0
       return {
         ticketId: id, ref: t.ref, title: t.title, needsYou: this.needsYou(t), isRunning,
-        right: isRunning ? { type: 'running' } : spent > 0 ? { type: 'spent', text: total(spent) } : { type: 'none' },
+        right: isRunning ? { type: 'running', counter: counter(elapsed) } : spent > 0 ? { type: 'spent', text: total(spent) } : { type: 'none' },
         button: isRunning
           ? { type: 'stop' }
           : this.canStart(t) && !this.timer.web[id]

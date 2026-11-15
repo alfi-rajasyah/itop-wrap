@@ -168,7 +168,7 @@ describe('TicketListScreen: rows, notices and lookups', () => {
     await listbox()
     await backendDispatch(mock, 'timer', { type: 'start', ticketId: 'UserRequest::412' })
     const vpn = await rowOf('R-000412')
-    await waitFor(() => expect(within(vpn).getByRole('img', { name: /^Timer running, 0:0\d$/ })).toBeInTheDocument())
+    await waitFor(() => expect(within(vpn).getByRole('img', { name: 'Timer running' })).toHaveTextContent(/0:0\d/))
   })
 
   it('a failed time save: the timer notice with Retry and "Discard this time" (TMR-11, TMR-20)', async () => {

@@ -162,13 +162,21 @@ export function DropdownField({
       case "Enter":
         if (e.metaKey || e.ctrlKey) return; // ⌘↩ belongs to the sheet
         e.preventDefault();
-        if (open) pick(shown[active]);
+        if (open) {
+          // KEY-13/14: Return with nothing highlighted (no match) closes the list.
+          if (shown[active]) pick(shown[active]);
+          else doClose();
+        }
         else doOpen();
         return;
       case " ":
         if (searchable) return; // a space is text
         e.preventDefault();
-        if (open) pick(shown[active]);
+        if (open) {
+          // KEY-13/14: Return with nothing highlighted (no match) closes the list.
+          if (shown[active]) pick(shown[active]);
+          else doClose();
+        }
         else doOpen();
         return;
       case "Escape":
@@ -186,7 +194,8 @@ export function DropdownField({
         if (open) doClose();
         return;
       default:
-        if (!searchable && e.key.length === 1 && /\S/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        // Short lists: a letter (letters only, like `.onKeyPress(characters: .letters)`) jumps.
+        if (!searchable && e.key.length === 1 && /\p{L}/u.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
           const ch = e.key.toLowerCase();
           const i = items.findIndex((it) => it.label.toLowerCase().startsWith(ch));
           if (i >= 0) {
@@ -232,8 +241,10 @@ export function DropdownField({
           "flex h-8 w-full items-center gap-1.5 rounded-control bg-field px-2.5 text-[13px] shadow-hairline",
           "transition-[box-shadow,background-color] duration-150",
           disabled ? "cursor-default opacity-55" : "cursor-pointer hover:bg-hover-2",
-          (open || invalid) && "shadow-[0_0_0_1.5px_var(--ink-2)]",
-          invalid && "shadow-[0_0_0_1.5px_var(--danger)]",
+          // KEY-16: the darker 1.5 px border while open or focused. No red border: only the
+          // "Required" text turns red after a failed confirm (LC-8, NEW-14).
+          open && "shadow-[0_0_0_1.5px_var(--ink-2)]",
+          "focus-within:shadow-[0_0_0_1.5px_var(--ink-2)]",
           "has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--focus)]",
         )}
       >
@@ -247,7 +258,9 @@ export function DropdownField({
               aria-autocomplete="list"
               disabled={disabled}
               value={query ?? display}
-              placeholder={selected ? undefined : open ? (searchPrompt ?? placeholder) : placeholder}
+              // KEY-13: a usable searchable field shows its search prompt whenever it is empty,
+              // open or not; "Choose…" (the placeholder) only when it can't be used.
+              placeholder={canOpen ? (searchPrompt ?? placeholder) : placeholder}
               onFocus={(e) => e.currentTarget.select()}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -298,7 +311,7 @@ export function DropdownField({
         <div id={listId} role="listbox" aria-labelledby={aria["aria-labelledby"]} aria-label={aria["aria-label"]}>
           {shown.length === 0 ? (
             <div className="px-2 py-1.5 text-[12.5px] text-ink-2">
-              {noMatchText ?? `Nothing matches “${(query ?? "").trim()}”.`}
+              {noMatchText ?? `Nothing matches “${query ?? ""}”.`}
             </div>
           ) : (
             <div className="relative flex flex-col">

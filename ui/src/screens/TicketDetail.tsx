@@ -103,14 +103,13 @@ function Strip({ view }: { view: TicketDetailView }) {
 }
 
 function Agent({ chip }: { chip: AgentChip }) {
+  // DET-26: the "Agent" tooltip is only on an assigned agent.
   if (chip.type === 'unassigned') {
     return (
-      <Tooltip content="Agent" describe={false}>
-        <span role="img" aria-label="Agent: unassigned" className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
-          <UnassignedMark size={18} />
-          Unassigned
-        </span>
-      </Tooltip>
+      <span role="img" aria-label="Agent: unassigned" className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-ink">
+        <UnassignedMark size={18} />
+        Unassigned
+      </span>
     )
   }
   return (
