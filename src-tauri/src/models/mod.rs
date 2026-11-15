@@ -1,6 +1,10 @@
 //! The app's models: Rust ports of the Swift view models (contract.md §3, §5).
 
 pub mod app_router;
+pub mod cmdb;
+pub mod new_ticket;
+pub mod orgs;
+pub mod people;
 pub mod debug;
 pub mod detail;
 pub mod format;
