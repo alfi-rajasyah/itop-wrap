@@ -6,6 +6,8 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 pub mod fake;
+#[cfg(target_os = "macos")]
+pub mod mac;
 
 /// An image after intake conversion (LOG-18): what `sips`/ImageIO produced.
 #[derive(Debug, Clone, PartialEq, Eq)]

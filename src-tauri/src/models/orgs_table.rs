@@ -7,28 +7,7 @@ use ts_rs::TS;
 
 use crate::models::cmdb::text::chip_initials;
 
-/// Who has a ticket, as the detail strip and the org/person tables draw it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
-#[serde(tag = "type", rename_all = "camelCase")]
-#[ts(export, export_to = "../../ui/src/bindings/app/")]
-pub enum AgentChip {
-    Unassigned,
-    /// `name` is "You" for your own; `initials` are yours then, else the agent's.
-    Person { initials: String, name: String },
-}
-
-/// Under a paged list.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
-#[serde(tag = "type", rename_all = "camelCase")]
-#[ts(export, export_to = "../../ui/src/bindings/app/")]
-pub enum Pager {
-    None,
-    /// One page: "1 ticket" / "12 tickets".
-    Count { text: String },
-    /// More pages: ‹ "21–40 of 556" ›.
-    #[serde(rename_all = "camelCase")]
-    Pages { page: i32, page_count: i32, label: String, can_previous: bool, can_next: bool },
-}
+pub use crate::models::records::{AgentChip, Pager, pager};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -114,22 +93,6 @@ impl TableOptions {
     }
 }
 
-/// `Pager` (W/ListOptions.swift:156-178).
-pub fn pager(page: &TicketPage) -> Pager {
-    if page.page_count > 1 {
-        Pager::Pages {
-            page: page.page as i32,
-            page_count: page.page_count as i32,
-            label: page.label(),
-            can_previous: page.page > 1,
-            can_next: page.page < page.page_count,
-        }
-    } else if page.total > 0 {
-        Pager::Count { text: if page.total == 1 { "1 ticket".to_owned() } else { format!("{} tickets", page.total) } }
-    } else {
-        Pager::None
-    }
-}
 
 /// `TicketTable.body`: grouped in Team order with the chosen sort, then paged.
 pub fn table(tickets: &[Ticket], me: &CurrentUser, last_column: LastColumn, opts: &TableOptions) -> TicketTable {

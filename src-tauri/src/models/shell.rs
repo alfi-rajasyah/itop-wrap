@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::records::{ConfirmText, LinkedCI, ListScope, SidebarItem, TicketLink};
-use super::seams::NewTicketStart;
+use super::new_ticket::{NewTicketInstance, NewTicketStart};
+use itop_kit::ConfigItem;
 use super::workspace::{State, Workspace};
 use crate::error::AppError;
 
@@ -143,47 +144,42 @@ impl Workspace {
     }
 
     pub(crate) async fn dispatch_shell(&self, intent: ShellIntent) -> Result<serde_json::Value, AppError> {
-        let links = self.standalone().map(|s| s.links.clone());
+        let s = self.standalone().cloned();
         match intent {
             ShellIntent::Select { item } => self.shell_select(item).await,
             ShellIntent::OpenTicket { ticket } => self.shell_open_ticket(&ticket.ticket_id, &ticket.r#ref).await,
-            ShellIntent::OpenOrg { org_id, org_name } => {
-                if let Some(l) = &links {
-                    l.open_org(&org_id, &org_name).await;
+            // SHELL-10: the org first, then the section, so it loads once.
+            ShellIntent::OpenOrg { org_id, .. } => {
+                if let Some(s) = &s {
+                    s.orgs.show_org(&org_id);
                 }
                 self.shell_select(SidebarItem::Organizations).await;
             }
+            // SHELL-11: the linked CI as the current CI, its org empty.
             ShellIntent::OpenCi { ci } => {
-                if let Some(l) = &links {
-                    l.open_ci(&ci.key, &ci.class_name, &ci.name).await;
+                if let Some(s) = &s {
+                    s.cmdb.open(ConfigItem { key: ci.key, class_name: ci.class_name, name: ci.name, org_name: String::new() });
                 }
                 self.shell_select(SidebarItem::ConfigItems).await;
             }
             ShellIntent::OpenOrgPeople { org_id, org_name } => {
-                if let Some(l) = &links {
-                    l.show_org_people(&org_id, &org_name).await;
+                if let Some(s) = &s {
+                    s.people.show_org(&org_id, &org_name);
                 }
                 self.shell_select(SidebarItem::People).await;
             }
             ShellIntent::OpenOrgConfigItems { org_id, org_name } => {
-                if let Some(l) = &links {
-                    l.show_org_config_items(&org_id, &org_name).await;
+                if let Some(s) = &s {
+                    s.cmdb.show_org(&org_id, &org_name);
                 }
                 self.shell_select(SidebarItem::ConfigItems).await;
             }
             ShellIntent::NewTicket => self.request_new_ticket(NewTicketStart::default()).await,
             ShellIntent::NewTicketForOrg { org_id, org_name } => {
-                self.request_new_ticket(NewTicketStart { org_id: Some(org_id), org_name: Some(org_name), ..Default::default() })
-                    .await
+                self.request_new_ticket(NewTicketStart::for_org(&org_id, &org_name)).await
             }
             ShellIntent::NewTicketForCi { key, name, org_name } => {
-                self.request_new_ticket(NewTicketStart {
-                    org_name: Some(org_name),
-                    ci_id: Some(key),
-                    ci_name: Some(name),
-                    ..Default::default()
-                })
-                .await
+                self.request_new_ticket(NewTicketStart::for_ci(&key, &name, &org_name)).await
             }
         }
         Ok(serde_json::Value::Null)
@@ -191,13 +187,13 @@ impl Workspace {
 
     /// Swift `Workspace.requestNewTicket(_:)`: New ticket as a sheet in the main window.
     pub(crate) async fn request_new_ticket(&self, start: NewTicketStart) {
-        if let Some(s) = self.standalone() {
-            s.links.open_new_ticket(false, start).await;
+        if let Some(s) = self.standalone().cloned() {
+            s.new_tickets.request(NewTicketInstance::Sheet, start).await;
         }
     }
 
-    /// Sidebar selection (and View ▸ ⌘1…5). The section that appears runs its views' on-appear
-    /// work; Team tickets stops polling when it leaves.
+    /// Sidebar selection (and View ▸ ⌘1…5). The section that leaves disappears and the one that
+    /// comes runs its views' on-appear work; Team tickets stops polling when it leaves.
     pub(crate) async fn shell_select(&self, item: SidebarItem) {
         let old = {
             let mut st = self.lock();
@@ -215,13 +211,12 @@ impl Workspace {
         {
             h.abort();
         }
+        if let Some(s) = self.standalone() {
+            s.section(old, false);
+            s.section(item, true);
+        }
         self.section_appeared(item);
         self.publish();
-        if item.list().is_none()
-            && let Some(s) = self.standalone()
-        {
-            s.links.section_shown(item.raw()).await;
-        }
     }
 
     /// What a list view does when it appears (`.task` and `.task(id: query)` in TicketListView):

@@ -12,9 +12,10 @@ use serde_json::Value;
 use super::format::Fmt;
 use super::prefs::Prefs;
 use super::records::{ListScope, SidebarItem};
-use super::seams::{ModelContext, NewTicketStart};
+use super::new_ticket::NewTicketStart;
+use super::seams::{Model, ModelContext};
 use super::session::{FocusField, SessionIntent, SessionModelState, SessionState, SignInResult};
-use super::workspace::{StandaloneFactory, WORKSPACE_MODEL_IDS, Workspace};
+use super::workspace::{WORKSPACE_MODEL_IDS, Workspace};
 use crate::error::AppError;
 use crate::hub::Hub;
 use crate::native::Native;
@@ -33,8 +34,6 @@ pub struct AppConfig {
     pub fmt: Fmt,
     /// `ITOPWRAP_TRACE=1` in debug builds.
     pub trace: bool,
-    // SEAM: the other agent's constructor for New ticket, CMDB, orgs and people.
-    pub standalone: Option<StandaloneFactory>,
 }
 
 /// The real `SessionService`: the system's TLS through reqwest, the given Keychain and settings,
@@ -55,7 +54,6 @@ struct RouterInner {
     native: Arc<dyn Native>,
     fmt: Fmt,
     trace: bool,
-    standalone: Option<StandaloneFactory>,
     session: Mutex<SessionModelState>,
     workspace: Mutex<Option<Workspace>>,
 }
@@ -83,7 +81,6 @@ impl AppRouter {
             native: config.native,
             fmt: config.fmt,
             trace: config.trace,
-            standalone: config.standalone,
             session: Mutex::new(session),
             workspace: Mutex::new(None),
         }));
@@ -140,7 +137,7 @@ impl AppRouter {
                     ws.clear_snapshots();
                 }
                 let ctx = ModelContext { session, hub: self.0.hub.clone(), native: self.0.native.clone() };
-                let ws = Workspace::new(ctx, self.0.fmt, self.0.prefs.clone(), self.0.trace, self.0.standalone.as_ref());
+                let ws = Workspace::new(ctx, self.0.fmt, self.0.prefs.clone(), self.0.trace);
                 ws.start();
                 *slot = Some(ws);
             }
@@ -264,19 +261,16 @@ pub(crate) async fn route_workspace(ws: &Workspace, model: &str, intent: Value) 
             m if m.starts_with("assign:") => ws.dispatch_assign(scope_of(m)?, decode(intent)?).await,
             m if m.starts_with("pending:") => ws.dispatch_pending(scope_of(m)?, decode(intent)?).await,
             m if m.starts_with("resolve:") => ws.dispatch_resolve(scope_of(m)?, decode(intent)?).await,
-            // SEAM: the other agent's models.
             "newTicket:sheet" | "newTicket:window" | "cmdb" | "orgs" | "people" => {
-                let Some(s) = ws.standalone() else {
-                    return Err(AppError::internal(format!("{model} isn't built into this app yet.")));
+                let Some(s) = ws.standalone().cloned() else {
+                    return Err(AppError::internal(format!("{model} doesn't exist.")));
                 };
-                let target = match model {
-                    "newTicket:sheet" => &s.new_ticket_sheet,
-                    "newTicket:window" => &s.new_ticket_window,
-                    "cmdb" => &s.cmdb,
-                    "orgs" => &s.orgs,
-                    _ => &s.people,
-                };
-                target.dispatch(model, intent).await
+                match model {
+                    "newTicket:sheet" | "newTicket:window" => s.new_tickets.dispatch(model, intent).await,
+                    "cmdb" => s.cmdb.dispatch(model, intent).await,
+                    "orgs" => s.orgs.dispatch(model, intent).await,
+                    _ => s.people.dispatch(model, intent).await,
+                }
             }
             other => Err(AppError::unknown_model(other)),
         }
@@ -331,9 +325,9 @@ impl Router for AppRouter {
                 }
             }
             // File ▸ New Ticket… (NEW-1): main window forward, New ticket as a sheet there.
+            // The shell has already brought the main window forward.
             NativeEvent::MenuNewTicket => {
                 if let Some(ws) = ws {
-                    self.0.native.show_main_window();
                     ws.request_new_ticket(NewTicketStart::default()).await;
                 }
             }
@@ -366,8 +360,8 @@ impl Router for AppRouter {
             }
             // The New Ticket window's close button: no draft kept (NEW-21).
             NativeEvent::NewTicketWindowClosed => {
-                if let Some(s) = ws.as_ref().and_then(|w| w.standalone()) {
-                    let _ = s.new_ticket_window.dispatch("newTicket:window", serde_json::json!({"type": "dismiss"})).await;
+                if let Some(s) = ws.as_ref().and_then(|w| w.standalone()).cloned() {
+                    let _ = s.new_tickets.dispatch("newTicket:window", serde_json::json!({"type": "dismiss"})).await;
                 }
             }
         }

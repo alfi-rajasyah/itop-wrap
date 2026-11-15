@@ -21,7 +21,7 @@ pub mod timer;
 pub mod workspace;
 
 pub use app_router::{AppConfig, AppRouter, session_service};
-pub use workspace::{Standalone, StandaloneFactory, Workspace};
+pub use workspace::{Standalone, Workspace};
 
 #[cfg(test)]
 mod testkit;

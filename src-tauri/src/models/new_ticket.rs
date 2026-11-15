@@ -73,44 +73,7 @@ impl NewTicketStart {
 }
 
 // MARK: - Contract shapes
-
-/// An item in a dropdown.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../ui/src/bindings/app/")]
-pub struct PickItem {
-    pub id: String,
-    pub label: String,
-}
-
-/// A searchable dropdown's prompt and no-match text.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../ui/src/bindings/app/")]
-pub struct DropdownSearch {
-    pub prompt: String,
-    pub no_match: String,
-}
-
-/// One picker (W/DropdownField.swift).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../ui/src/bindings/app/")]
-pub struct Dropdown {
-    pub items: Vec<PickItem>,
-    pub selected_id: Option<String>,
-    pub placeholder: String,
-    pub enabled: bool,
-    pub search: Option<DropdownSearch>,
-}
-
-/// A required field's "Required" label: red once a confirm was tried with it empty.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../ui/src/bindings/app/")]
-pub struct RequiredMark {
-    pub missing: bool,
-}
+pub use super::records::{Dropdown, DropdownSearch, PickItem, RequiredMark};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]

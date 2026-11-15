@@ -927,6 +927,13 @@ impl Workspace {
         ok
     }
 
+    /// The Save panel is modal and blocks until answered, so it runs off the async workers.
+    async fn save_panel(&self, name: &str) -> Option<std::path::PathBuf> {
+        let native = self.0.ctx.native.clone();
+        let name = name.to_owned();
+        tokio::task::spawn_blocking(move || native.save_panel(&name)).await.ok().flatten()
+    }
+
     /// `AttachmentsView.save` (DET-33, DET-34).
     async fn detail_download(&self, scope: ListScope, instance: u64, a: AttachmentRef) {
         let i = scope.index();
@@ -939,7 +946,7 @@ impl Workspace {
         }
         self.publish();
         let outcome: Result<Option<String>, String> = match self.0.images.download(&a).await {
-            Ok(file) => match self.0.ctx.native.save_panel(&file.filename) {
+            Ok(file) => match self.save_panel(&file.filename).await {
                 None => Ok(None),
                 Some(path) => match std::fs::write(&path, &file.data) {
                     Ok(()) => Ok(Some(format!("Saved {} ({}).", file.filename, byte_count(file.data.len() as u64)))),

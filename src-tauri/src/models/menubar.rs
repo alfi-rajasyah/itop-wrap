@@ -8,7 +8,7 @@ use ts_rs::TS;
 
 use super::list::Phase;
 use super::records::{SidebarItem, TicketGroup};
-use super::seams::NewTicketStart;
+use super::new_ticket::{NewTicketInstance, NewTicketStart};
 use super::workspace::{State, Workspace};
 use crate::error::AppError;
 
@@ -223,10 +223,9 @@ impl Workspace {
             // NEW-2: the separate New Ticket window, without the main window.
             MenuBarIntent::NewTicket => {
                 native.hide_menubar_panel();
-                if let Some(s) = self.standalone() {
-                    s.links.open_new_ticket(true, NewTicketStart::default()).await;
+                if let Some(s) = self.standalone().cloned() {
+                    s.new_tickets.request(NewTicketInstance::Window, NewTicketStart::default()).await;
                 }
-                native.show_new_ticket_window();
             }
             MenuBarIntent::Refresh => self.list_refresh(super::records::ListScope::Mine).await,
         }

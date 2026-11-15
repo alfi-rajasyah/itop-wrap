@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use super::format::Fmt;
 use super::prefs::MemoryPrefs;
 use super::seams::ModelContext;
-use super::workspace::{StandaloneFactory, Workspace};
+use super::workspace::Workspace;
 use crate::hub::{Hub, RecordingSink};
 use crate::native::fake::FakeNative;
 
@@ -265,12 +265,11 @@ pub struct Setup {
     pub writes: bool,
     pub prefs: MemoryPrefs,
     pub user: CurrentUser,
-    pub standalone: Option<StandaloneFactory>,
 }
 
 impl Default for Setup {
     fn default() -> Self {
-        Setup { writes: true, prefs: MemoryPrefs::new(), user: me(), standalone: None }
+        Setup { writes: true, prefs: MemoryPrefs::new(), user: me() }
     }
 }
 
@@ -289,7 +288,7 @@ impl Harness {
         let prefs = Arc::new(setup.prefs);
         let session = Arc::new(Session { client: client(&stub, setup.writes), user: setup.user });
         let ctx = ModelContext { session, hub: hub.clone(), native: native.clone() };
-        let ws = Workspace::new(ctx, Fmt::utc(), prefs.clone(), false, setup.standalone.as_ref());
+        let ws = Workspace::new(ctx, Fmt::utc(), prefs.clone(), false);
         Harness { itop, stub, ws, native, sink, hub, prefs }
     }
 

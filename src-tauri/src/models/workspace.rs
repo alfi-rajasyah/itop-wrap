@@ -26,29 +26,41 @@ use super::menubar::MenuState;
 use super::options::OptionsState;
 use super::prefs::Prefs;
 use super::records::{ListScope, SidebarItem};
-use super::seams::{Model, ModelContext, StandaloneLinks, ViewOptions, WorkspaceLink};
+use super::cmdb::CmdbModel;
+use super::new_ticket::NewTickets;
+use super::orgs::OrgsModel;
+use super::people::PeopleModel;
+use super::seams::{ModelContext, WorkspaceLink};
 use super::sheets::{AssignState, PendingState, ResolveState};
 use super::shell::ShellState;
 use super::timer::TimerState;
 
 pub(crate) type BoxFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
-/// The other agent's models (New ticket, CMDB, orgs, people), as the workspace routes to them.
-// SEAM: built by the `StandaloneFactory` handed to `AppRouter` (models/new_ticket.rs, cmdb.rs,
-// orgs.rs, people.rs). `links` is how the shell reaches into them (StandaloneLinks in seams.rs).
+/// New ticket, CMDB, organizations and people: models of their own that reach the rest of the
+/// workspace through `WorkspaceLink`.
 #[derive(Clone)]
 pub struct Standalone {
-    pub new_ticket_sheet: Arc<dyn Model>,
-    pub new_ticket_window: Arc<dyn Model>,
-    pub cmdb: Arc<dyn Model>,
-    pub orgs: Arc<dyn Model>,
-    pub people: Arc<dyn Model>,
-    pub links: Arc<dyn StandaloneLinks>,
+    pub new_tickets: Arc<NewTickets>,
+    pub cmdb: Arc<CmdbModel>,
+    pub orgs: Arc<OrgsModel>,
+    pub people: Arc<PeopleModel>,
 }
 
-/// Builds the standalone models for a new workspace.
-// SEAM: `run()` passes the other agent's constructor here.
-pub type StandaloneFactory = Arc<dyn Fn(ModelContext, Arc<dyn WorkspaceLink>) -> Standalone + Send + Sync>;
+impl Standalone {
+    /// The sidebar section's views appeared (`appear`) or went away (`disappear`).
+    pub(crate) fn section(&self, item: SidebarItem, shown: bool) {
+        match (item, shown) {
+            (SidebarItem::ConfigItems, true) => self.cmdb.appear(),
+            (SidebarItem::ConfigItems, false) => self.cmdb.disappear(),
+            (SidebarItem::Organizations, true) => self.orgs.appear(),
+            (SidebarItem::Organizations, false) => self.orgs.disappear(),
+            (SidebarItem::People, true) => self.people.appear(),
+            (SidebarItem::People, false) => self.people.disappear(),
+            _ => {}
+        }
+    }
+}
 
 /// Everything the models read and change.
 pub(crate) struct State {
@@ -132,7 +144,6 @@ impl Workspace {
         fmt: Fmt,
         prefs: Arc<dyn Prefs>,
         trace: bool,
-        standalone: Option<&StandaloneFactory>,
     ) -> Workspace {
         let client = ctx.session.client.clone();
         let host = client.server.host();
@@ -171,11 +182,14 @@ impl Workspace {
             standalone: OnceLock::new(),
             ctx,
         }));
-        if let Some(factory) = standalone {
-            let link: Arc<dyn WorkspaceLink> = Arc::new(WeakLink(Arc::downgrade(&ws.0)));
-            let built = factory(ws.0.ctx.clone(), link);
-            let _ = ws.0.standalone.set(built);
-        }
+        let link: Arc<dyn WorkspaceLink> = Arc::new(WeakLink(Arc::downgrade(&ws.0)));
+        let ctx = ws.0.ctx.clone();
+        let _ = ws.0.standalone.set(Standalone {
+            new_tickets: NewTickets::new(ctx.clone(), link.clone()),
+            cmdb: CmdbModel::new(ctx.clone(), link.clone()),
+            orgs: OrgsModel::new(ctx.clone(), link.clone()),
+            people: PeopleModel::new(ctx, link),
+        });
         ws
     }
 
@@ -273,9 +287,12 @@ impl Workspace {
             tasks.emit_loop = Some(emit);
         }
         if let Some(s) = self.standalone() {
-            let links = s.links.clone();
-            let view = self.view_options();
-            self.spawn(async move { links.view_changed(view, None, false).await });
+            let (sort, page_size) = {
+                let st = self.lock();
+                (st.options.sort, st.options.page_size)
+            };
+            s.orgs.set_table_options(sort, page_size);
+            s.people.set_table_options(sort, page_size);
         }
         let shown = self.lock().shell.selection;
         self.section_appeared(shown);
@@ -297,6 +314,13 @@ impl Workspace {
         ];
         for h in handles.into_iter().flatten() {
             h.abort();
+        }
+        drop(tasks);
+        if let Some(s) = self.standalone() {
+            s.new_tickets.clear();
+            s.cmdb.clear();
+            s.orgs.clear();
+            s.people.clear();
         }
     }
 
@@ -424,11 +448,6 @@ impl Workspace {
         for id in WORKSPACE_MODEL_IDS {
             self.0.ctx.hub.clear(id);
         }
-    }
-
-    pub(crate) fn view_options(&self) -> ViewOptions {
-        let st = self.lock();
-        ViewOptions { scope: st.options.scope(), sort: st.options.sort, page_size: st.options.page_size }
     }
 
     /// Swift `Workspace.created(_:assign:)`, after ShellView's `model.selection = .myTickets`.

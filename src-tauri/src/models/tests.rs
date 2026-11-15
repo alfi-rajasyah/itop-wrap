@@ -1,7 +1,7 @@
 //! Model tests: the Swift `ITopWrapTests` ported one to one, then one test per model-side
 //! checklist item (named after it), then the JSON shapes against contract.ts.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use itop_kit::{MemorySecretStore, Resolution, SecretStore, SessionService, SessionSettings, TicketChange, WriteAccess};
@@ -11,9 +11,8 @@ use super::app_router::{AppConfig, AppRouter, route_workspace};
 use super::format::Fmt;
 use super::prefs::{MemoryPrefs, Prefs};
 use super::records::{ListScope, SidebarItem};
-use super::seams::{Model, ModelContext, NewTicketStart, StandaloneLinks, ViewOptions, WorkspaceLink};
+use super::seams::ModelContext;
 use super::testkit::{FakeITop, Harness, Setup, client, me, now, object, objects, ticket};
-use super::workspace::{Standalone, StandaloneFactory};
 use crate::error::AppError;
 use crate::hub::{Hub, RecordingSink};
 use crate::native::fake::{Call, FakeNative};
@@ -188,7 +187,7 @@ struct App {
     itop: Arc<FakeITop>,
 }
 
-fn app_with(prefs: MemoryPrefs, secrets: MemorySecretStore, standalone: Option<StandaloneFactory>) -> App {
+fn app_with(prefs: MemoryPrefs, secrets: MemorySecretStore) -> App {
     let itop = Arc::new(FakeITop::with(vec![ticket("601", "assigned", "7")]));
     let stub = itop.serve();
     let prefs = Arc::new(prefs);
@@ -210,13 +209,12 @@ fn app_with(prefs: MemoryPrefs, secrets: MemorySecretStore, standalone: Option<S
         native: native.clone(),
         fmt: Fmt::utc(),
         trace: false,
-        standalone,
     });
     App { router, hub, native, secrets, prefs, itop }
 }
 
 fn app() -> App {
-    app_with(MemoryPrefs::new(), MemorySecretStore::new(), None)
+    app_with(MemoryPrefs::new(), MemorySecretStore::new())
 }
 
 fn saved_app() -> App {
@@ -226,7 +224,7 @@ fn saved_app() -> App {
     prefs.set_string("user", Some("agent"));
     let secrets = MemorySecretStore::new();
     let _ = secrets.set_password("secret", "agent@https://itop.example.com");
-    app_with(prefs, secrets, None)
+    app_with(prefs, secrets)
 }
 
 async fn settle() {
@@ -288,7 +286,6 @@ async fn auth_4_other_restore_errors_show_unreachable() {
         native: Arc::new(FakeNative::new(now())),
         fmt: Fmt::utc(),
         trace: false,
-        standalone: None,
     });
     router.native_event(NativeEvent::Launched).await;
     assert_eq!(
@@ -482,114 +479,40 @@ async fn shell_9_unknown_ticket_becomes_a_search_without_selecting() {
     assert_eq!(h.snap("shell")["selection"], "myTickets");
 }
 
-/// The standalone models as a recorder (the other agent's models stand behind this seam).
-#[derive(Default)]
-struct FakeStandalone {
-    calls: Mutex<Vec<String>>,
-}
-
-impl FakeStandalone {
-    fn log(&self, s: String) {
-        self.calls.lock().unwrap_or_else(|e| e.into_inner()).push(s);
-    }
-    fn calls(&self) -> Vec<String> {
-        self.calls.lock().unwrap_or_else(|e| e.into_inner()).clone()
-    }
-}
-
-#[async_trait::async_trait]
-impl Model for FakeStandalone {
-    async fn dispatch(&self, model_id: &str, intent: Value) -> Result<Value, AppError> {
-        self.log(format!("{model_id} {intent}"));
-        Ok(Value::Null)
-    }
-}
-
-#[async_trait::async_trait]
-impl StandaloneLinks for FakeStandalone {
-    async fn open_org(&self, org_id: &str, org_name: &str) {
-        self.log(format!("open_org {org_id} {org_name}"));
-    }
-    async fn open_ci(&self, key: &str, class_name: &str, name: &str) {
-        self.log(format!("open_ci {key} {class_name} {name}"));
-    }
-    async fn show_org_people(&self, org_id: &str, _: &str) {
-        self.log(format!("show_org_people {org_id}"));
-    }
-    async fn show_org_config_items(&self, org_id: &str, _: &str) {
-        self.log(format!("show_org_config_items {org_id}"));
-    }
-    async fn open_new_ticket(&self, window: bool, start: NewTicketStart) {
-        self.log(format!("open_new_ticket {window} {start:?}"));
-    }
-    async fn section_shown(&self, section: &str) {
-        self.log(format!("section_shown {section}"));
-    }
-    async fn view_changed(&self, view: ViewOptions, shown: Option<&str>, scope_changed: bool) {
-        self.log(format!("view_changed {:?} {shown:?} {scope_changed}", view.scope.include_closed));
-    }
-}
-
-fn standalone(fake: Arc<FakeStandalone>, link: Arc<Mutex<Option<Arc<dyn WorkspaceLink>>>>) -> StandaloneFactory {
-    Arc::new(move |_ctx: ModelContext, l: Arc<dyn WorkspaceLink>| {
-        *link.lock().unwrap_or_else(|e| e.into_inner()) = Some(l);
-        let m: Arc<dyn Model> = fake.clone();
-        Standalone {
-            new_ticket_sheet: m.clone(),
-            new_ticket_window: m.clone(),
-            cmdb: m.clone(),
-            orgs: m.clone(),
-            people: m,
-            links: fake.clone(),
-        }
-    })
-}
-
 #[tokio::test(start_paused = true)]
 async fn shell_10_to_14_routing_into_the_standalone_models() {
-    let fake = Arc::new(FakeStandalone::default());
-    let link = Arc::new(Mutex::new(None));
-    let h = Harness::with(FakeITop::default(), Setup { standalone: Some(standalone(fake.clone(), link)), ..Setup::default() });
+    let h = Harness::new(FakeITop::default());
     send(&h, "shell", json!({"type": "openOrg", "orgId": "4", "orgName": "Org A"})).await.expect("ok");
     assert_eq!(h.snap("shell")["selection"], "organizations");
+    assert_eq!(h.hub.get("orgs")["selectedId"], "4", "SHELL-10");
     send(&h, "shell", json!({"type": "openCI", "ci": {"key": "9", "className": "Server", "name": "srv"}})).await.expect("ok");
     assert_eq!(h.snap("shell")["selection"], "configItems");
+    assert_eq!(h.hub.get("cmdb")["current"]["name"], "srv", "SHELL-11");
     send(&h, "shell", json!({"type": "openOrgPeople", "orgId": "4", "orgName": "Org A"})).await.expect("ok");
     assert_eq!(h.snap("shell")["selection"], "people");
+    assert_eq!(h.hub.get("people")["scope"], json!({"orgId": "4", "orgName": "Org A"}), "SHELL-12");
     send(&h, "shell", json!({"type": "openOrgConfigItems", "orgId": "4", "orgName": "Org A"})).await.expect("ok");
+    assert_eq!(h.hub.get("cmdb")["scope"], json!({"orgId": "4", "orgName": "Org A"}));
     send(&h, "shell", json!({"type": "newTicketForOrg", "orgId": "4", "orgName": "Org A"})).await.expect("ok");
-    send(&h, "shell", json!({"type": "newTicketForCI", "key": "9", "name": "srv", "orgName": "Org A"})).await.expect("ok");
-    send(&h, "orgs", json!({"type": "retryList"})).await.expect("ok");
-    let calls = fake.calls();
-    assert!(calls.contains(&"open_org 4 Org A".to_owned()));
-    assert!(calls.contains(&"open_ci 9 Server srv".to_owned()));
-    assert!(calls.contains(&"show_org_people 4".to_owned()));
-    assert!(calls.contains(&"show_org_config_items 4".to_owned()));
-    assert!(calls.contains(&"section_shown organizations".to_owned()));
-    assert!(calls.iter().any(|c| c.starts_with("open_new_ticket false") && c.contains("org_id: Some(\"4\")")));
-    assert!(calls.iter().any(|c| c.starts_with("open_new_ticket false") && c.contains("ci_id: Some(\"9\")")));
-    assert!(calls.contains(&r#"orgs {"type":"retryList"}"#.to_owned()));
+    assert_eq!(h.hub.get("newTicket:sheet")["type"], "open", "SHELL-14");
+    assert_eq!(h.hub.get("newTicket:window")["type"], "closed");
+    send(&h, "menubar", json!({"type": "newTicket"})).await.expect("ok");
+    assert_eq!(h.hub.get("newTicket:window")["type"], "open", "NEW-2");
+    assert!(h.native.calls().contains(&Call::ShowNewTicketWindow));
 }
 
 #[tokio::test(start_paused = true)]
 async fn new_19_ticket_created_shows_in_my_tickets() {
-    let fake = Arc::new(FakeStandalone::default());
-    let link: Arc<Mutex<Option<Arc<dyn WorkspaceLink>>>> = Arc::new(Mutex::new(None));
-    let h = Harness::with(
-        FakeITop::with(vec![ticket("650", "new", "0")]),
-        Setup { standalone: Some(standalone(fake, link.clone())), ..Setup::default() },
-    );
+    let h = Harness::new(FakeITop::with(vec![ticket("650", "new", "0")]));
     h.load().await;
     send(&h, "shell", json!({"type": "select", "item": "people"})).await.expect("ok");
-    let l = link.lock().unwrap_or_else(|e| e.into_inner()).clone().expect("link");
-    l.ticket_created(h.itop.get("650").expect("t"), false).await;
+    h.ws.created(h.itop.get("650").expect("t"), false).await;
     h.settle().await;
     assert_eq!(h.snap("shell")["selection"], "myTickets");
     let list = h.snap("list:mine");
     assert_eq!(list["query"], "R-000650");
     assert_eq!(list["selection"], "UserRequest::650");
     assert_eq!(list["content"]["body"]["notice"], json!({"text": "R-000650 is created.", "isError": false}));
-    assert_eq!(l.scope(), itop_kit::TicketScope::OPEN);
 }
 
 // =============================================================================================
@@ -752,7 +675,6 @@ async fn list_26_lookup_failure() {
         Fmt::utc(),
         h.prefs.clone(),
         false,
-        None,
     );
     ws.lock().lists[0].phase = super::list::Phase::Loaded;
     ws.lock().lists[0].tickets.push(ticket("1", "assigned", "7"));
@@ -1823,31 +1745,20 @@ async fn poll_8_tray_ticks_every_second_with_a_timer() {
 
 #[tokio::test(start_paused = true)]
 async fn key_2_menu_selects_sections_and_new_1_opens_the_sheet() {
-    let fake = Arc::new(FakeStandalone::default());
-    let a = app_with(
-        {
-            let p = MemoryPrefs::new();
-            use itop_kit::SettingsStore;
-            p.set_string("server", Some("https://itop.example.com"));
-            p.set_string("user", Some("agent"));
-            p
-        },
-        {
-            let s = MemorySecretStore::new();
-            let _ = s.set_password("secret", "agent@https://itop.example.com");
-            s
-        },
-        Some(standalone(fake.clone(), Arc::new(Mutex::new(None)))),
-    );
+    let a = saved_app();
     a.router.native_event(NativeEvent::Launched).await;
     settle().await;
     a.router.native_event(NativeEvent::MenuSelectSection(4)).await;
     assert_eq!(a.hub.get("shell")["selection"], "people");
     a.router.native_event(NativeEvent::MenuNewTicket).await;
-    assert!(a.native.calls().contains(&Call::ShowMainWindow));
-    assert!(fake.calls().iter().any(|c| c.starts_with("open_new_ticket false")));
+    settle().await;
+    assert_eq!(a.hub.get("newTicket:sheet")["type"], "open");
+    a.router.native_event(NativeEvent::PanelNewTicket).await;
+    settle().await;
+    assert_eq!(a.hub.get("newTicket:window")["type"], "open");
     a.router.native_event(NativeEvent::NewTicketWindowClosed).await;
-    assert!(fake.calls().contains(&r#"newTicket:window {"type":"dismiss"}"#.to_owned()));
+    settle().await;
+    assert_eq!(a.hub.get("newTicket:window")["type"], "closed", "dismissed, no draft");
 }
 
 // =============================================================================================

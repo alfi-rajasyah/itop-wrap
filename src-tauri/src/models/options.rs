@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::prefs::Prefs;
-use super::records::{SidebarItem, TicketSort};
+use super::records::TicketSort;
 use super::workspace::Workspace;
 
 pub const RANGE_KEY: &str = "list.range";
@@ -208,6 +208,7 @@ impl Workspace {
     /// (`onChange` in `TicketListView`, `OrgDetailView`, `PersonDetailView`, `TicketTable`).
     async fn options_changed(&self, before: OptionsState, after: OptionsState) {
         after.save(self.0.prefs.as_ref());
+        let (sort, page_size) = (after.sort, after.page_size);
         let scope_changed = before.scope() != after.scope();
         let page_reset = scope_changed || before.sort != after.sort || before.page_size != after.page_size;
         let shown = {
@@ -228,13 +229,16 @@ impl Workspace {
         } else {
             self.publish();
         }
-        if page_reset && let Some(s) = self.standalone() {
-            let view = self.view_options();
-            let section = match shown {
-                SidebarItem::Organizations | SidebarItem::People => Some(shown.raw()),
-                _ => None,
-            };
-            s.links.view_changed(view, section, scope_changed).await;
+        // The org and person tables: the models reload only when their view is on screen.
+        if let Some(s) = self.standalone() {
+            if scope_changed {
+                s.orgs.scope_changed();
+                s.people.scope_changed();
+            }
+            if before.sort != sort || before.page_size != page_size {
+                s.orgs.set_table_options(sort, page_size);
+                s.people.set_table_options(sort, page_size);
+            }
         }
     }
 }
