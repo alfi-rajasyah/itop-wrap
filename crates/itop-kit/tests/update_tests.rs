@@ -1,13 +1,14 @@
-//! Port of Tests/ITopKitTests/UpdateTests.swift: the tests that need only the client and the
-//! session. The rest need TicketWrites (TicketWrites.swift) and are ported with that module.
+//! Port of Tests/ITopKitTests/UpdateTests.swift (all 13 tests).
 
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use itop_kit::stub::{StubReply, StubServer};
+use itop_kit::ticket_writes::Failure;
 use itop_kit::{
     Credentials, ITopClient, ITopError, JsonObject, MemorySecretStore, RestOperation,
-    ServerAddress, SessionService, SessionSettings, WriteAccess,
+    ServerAddress, SessionService, SessionSettings, Ticket, TicketClass, TicketWrites, WriteAccess,
+    WriteError,
 };
 
 fn client(stub: &StubServer, writes: bool, allow: Option<&[&str]>) -> ITopClient {
@@ -27,11 +28,153 @@ fn ok() -> StubReply {
     )
 }
 
-// NOT PORTED here (need TicketWrites): LogEntryTests (all), WriteSafetyTests.off,
-// WriteSafetyTests.allowlist, WriteSafetyTests.refs.
+fn ticket_with(key: &str) -> Ticket {
+    Ticket {
+        key: key.into(),
+        ticket_class: TicketClass::UserRequest,
+        r#ref: format!("R-00000{key}"),
+        title: "t".into(),
+        status: "assigned".into(),
+        priority: 3,
+        caller_name: String::new(),
+        org_name: String::new(),
+        org_id: "0".into(),
+        team_id: "0".into(),
+        team_name: String::new(),
+        agent_id: "2".into(),
+        agent_name: String::new(),
+        start_date: None,
+        last_update: None,
+    }
+}
+
+fn ticket() -> Ticket {
+    ticket_with("7")
+}
+
+fn add_item<'a>(r: &'a serde_json::Value, field: &str) -> &'a serde_json::Value {
+    &r["fields"][field]["add_item"]
+}
+
+mod log_entry_tests {
+    use super::*;
+
+    /// A public entry is appended with core/update, as text, with a comment for the history
+    #[tokio::test]
+    async fn public_entry() {
+        let stub = StubServer::new(ok());
+        TicketWrites::new(client(&stub, true, None))
+            .add_log_entry(&ticket(), "Raised the timeout.\nPlease test.", false)
+            .await
+            .unwrap();
+
+        let r = stub.requests()[0].json_data();
+        assert_eq!(r["operation"], "core/update");
+        assert_eq!(r["class"], "UserRequest");
+        assert_eq!(r["key"], "7");
+        assert_eq!(r["comment"], TicketWrites::COMMENT);
+        let add = add_item(&r, "public_log");
+        assert_eq!(add["message"], "Raised the timeout.\nPlease test.");
+        assert_eq!(add["format"], "text");
+    }
+
+    /// A private entry goes to private_log
+    #[tokio::test]
+    async fn private_entry() {
+        let stub = StubServer::new(ok());
+        TicketWrites::new(client(&stub, true, None))
+            .add_log_entry(&ticket(), "Internal note", true)
+            .await
+            .unwrap();
+        let fields = &stub.requests()[0].json_data()["fields"];
+        assert!(fields.get("private_log").is_some() && fields.get("public_log").is_none());
+    }
+
+    /// Blank text is refused before anything is sent (arguments: "", "   ", "\n\t")
+    #[tokio::test]
+    async fn blank() {
+        for text in ["", "   ", "\n\t"] {
+            let stub = StubServer::new(ok());
+            assert_eq!(
+                TicketWrites::new(client(&stub, true, None))
+                    .add_log_entry(&ticket(), text, false)
+                    .await,
+                Err(WriteError::Failure(Failure::EmptyEntry)),
+                "{text:?}"
+            );
+            assert!(stub.requests().is_empty());
+        }
+    }
+
+    /// Surrounding blank lines are trimmed, inner line breaks kept
+    #[tokio::test]
+    async fn trimmed() {
+        let stub = StubServer::new(ok());
+        TicketWrites::new(client(&stub, true, None))
+            .add_log_entry(&ticket(), "\n  Line one\nLine two  \n\n", false)
+            .await
+            .unwrap();
+        let r = stub.requests()[0].json_data();
+        assert_eq!(add_item(&r, "public_log")["message"], "Line one\nLine two");
+    }
+
+    /// iTop rejecting this one object is an error, even when the call itself succeeds
+    #[tokio::test]
+    async fn per_object_failure() {
+        let stub = StubServer::new(StubReply::json(
+            r#"{"code":0,"message":"","objects":{"UserRequest::7":{"class":"UserRequest","key":"7","code":100,"message":"Error: public_log is read-only for this profile"}}}"#,
+        ));
+        assert_eq!(
+            TicketWrites::new(client(&stub, true, None))
+                .add_log_entry(&ticket(), "Hello", false)
+                .await,
+            Err(WriteError::ITop(ITopError::Server {
+                code: 100,
+                message: "Error: public_log is read-only for this profile".into()
+            }))
+        );
+    }
+}
 
 mod write_safety_tests {
     use super::*;
+
+    /// With writes off, nothing is sent
+    #[tokio::test]
+    async fn off() {
+        let stub = StubServer::new(ok());
+        assert_eq!(
+            TicketWrites::new(client(&stub, false, None))
+                .add_log_entry(&ticket(), "Hello", false)
+                .await,
+            Err(WriteError::ITop(ITopError::WritesDisabled))
+        );
+        assert!(stub.requests().is_empty());
+    }
+
+    /// With an allowlist, only those tickets can be changed
+    #[tokio::test]
+    async fn allowlist() {
+        let stub = StubServer::new(ok());
+        let writes = TicketWrites::new(client(&stub, true, Some(&["UserRequest::7"])));
+        writes
+            .add_log_entry(&ticket(), "Allowed", false)
+            .await
+            .unwrap();
+
+        let other = ticket_with("8");
+        assert_eq!(
+            writes.add_log_entry(&other, "Not allowed", false).await,
+            Err(WriteError::ITop(ITopError::WritesDisabled))
+        );
+        assert_eq!(stub.requests().len(), 1);
+    }
+
+    /// Allowlist entries can be refs, resolved to class and key by the app
+    #[test]
+    fn refs() {
+        assert_eq!(TicketWrites::allowlist_key(&ticket()), "UserRequest::7");
+    }
 
     /// With an allowlist, creating new objects is refused
     #[tokio::test]
