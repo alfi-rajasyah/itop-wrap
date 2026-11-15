@@ -94,7 +94,7 @@ durations are monospaced with tabular figures; light and dark both work; every k
    - UI B: ticket detail, composer, sheets, new ticket, CMDB, organizations, people, menu bar panel.
 3. Orchestrator: the app models and commands, tray, timer wiring, notifications, shortcuts, packaging.
 4. Verification: ported tests, live run against the homelab, checklist walk, independent review.
-5. Swift sources removed in one final commit once the checklist passes.
+5. Swift sources removed once the hands-on check (docs/rewrite/hands-on-check.md) passes.
 
 ## Left to the builder
 
