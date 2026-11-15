@@ -2,8 +2,7 @@
 //! helpers that live in the views (`ErrorText`, `TicketGroup.statusLabel`, `Loadable`) or that
 //! itop-kit keeps crate-private (Foundation's `.whitespaces`, `String.count`).
 //!
-//! Locale-dependent text follows en_US (the brief's choice): `join_list` is `ListFormatter` for
-//! en_US.
+//! Locale-dependent text (the CI list join) comes from `Native::format_list`.
 
 use itop_kit::{ITopError, Session, WriteError};
 use serde::Serialize;
@@ -110,16 +109,6 @@ pub fn status_label(status: &str) -> String {
     }
 }
 
-/// `ListFormatter.localizedString(byJoining:)` for en_US: "A", "A and B", "A, B, and C".
-pub fn join_list(items: &[String]) -> String {
-    match items {
-        [] => String::new(),
-        [one] => one.clone(),
-        [a, b] => format!("{a} and {b}"),
-        [init @ .., last] => format!("{}, and {last}", init.join(", ")),
-    }
-}
-
 /// Initials the way `PersonChip` draws them: first letters of the first two space-separated
 /// words, uppercased (W/OrgsView.swift:96).
 pub fn chip_initials(name: &str) -> String {
@@ -180,14 +169,6 @@ mod tests {
         assert_eq!(status_label("assigned"), "Assigned");
         assert_eq!(status_label("pending_customer"), "Pending customer");
         assert_eq!(status_label(""), "");
-    }
-
-    #[test]
-    fn list_join_en_us() {
-        let s = |v: &[&str]| join_list(&v.iter().map(|x| x.to_string()).collect::<Vec<_>>());
-        assert_eq!(s(&["a"]), "a");
-        assert_eq!(s(&["a", "b"]), "a and b");
-        assert_eq!(s(&["a", "b", "c"]), "a, b, and c");
     }
 
     #[test]

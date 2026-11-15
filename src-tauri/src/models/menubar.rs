@@ -219,9 +219,14 @@ impl Workspace {
             query: query.clone(),
             content,
             refreshing: mine.refreshing,
-            updated_text: mine
-                .updated_at
-                .map(|at| format!("Updated {}", self.0.fmt.relative_named(at, now))),
+            updated_text: mine.updated_at.map(|at| {
+                format!(
+                    "Updated {}",
+                    self.0
+                        .fmt
+                        .relative_named(self.0.ctx.native.as_ref(), at, now)
+                )
+            }),
         }
     }
 

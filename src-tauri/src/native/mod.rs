@@ -54,4 +54,40 @@ pub trait Native: Send + Sync {
     fn new_ticket_assign_to_me(&self) -> bool;
     /// Remembers "Assign to me" at once (NEW-12, PERS-8).
     fn set_new_ticket_assign_to_me(&self, on: bool);
+
+    // Locale-dependent text: Foundation's formatters with the Mac's current locale and time zone,
+    // exactly as each Swift call site uses them (contract.md open point 5).
+
+    /// `DateFormatter` with `setLocalizedDateFormatFromTemplate(template)` ("HH:mm" is used as
+    /// the fixed format), as `LogDate.format` does (K/CaseLog.swift, DET-39).
+    fn format_date_template(&self, date: DateTime<Utc>, template: &str) -> String;
+    /// `date.formatted(date: .abbreviated, time: .shortened)` when `with_date`, else
+    /// `date.formatted(date: .omitted, time: .shortened)` (LIST-54, TMR-16).
+    fn format_date_time(&self, date: DateTime<Utc>, with_date: bool) -> String;
+    /// `date.formatted(.relative(presentation: .named))` with `now` as the reference (MB-16).
+    fn format_relative_named(&self, date: DateTime<Utc>, now: DateTime<Utc>) -> String;
+    /// `ByteCountFormatter.string(fromByteCount:countStyle: .file)` (LOG-20, DET-33).
+    fn format_byte_count(&self, bytes: i64) -> String;
+    /// `ListFormatter.localizedString(byJoining:)` (CMDB-14).
+    fn format_list(&self, items: &[String]) -> String;
+
+    /// The general pasteboard read like `ImageIntake.items(from: .general, preferText: true)`
+    /// (W/ComposerTextView.swift, LOG-14): image file URLs first (files over `max_file_bytes`
+    /// are not read); file URLs without images, or any text, → `None` (paste normally);
+    /// otherwise PNG, then TIFF data. `None` when there are no images.
+    fn pasteboard_images(&self, max_file_bytes: u64) -> Option<Vec<PastedImage>>;
+
+    /// Writes a file the way `Data.write(to:)` does; the error is Foundation's
+    /// `localizedDescription` (DET-34).
+    fn write_file(&self, path: &std::path::Path, data: &[u8]) -> Result<(), String>;
+}
+
+/// One image read from the pasteboard (`ImageIntake.Item`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PastedImage {
+    pub filename: String,
+    /// `None` when the file is too big to read, or couldn't be read.
+    pub data: Option<Vec<u8>>,
+    /// The file's size (0 when unknown); raw data's length.
+    pub size: u64,
 }

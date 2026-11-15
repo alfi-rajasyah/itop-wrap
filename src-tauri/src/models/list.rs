@@ -368,9 +368,12 @@ impl Workspace {
         TicketRow {
             ticket: ticket_view(t, me),
             age: t.start_date.map(|s| Age::short(s, now)),
-            opened_tooltip: t
-                .start_date
-                .map(|s| format!("Opened {}", self.0.fmt.date_time(s))),
+            opened_tooltip: t.start_date.map(|s| {
+                format!(
+                    "Opened {}",
+                    self.0.fmt.date_time(self.0.ctx.native.as_ref(), s)
+                )
+            }),
             priority_mark: match t.priority {
                 1 => Some(PriorityMark::P1),
                 2 => Some(PriorityMark::P2),

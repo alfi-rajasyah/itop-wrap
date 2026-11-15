@@ -16,7 +16,6 @@ use itop_kit::{
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::format::byte_count;
 use super::list::ListState;
 use super::records::{
     AgentChip, ConfirmText, DraftImage, ImageIntakeItem, LinkedCI, ListScope, LogEntryView, LogTab,
@@ -466,7 +465,9 @@ impl Workspace {
             TimerButton::WebStopwatch {
                 label: format!(
                     "Web stopwatch since {}",
-                    self.0.fmt.since(*since, self.now())
+                    self.0
+                        .fmt
+                        .since(self.0.ctx.native.as_ref(), *since, self.now())
                 ),
             }
         } else if timer.can_start(t, me) {
@@ -644,7 +645,9 @@ impl Workspace {
                             id: e.id,
                             header: [
                                 Some(e.author.clone()),
-                                e.date.map(|dt| self.0.fmt.log_date(dt, now)),
+                                e.date.map(|dt| {
+                                    self.0.fmt.log_date(self.0.ctx.native.as_ref(), dt, now)
+                                }),
                             ]
                             .into_iter()
                             .flatten()
@@ -747,7 +750,10 @@ impl Workspace {
                 .map(|im| DraftImage {
                     id: im.id.clone(),
                     filename: im.filename.clone(),
-                    size_text: byte_count(im.data.len() as u64),
+                    size_text: self
+                        .0
+                        .fmt
+                        .byte_count(self.0.ctx.native.as_ref(), im.data.len()),
                     thumbnail_src: format!("itop://localhost/draft-image/{}", im.id),
                 })
                 .collect(),
@@ -1122,6 +1128,15 @@ impl Workspace {
             .flatten()
     }
 
+    /// `file.data.write(to: url)` off the async workers; the error reads like Foundation's
+    /// `localizedDescription` (DET-34).
+    async fn write_file(&self, path: std::path::PathBuf, data: Vec<u8>) -> Result<(), String> {
+        let native = self.0.ctx.native.clone();
+        tokio::task::spawn_blocking(move || native.write_file(&path, &data))
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()))
+    }
+
     /// `AttachmentsView.save` (DET-33, DET-34).
     async fn detail_download(&self, scope: ListScope, instance: u64, a: AttachmentRef) {
         let i = scope.index();
@@ -1136,13 +1151,15 @@ impl Workspace {
         let outcome: Result<Option<String>, String> = match self.0.images.download(&a).await {
             Ok(file) => match self.save_panel(&file.filename).await {
                 None => Ok(None),
-                Some(path) => match std::fs::write(&path, &file.data) {
+                Some(path) => match self.write_file(path, file.data.clone()).await {
                     Ok(()) => Ok(Some(format!(
                         "Saved {} ({}).",
                         file.filename,
-                        byte_count(file.data.len() as u64)
+                        self.0
+                            .fmt
+                            .byte_count(self.0.ctx.native.as_ref(), file.data.len())
                     ))),
-                    Err(e) => Err(e.to_string()),
+                    Err(why) => Err(why),
                 },
             },
             Err(e) => Err(self.describe_image(&e)),

@@ -681,7 +681,7 @@ impl CmdbModel {
                     format!(
                         "If {} fails, {} {} affected.",
                         item.name,
-                        text::join_list(&names),
+                        self.ctx.native.format_list(&names),
                         if d.used_by.len() == 1 { "is" } else { "are" }
                     )
                 };

@@ -234,7 +234,7 @@ impl Workspace {
                     text: format!(
                         "Your web stopwatch is already running on {} since {}. Stop it in iTop, or keep using it there.",
                         t.r#ref,
-                        self.0.fmt.since(since, now)
+                        self.0.fmt.since(self.0.ctx.native.as_ref(), since, now)
                     ),
                     is_error: false,
                     can_retry: false,

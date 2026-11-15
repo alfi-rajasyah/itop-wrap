@@ -1,57 +1,46 @@
-//! Locale-dependent formatting, in one place so it can be swapped (contract.md open point 5).
+//! Locale-dependent formatting, in one place (contract.md open point 5).
 //!
-//! The Swift app formats with the Mac's locale through Foundation. This module reproduces
-//! Foundation's en_US output by hand:
+//! The Swift app formats with the Mac's current locale through Foundation. The text itself comes
+//! from [`Native`]'s `format_*` operations (Foundation's formatters in the app, en_US in tests);
+//! this module only adds the rules around them that the Swift call sites apply:
 //!
-//! - [`Fmt::date_time`]: `date.formatted(date: .abbreviated, time: .shortened)` → "Nov 16, 2026 at 9:12 AM"
-//! - [`Fmt::time_short`]: `.formatted(date: .omitted, time: .shortened)` → "9:12 AM"
-//! - [`Fmt::since`]: `TimerModel.time(_:)`: today the time only, otherwise date and time
-//! - [`Fmt::relative_named`]: `formatted(.relative(presentation: .named))` → "2 minutes ago", "now"
-//! - [`byte_count`]: `ByteCountFormatter.string(fromByteCount:countStyle: .file)` → "2 KB", "1.2 MB"
-//!
-//! Log entry dates (`LogDate.short`, 24-hour) come from `itop_kit::LogDate` with
-//! `DateLocale::EnUs`. Times use Foundation's narrow no-break space before AM/PM (ICU 72+).
+//! - [`Fmt::log_date`]: `LogDate.short` (K/CaseLog.swift, DET-39)
+//! - [`Fmt::date_time`]: `date.formatted(date: .abbreviated, time: .shortened)` (LIST-54)
+//! - [`Fmt::since`]: `TimerModel.time(_:)`: today the time only, otherwise date and time (TMR-16)
+//! - [`Fmt::relative_named`]: `formatted(.relative(presentation: .named))` (MB-16)
+//! - [`Fmt::byte_count`]: `ByteCountFormatter` `.file` (LOG-20, DET-33)
+//! - [`Fmt::list`]: `ListFormatter.localizedString(byJoining:)` (CMDB-14)
 
-use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDateTime, Offset, Timelike, Utc};
-use itop_kit::{DateLocale, LogDate};
+use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Offset, Utc};
+use itop_kit::LogDate;
 
-/// The narrow no-break space ICU puts between the time and "AM"/"PM".
-pub const AM_PM_SPACE: char = '\u{202F}';
+use crate::native::Native;
 
-/// Which wall clock dates are shown in.
+/// Which wall clock "today" and calendar days are counted in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Zone {
-    /// The Mac's time zone (the app).
+    /// The Mac's time zone (the app, like `Calendar.current`).
     Local,
-    /// A fixed offset (tests).
+    /// A fixed offset (tests; `FakeNative` formats at UTC).
     Fixed(FixedOffset),
 }
 
-/// The formatters, for one locale and time zone.
+/// The calendar the formatters are used with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Fmt {
     pub zone: Zone,
-    pub log_locale: DateLocale,
 }
 
-const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
-
 impl Fmt {
-    /// en_US in the Mac's time zone.
+    /// The Mac's time zone.
     pub fn local() -> Self {
-        Fmt {
-            zone: Zone::Local,
-            log_locale: DateLocale::EnUs,
-        }
+        Fmt { zone: Zone::Local }
     }
 
-    /// en_US at UTC, for tests.
+    /// UTC, for tests.
     pub fn utc() -> Self {
         Fmt {
             zone: Zone::Fixed(Utc.fix()),
-            log_locale: DateLocale::EnUs,
         }
     }
 
@@ -62,50 +51,87 @@ impl Fmt {
         }
     }
 
-    /// "Today 09:12", "Yesterday 14:20", "Fri 16:10", "Nov 2 09:00", "Dec 24, 2025" (DET-39).
-    pub fn log_date(&self, date: DateTime<Utc>, now: DateTime<Utc>) -> String {
+    /// "Today 09:12", "Yesterday 14:20", "Fri 16:10", then the locale's "d MMM" + time, or
+    /// "d MMM yyyy" for other years (DET-39).
+    pub fn log_date(&self, n: &dyn Native, date: DateTime<Utc>, now: DateTime<Utc>) -> String {
+        let format = |template: &str| n.format_date_template(date, template);
         match self.zone {
-            Zone::Local => LogDate::short(date, now, &Local, self.log_locale),
-            Zone::Fixed(off) => LogDate::short(date, now, &off, self.log_locale),
+            Zone::Local => LogDate::short_with(date, now, &Local, format),
+            Zone::Fixed(off) => LogDate::short_with(date, now, &off, format),
         }
     }
 
-    /// "9:12 AM".
-    pub fn time_short(&self, d: DateTime<Utc>) -> String {
-        let n = self.naive(d);
-        let (pm, hour) = n.hour12();
-        format!(
-            "{hour}:{:02}{AM_PM_SPACE}{}",
-            n.minute(),
-            if pm { "PM" } else { "AM" }
-        )
-    }
-
-    /// "Nov 16, 2026".
-    pub fn date_abbreviated(&self, d: DateTime<Utc>) -> String {
-        let n = self.naive(d);
-        let month = MONTHS.get(n.month0() as usize).copied().unwrap_or("");
-        format!("{month} {}, {}", n.day(), n.year())
-    }
-
-    /// "Nov 16, 2026 at 9:12 AM".
-    pub fn date_time(&self, d: DateTime<Utc>) -> String {
-        format!("{} at {}", self.date_abbreviated(d), self.time_short(d))
+    /// Abbreviated date and short time (LIST-54).
+    pub fn date_time(&self, n: &dyn Native, d: DateTime<Utc>) -> String {
+        n.format_date_time(d, true)
     }
 
     /// `TimerModel.time(_:)`: the time alone when `d` is today, otherwise date and time (TMR-16).
-    pub fn since(&self, d: DateTime<Utc>, now: DateTime<Utc>) -> String {
-        if self.naive(d).date() == self.naive(now).date() {
-            self.time_short(d)
+    pub fn since(&self, n: &dyn Native, d: DateTime<Utc>, now: DateTime<Utc>) -> String {
+        let today = self.naive(d).date() == self.naive(now).date();
+        n.format_date_time(d, !today)
+    }
+
+    /// "now", "2 minutes ago", "yesterday", … (MB-16).
+    pub fn relative_named(&self, n: &dyn Native, d: DateTime<Utc>, now: DateTime<Utc>) -> String {
+        n.format_relative_named(d, now)
+    }
+
+    /// A file-style byte count (LOG-20, DET-33).
+    pub fn byte_count(&self, n: &dyn Native, bytes: usize) -> String {
+        n.format_byte_count(i64::try_from(bytes).unwrap_or(i64::MAX))
+    }
+
+    /// "A, B, and C" in the locale (CMDB-14).
+    pub fn list(&self, n: &dyn Native, items: &[String]) -> String {
+        n.format_list(items)
+    }
+}
+
+/// Foundation's en_US output, by hand: what `FakeNative` answers so tests are deterministic.
+/// Dates are formatted at UTC; times use ICU's narrow no-break space before AM/PM.
+pub mod en_us {
+    use chrono::{DateTime, Datelike, Timelike, Utc};
+
+    /// The narrow no-break space ICU puts between the time and "AM"/"PM".
+    pub const AM_PM_SPACE: char = '\u{202F}';
+
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+
+    fn month(d: DateTime<Utc>) -> &'static str {
+        MONTHS.get(d.month0() as usize).copied().unwrap_or("")
+    }
+
+    /// The templates `LogDate` uses: "HH:mm", "EEE", "d MMM" → "Nov 2", "d MMM yyyy" → "Nov 2, 2026".
+    pub fn date_template(d: DateTime<Utc>, template: &str) -> String {
+        match template {
+            "HH:mm" => d.format("%H:%M").to_string(),
+            "EEE" => d.format("%a").to_string(),
+            "d MMM" => format!("{} {}", month(d), d.day()),
+            _ => format!("{} {}, {:04}", month(d), d.day(), d.year()),
+        }
+    }
+
+    /// "9:12 AM", or "Nov 16, 2026 at 9:12 AM" with the date.
+    pub fn date_time(d: DateTime<Utc>, with_date: bool) -> String {
+        let (pm, hour) = d.hour12();
+        let time = format!(
+            "{hour}:{:02}{AM_PM_SPACE}{}",
+            d.minute(),
+            if pm { "PM" } else { "AM" }
+        );
+        if with_date {
+            format!("{} {}, {} at {time}", month(d), d.day(), d.year())
         } else {
-            self.date_time(d)
+            time
         }
     }
 
     /// "now", "45 seconds ago", "2 minutes ago", "3 hours ago", "yesterday", "4 days ago",
-    /// "last week", "3 weeks ago", "last month", "last year" (MB-16). The largest non-zero
-    /// calendar unit, truncated.
-    pub fn relative_named(&self, d: DateTime<Utc>, now: DateTime<Utc>) -> String {
+    /// "last week", "3 weeks ago", "last month", "last year": the largest non-zero unit.
+    pub fn relative_named(d: DateTime<Utc>, now: DateTime<Utc>) -> String {
         let secs = (now - d).num_seconds();
         let past = secs >= 0;
         let s = secs.unsigned_abs();
@@ -116,29 +142,17 @@ impl Fmt {
         } else if s < 86_400 {
             (s / 3600, "hour", None)
         } else if s < 7 * 86_400 {
-            (
-                s / 86_400,
-                "day",
-                Some(if past { "yesterday" } else { "tomorrow" }),
-            )
+            let n = if past { "yesterday" } else { "tomorrow" };
+            (s / 86_400, "day", Some(n))
         } else if s < 30 * 86_400 {
-            (
-                s / (7 * 86_400),
-                "week",
-                Some(if past { "last week" } else { "next week" }),
-            )
+            let n = if past { "last week" } else { "next week" };
+            (s / (7 * 86_400), "week", Some(n))
         } else if s < 365 * 86_400 {
-            (
-                s / (30 * 86_400),
-                "month",
-                Some(if past { "last month" } else { "next month" }),
-            )
+            let n = if past { "last month" } else { "next month" };
+            (s / (30 * 86_400), "month", Some(n))
         } else {
-            (
-                s / (365 * 86_400),
-                "year",
-                Some(if past { "last year" } else { "next year" }),
-            )
+            let n = if past { "last year" } else { "next year" };
+            (s / (365 * 86_400), "year", Some(n))
         };
         if value == 0 {
             return "now".to_owned();
@@ -155,65 +169,76 @@ impl Fmt {
             format!("in {value} {unit}{plural}")
         }
     }
-}
 
-/// `ByteCountFormatter` with `.file` style in en_US: decimal units, "Zero KB", "1 byte",
-/// "512 bytes", whole KB, one decimal for MB, two for GB and above, trailing zeros dropped.
-pub fn byte_count(bytes: u64) -> String {
-    if bytes == 0 {
-        return "Zero KB".to_owned();
-    }
-    if bytes < 1000 {
-        return if bytes == 1 {
-            "1 byte".to_owned()
+    /// `.file` style: decimal units, "Zero KB", "1 byte", "512 bytes", whole KB, one decimal for
+    /// MB, two for GB and above, trailing zeros dropped.
+    pub fn byte_count(bytes: i64) -> String {
+        let bytes = bytes.max(0) as u64;
+        if bytes == 0 {
+            return "Zero KB".to_owned();
+        }
+        if bytes < 1000 {
+            return if bytes == 1 {
+                "1 byte".to_owned()
+            } else {
+                format!("{bytes} bytes")
+            };
+        }
+        let units = [("KB", 0usize), ("MB", 1), ("GB", 2), ("TB", 2), ("PB", 2)];
+        let mut value = bytes as f64 / 1000.0;
+        let mut i = 0;
+        while i + 1 < units.len() {
+            let factor = 10f64.powi(units[i].1 as i32);
+            if (value * factor).round() / factor < 1000.0 {
+                break;
+            }
+            value /= 1000.0;
+            i += 1;
+        }
+        let (unit, decimals) = units[i];
+        let text = format!("{value:.decimals$}");
+        let text = if text.contains('.') {
+            text.trim_end_matches('0').trim_end_matches('.').to_owned()
         } else {
-            format!("{bytes} bytes")
+            text
         };
+        format!("{} {unit}", group_thousands(&text))
     }
-    let units = [("KB", 0usize), ("MB", 1), ("GB", 2), ("TB", 2), ("PB", 2)];
-    let mut value = bytes as f64 / 1000.0;
-    let mut i = 0;
-    while i + 1 < units.len() {
-        let decimals = units[i].1;
-        let factor = 10f64.powi(decimals as i32);
-        if (value * factor).round() / factor < 1000.0 {
-            break;
-        }
-        value /= 1000.0;
-        i += 1;
-    }
-    let (unit, decimals) = units[i];
-    let text = format!("{value:.decimals$}");
-    let text = if text.contains('.') {
-        text.trim_end_matches('0').trim_end_matches('.').to_owned()
-    } else {
-        text
-    };
-    format!("{} {unit}", group_thousands(&text))
-}
 
-/// "1234.5" → "1,234.5".
-fn group_thousands(number: &str) -> String {
-    let (int, frac) = number
-        .split_once('.')
-        .map_or((number, None), |(a, b)| (a, Some(b)));
-    let mut out = String::new();
-    for (i, c) in int.chars().enumerate() {
-        if i > 0 && (int.len() - i) % 3 == 0 {
-            out.push(',');
+    /// "1234.5" → "1,234.5".
+    fn group_thousands(number: &str) -> String {
+        let (int, frac) = number
+            .split_once('.')
+            .map_or((number, None), |(a, b)| (a, Some(b)));
+        let mut out = String::new();
+        for (i, c) in int.chars().enumerate() {
+            if i > 0 && (int.len() - i) % 3 == 0 {
+                out.push(',');
+            }
+            out.push(c);
         }
-        out.push(c);
+        if let Some(f) = frac {
+            out.push('.');
+            out.push_str(f);
+        }
+        out
     }
-    if let Some(f) = frac {
-        out.push('.');
-        out.push_str(f);
+
+    /// "A", "A and B", "A, B, and C".
+    pub fn list(items: &[String]) -> String {
+        match items {
+            [] => String::new(),
+            [one] => one.clone(),
+            [a, b] => format!("{a} and {b}"),
+            [init @ .., last] => format!("{}, and {last}", init.join(", ")),
+        }
     }
-    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::native::fake::FakeNative;
     use chrono::TimeZone;
 
     fn at(y: i32, mo: u32, d: u32, h: u32, mi: u32) -> DateTime<Utc> {
@@ -222,77 +247,132 @@ mod tests {
             .expect("valid date")
     }
 
+    fn native() -> FakeNative {
+        FakeNative::new(at(2026, 11, 16, 15, 0))
+    }
+
     #[test]
     fn times_are_12_hour_with_narrow_space() {
-        let f = Fmt::utc();
-        assert_eq!(f.time_short(at(2026, 11, 16, 9, 12)), "9:12\u{202F}AM");
-        assert_eq!(f.time_short(at(2026, 11, 16, 0, 5)), "12:05\u{202F}AM");
-        assert_eq!(f.time_short(at(2026, 11, 16, 13, 0)), "1:00\u{202F}PM");
+        let (f, n) = (Fmt::utc(), native());
         assert_eq!(
-            f.date_time(at(2026, 11, 16, 9, 12)),
+            en_us::date_time(at(2026, 11, 16, 9, 12), false),
+            "9:12\u{202F}AM"
+        );
+        assert_eq!(
+            en_us::date_time(at(2026, 11, 16, 0, 5), false),
+            "12:05\u{202F}AM"
+        );
+        assert_eq!(
+            en_us::date_time(at(2026, 11, 16, 13, 0), false),
+            "1:00\u{202F}PM"
+        );
+        assert_eq!(
+            f.date_time(&n, at(2026, 11, 16, 9, 12)),
             "Nov 16, 2026 at 9:12\u{202F}AM"
         );
     }
 
     #[test]
     fn tmr_16_since_today_is_time_only() {
-        let f = Fmt::utc();
+        let (f, n) = (Fmt::utc(), native());
         let now = at(2026, 11, 16, 15, 0);
-        assert_eq!(f.since(at(2026, 11, 16, 10, 42), now), "10:42\u{202F}AM");
         assert_eq!(
-            f.since(at(2026, 11, 15, 10, 42), now),
+            f.since(&n, at(2026, 11, 16, 10, 42), now),
+            "10:42\u{202F}AM"
+        );
+        assert_eq!(
+            f.since(&n, at(2026, 11, 15, 10, 42), now),
             "Nov 15, 2026 at 10:42\u{202F}AM"
         );
     }
 
     #[test]
     fn mb_16_relative_named() {
-        let f = Fmt::utc();
+        let (f, n) = (Fmt::utc(), native());
         let now = at(2026, 11, 16, 15, 0);
-        assert_eq!(f.relative_named(now, now), "now");
-        assert_eq!(
-            f.relative_named(now - chrono::Duration::seconds(45), now),
-            "45 seconds ago"
-        );
-        assert_eq!(
-            f.relative_named(now - chrono::Duration::seconds(60), now),
-            "1 minute ago"
-        );
-        assert_eq!(
-            f.relative_named(now - chrono::Duration::minutes(2), now),
-            "2 minutes ago"
-        );
-        assert_eq!(
-            f.relative_named(now - chrono::Duration::hours(3), now),
-            "3 hours ago"
-        );
-        assert_eq!(
-            f.relative_named(now - chrono::Duration::days(1), now),
-            "yesterday"
-        );
-        assert_eq!(
-            f.relative_named(now - chrono::Duration::days(4), now),
-            "4 days ago"
-        );
+        let ago = |d: chrono::Duration| f.relative_named(&n, now - d, now);
+        assert_eq!(ago(chrono::Duration::zero()), "now");
+        assert_eq!(ago(chrono::Duration::seconds(45)), "45 seconds ago");
+        assert_eq!(ago(chrono::Duration::seconds(60)), "1 minute ago");
+        assert_eq!(ago(chrono::Duration::minutes(2)), "2 minutes ago");
+        assert_eq!(ago(chrono::Duration::hours(3)), "3 hours ago");
+        assert_eq!(ago(chrono::Duration::days(1)), "yesterday");
+        assert_eq!(ago(chrono::Duration::days(4)), "4 days ago");
     }
 
     #[test]
     fn byte_counts_like_the_file_style() {
-        assert_eq!(byte_count(0), "Zero KB");
-        assert_eq!(byte_count(1), "1 byte");
-        assert_eq!(byte_count(512), "512 bytes");
-        assert_eq!(byte_count(2048), "2 KB");
-        assert_eq!(byte_count(1_200_000), "1.2 MB");
-        assert_eq!(byte_count(2_000_000), "2 MB");
-        assert_eq!(byte_count(999_600), "1 MB");
-        assert_eq!(byte_count(3_456_000_000), "3.46 GB");
+        let (f, n) = (Fmt::utc(), native());
+        assert_eq!(f.byte_count(&n, 0), "Zero KB");
+        assert_eq!(f.byte_count(&n, 1), "1 byte");
+        assert_eq!(f.byte_count(&n, 512), "512 bytes");
+        assert_eq!(f.byte_count(&n, 2048), "2 KB");
+        assert_eq!(f.byte_count(&n, 1_200_000), "1.2 MB");
+        assert_eq!(f.byte_count(&n, 2_000_000), "2 MB");
+        assert_eq!(f.byte_count(&n, 999_600), "1 MB");
+        assert_eq!(f.byte_count(&n, 3_456_000_000), "3.46 GB");
     }
 
     #[test]
-    fn det_39_log_dates_are_us_24_hour() {
-        let f = Fmt::utc();
+    fn det_39_log_dates_use_the_template_formatter() {
+        let (f, n) = (Fmt::utc(), native());
         let now = at(2026, 11, 16, 15, 0);
-        assert_eq!(f.log_date(at(2026, 11, 16, 9, 12), now), "Today 09:12");
-        assert_eq!(f.log_date(at(2026, 11, 2, 9, 0), now), "Nov 2 09:00");
+        assert_eq!(f.log_date(&n, at(2026, 11, 16, 9, 12), now), "Today 09:12");
+        assert_eq!(
+            f.log_date(&n, at(2026, 11, 15, 23, 59), now),
+            "Yesterday 23:59"
+        );
+        assert_eq!(f.log_date(&n, at(2026, 11, 13, 16, 10), now), "Fri 16:10");
+        assert_eq!(f.log_date(&n, at(2026, 11, 2, 9, 0), now), "Nov 2 09:00");
+        assert_eq!(f.log_date(&n, at(2025, 12, 24, 10, 0), now), "Dec 24, 2025");
+    }
+
+    #[test]
+    fn cmdb_14_list_join() {
+        let (f, n) = (Fmt::utc(), native());
+        let s = |v: &[&str]| f.list(&n, &v.iter().map(|x| x.to_string()).collect::<Vec<_>>());
+        assert_eq!(s(&["a"]), "a");
+        assert_eq!(s(&["a", "b"]), "a and b");
+        assert_eq!(s(&["a", "b", "c"]), "a, b, and c");
+    }
+
+    /// Prints what the real Mac formatters give in the current locale, to compare with the
+    /// Swift app's output (`swift locale.swift`, see the parity report). Same sample instants.
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "prints the Mac's locale output; run by hand"]
+    fn mac_locale_parity() {
+        use crate::native::mac::locale as mac;
+        let now = Utc.timestamp_opt(1_794_830_400, 0).single().expect("now");
+        let f = Fmt::local();
+        let samples = [3 * 3600, 26 * 3600, 4 * 86_400, 40 * 86_400, 400 * 86_400];
+        let fmt_log =
+            |d: DateTime<Utc>| LogDate::short_with(d, now, &Local, |t| mac::date_template(d, t));
+        for back in samples {
+            let d = now - chrono::Duration::seconds(back);
+            let ts = d.timestamp();
+            let today = f.naive(d).date() == f.naive(now).date();
+            println!("log[{ts}]={}", fmt_log(d));
+            println!("opened[{ts}]=Opened {}", mac::date_time(d, true));
+            println!("since[{ts}]={}", mac::date_time(d, !today));
+        }
+        let real_now = Utc::now();
+        for secs in [
+            0, 45, 60, 89, 90, 150, 5400, 10800, 82800, 93600, 172800, 345600, 518400, 604800,
+            864000, 1209600, 2592000, 3456000, 5184000, 31536000, 34560000, 63072000,
+        ] {
+            let d = real_now - chrono::Duration::seconds(secs);
+            println!(
+                "relative[{secs}]=Updated {}",
+                mac::relative_named(d, real_now)
+            );
+        }
+        for b in [0i64, 1, 512, 2048, 999_600, 1_200_000, 3_456_000_000] {
+            println!("bytes[{b}]={}", mac::byte_count(b));
+        }
+        for l in [vec!["vpn-gw-01"], vec!["a", "b"], vec!["a", "b", "c"]] {
+            let items: Vec<String> = l.iter().map(|s| s.to_string()).collect();
+            println!("list[{}]={}", l.len(), mac::list(&items));
+        }
     }
 }

@@ -6,7 +6,9 @@
 //! after the app state is managed, so the web views never call a command before it exists.
 
 pub mod appkit;
+pub mod files;
 pub mod image;
+pub mod locale;
 pub mod tray_draw;
 
 use std::path::PathBuf;
@@ -23,7 +25,7 @@ use tauri::{
     WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry,
 };
 
-use crate::native::{ConvertTo, ConvertedImage, Native};
+use crate::native::{ConvertTo, ConvertedImage, Native, PastedImage};
 use crate::router::{NativeEvent, Router};
 use appkit::{PanelKey, on_main, on_main_async};
 use tray_draw::Slide;
@@ -783,6 +785,38 @@ impl Native for MacNative {
     fn set_new_ticket_assign_to_me(&self, on: bool) {
         self.standard
             .set_bool(crate::prefs::keys::NEW_TICKET_ASSIGN_TO_ME, on);
+    }
+
+    fn format_date_template(&self, date: DateTime<Utc>, template: &str) -> String {
+        locale::date_template(date, template)
+    }
+
+    fn format_date_time(&self, date: DateTime<Utc>, with_date: bool) -> String {
+        locale::date_time(date, with_date)
+    }
+
+    fn format_relative_named(&self, date: DateTime<Utc>, now: DateTime<Utc>) -> String {
+        locale::relative_named(date, now)
+    }
+
+    fn format_byte_count(&self, bytes: i64) -> String {
+        locale::byte_count(bytes)
+    }
+
+    fn format_list(&self, items: &[String]) -> String {
+        locale::list(items)
+    }
+
+    /// Hops to the main thread and waits; call it from a blocking-friendly context.
+    fn pasteboard_images(&self, max_file_bytes: u64) -> Option<Vec<PastedImage>> {
+        on_main(self.app(), move |_| {
+            files::pasteboard_images(max_file_bytes)
+        })
+        .flatten()
+    }
+
+    fn write_file(&self, path: &std::path::Path, data: &[u8]) -> Result<(), String> {
+        files::write_file(path, data)
     }
 }
 
