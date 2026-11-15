@@ -27,11 +27,19 @@ pub struct FakeNative {
     pub save_to: Mutex<Option<PathBuf>>,
     /// What `convert_image` answers.
     pub converted: Mutex<Option<ConvertedImage>>,
+    /// The remembered `newTicket.assignToMe` (default true).
+    pub assign_to_me: Mutex<bool>,
 }
 
 impl FakeNative {
     pub fn new(now: DateTime<Utc>) -> Self {
-        Self { now: Mutex::new(now), calls: Mutex::default(), save_to: Mutex::default(), converted: Mutex::default() }
+        Self {
+            now: Mutex::new(now),
+            calls: Mutex::default(),
+            save_to: Mutex::default(),
+            converted: Mutex::default(),
+            assign_to_me: Mutex::new(true),
+        }
     }
     pub fn set_now(&self, now: DateTime<Utc>) {
         *self.now.lock().unwrap_or_else(|e| e.into_inner()) = now;
@@ -82,5 +90,11 @@ impl Native for FakeNative {
     }
     fn set_tray(&self, title: &str, accessibility_label: &str) {
         self.record(Call::SetTray(title.to_owned(), accessibility_label.to_owned()));
+    }
+    fn new_ticket_assign_to_me(&self) -> bool {
+        *self.assign_to_me.lock().unwrap_or_else(|e| e.into_inner())
+    }
+    fn set_new_ticket_assign_to_me(&self, on: bool) {
+        *self.assign_to_me.lock().unwrap_or_else(|e| e.into_inner()) = on;
     }
 }

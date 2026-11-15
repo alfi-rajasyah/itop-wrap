@@ -47,4 +47,9 @@ pub trait Native: Send + Sync {
     fn session_changed(&self, signed_in: bool);
     /// The tray's title and accessibility label (MB-1…6).
     fn set_tray(&self, title: &str, accessibility_label: &str);
+    /// New ticket's "Assign to me": UserDefaults `newTicket.assignToMe` in the standard domain,
+    /// default true (NEW-12, PERS-8).
+    fn new_ticket_assign_to_me(&self) -> bool;
+    /// Remembers "Assign to me" at once (NEW-12, PERS-8).
+    fn set_new_ticket_assign_to_me(&self, on: bool);
 }
