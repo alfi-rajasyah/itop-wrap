@@ -482,7 +482,7 @@ Intents: `setQuery`, `clearScope`, `select {id}` (`loadSelected()`), `setTab {ta
 | `refreshing` | boolean | `mine.refreshing` | :213 |
 | `updatedText` | string \| null | "Updated <relative>" (MB-16) | :217-219 |
 
-`MenuRow`: ticketId, ref, title, needsYou, isRunning, right (running / spent / none), button (stop /
+`MenuRow`: ticketId, ref, title, needsYou, isRunning, right (running {counter} / spent / none; the panel's snapshot is re-sent every second while a timer runs, so the running row carries its live counter, MB-13), button (stop /
 start {enabled, help} / slot) (MB-12, MB-13; W/MenuBarView.swift:156-206).
 
 | Intent | Payload | Result | Swift |
@@ -535,8 +535,22 @@ slide animation (MB-4) is native; see Open points.
 **Notifications:** none (NOTIF-1). The scaffold's notification plugin must not be used.
 
 **Clipboard:** writes are Rust (`detail.copyRef`, `cmdb.copyName`, plain string, DET-10, CMDB-11).
-Reads for pasting images are React's `paste` event (LOG-14 rules: image files win, file URLs without
-images paste normally, text pastes as text, else PNG then TIFF data).
+Reads for pasting are Rust too: in the app the composer's `paste` handler prevents the default and
+dispatches `detail.pasteFromClipboard`; Rust reads NSPasteboard like `ImageIntake.items(from:
+preferText: true)` (image file URLs win, file URLs without images or any text → `"text"`, else PNG
+then TIFF data) and feeds the intake; on `"text"` the UI inserts the pasted text itself (LOG-14).
+The browser mock answers `"text"` and the UI takes images from the `paste` event.
+
+**Locale:** every locale-dependent string (log dates, "Opened …", "since …", "Updated … ago", byte
+counts, the CI list join) comes from `Native::format_*`: Foundation's formatters with the Mac's
+current locale in the app (`native/mac/locale.rs`, `Date.RelativeFormatStyle`'s unit choice ported
+onto NSCalendar), en_US in `FakeNative`.
+
+**Main window hidden/shown:** closing the signed-in main window hides it and sends
+`NativeEvent::MainWindowHidden`; showing it again sends `MainWindowShown`. The workspace treats them
+like SwiftUI's views disappearing/appearing (Team poll, searches and detail loads stop; on show the
+section appears again and the detail is made anew). My tickets' refresh, the timer and the menu bar
+keep running.
 
 **Open URL:** `open_url` (Rust) for rich-text links, outside-image chips, "Open in iTop on the web"
 (`more.webUrl`, `CIDetailView.webUrl`, image-failure link), a person's mailto (DET-43, DET-46, DET-24).
@@ -567,7 +581,9 @@ built in Rust and arrive as result strings or snapshot fields.
 `ITOPWRAP_WRITE_TICKETS`, `ITOPWRAP_WRITE_NEW`, `ITOPWRAP_SETTINGS`, `ITOPWRAP_TRACE`,
 `ITOPWRAP_STDERR`, `ITOPWRAP_APPEARANCE` stay Rust/native concerns of debug builds (DBG-1…9): with writes
 off the snapshots carry the writes-off texts and disabled flags, so the UI needs nothing extra.
-`ITOPWRAP_DEMO` and its `_MANY`, `_STATE`, `_TIMEFAIL` switches become the TypeScript mock (section 9).
+`ITOPWRAP_DEMO` and its `_MANY`, `_STATE`, `_TIMEFAIL` switches become the TypeScript mock (section 9)
+by design and are not ported to Rust. `ITOPWRAP_STDERR=<file>` appends stderr to the file and
+`ITOPWRAP_APPEARANCE=light|dark` forces `NSApp.appearance` (`models::debug::native_switches`).
 
 ## 9. Mock backend
 
@@ -601,15 +617,10 @@ paging, org filter and ref lookup; resolve sheet and "Resolved just now"; new ti
 4. **Option changes reload only the visible section.** That is what the Swift views do (`onChange` lives
    in the shown view), so a range change made in Organizations doesn't reload My tickets until its
    120 s poll. Mirrored here for parity; confirm this quirk is wanted.
-5. **Locale-dependent strings.** "Opened <date> <time>" (LIST-54), web stopwatch "since" (TMR-16),
-   "Updated 2 minutes ago" (MB-16), byte counts (LOG-20, DET-33), the CI "A, B and C" join (CMDB-14)
-   and short weekdays/months in log dates (DET-39) use the Mac's locale in Swift. Rust needs a locale
-   source (e.g. the macOS `AppleLocale`/`NSLocale` via objc2) and a formatter (ICU4X or hand-written for
-   the user's locale). The mock uses en-GB.
-6. **Pasting Finder-copied image files (LOG-14).** WKWebView's `paste` event may not expose files copied
-   in Finder as `File`s. If it doesn't, Rust needs a native paste path (read NSPasteboard file URLs when
-   the composer has focus, e.g. a `detail.pasteFromClipboard` intent). Text and screenshot data work in
-   the web view.
+5. **Locale-dependent strings.** Resolved: Foundation's formatters through `Native` (section 6,
+   Locale). The mock uses en-GB.
+6. **Pasting Finder-copied image files (LOG-14).** Resolved: `detail.pasteFromClipboard` (section 6,
+   Clipboard).
 7. **HEIC and other conversions (LOG-18).** Converting non-PNG/JPEG/GIF images needs Core Graphics /
    ImageIO from Rust (the `image` crate has no HEIC); owned by the Core B agent.
 8. **ts-rs.** The design spec says TS types are generated from Rust with ts-rs. This hand-written

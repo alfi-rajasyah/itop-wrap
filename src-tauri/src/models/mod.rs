@@ -28,4 +28,4 @@ mod testkit;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod window_tests;
+mod parity_fix_tests;

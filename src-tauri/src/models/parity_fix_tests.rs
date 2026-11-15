@@ -1,5 +1,6 @@
-//! The main window hiding and coming back (POLL-2/3/5, LIST-22, TMR-15), and a stopped
-//! workspace staying quiet (sign-out while work is in flight).
+//! Tests for the parity-audit fixes: the main window hiding and coming back (POLL-2/3/5, LIST-22,
+//! TMR-15), a stopped workspace staying quiet (sign-out while work is in flight), paste and save
+//! through Native, the sidebar.
 
 use std::time::Duration;
 
