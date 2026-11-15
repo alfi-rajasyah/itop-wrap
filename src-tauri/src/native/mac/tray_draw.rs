@@ -5,8 +5,9 @@
 use objc2::AnyThread;
 use objc2::rc::Retained;
 use objc2_app_kit::{
-    NSAttributedStringNSStringDrawing, NSBezierPath, NSBitmapImageFileType, NSBitmapImageRep, NSColor, NSCompositingOperation, NSDeviceRGBColorSpace,
-    NSFont, NSFontAttributeName, NSFontWeightRegular, NSForegroundColorAttributeName, NSGraphicsContext,
+    NSAttributedStringNSStringDrawing, NSBezierPath, NSBitmapImageFileType, NSBitmapImageRep,
+    NSColor, NSCompositingOperation, NSDeviceRGBColorSpace, NSFont, NSFontAttributeName,
+    NSFontWeightRegular, NSForegroundColorAttributeName, NSGraphicsContext,
 };
 use objc2_foundation::{NSAttributedString, NSDictionary, NSPoint, NSRect, NSSize, NSString};
 
@@ -41,14 +42,19 @@ fn text(title: &str) -> Retained<NSAttributedString> {
     // SAFETY: immutable NSString constants exported by AppKit.
     let (font_key, color_key) = unsafe { (NSFontAttributeName, NSForegroundColorAttributeName) };
     let objects: [&objc2::runtime::AnyObject; 2] = [&font, &black];
-    let attrs: Retained<NSDictionary<NSString, objc2::runtime::AnyObject>> = NSDictionary::from_slices(&[font_key, color_key], &objects);
+    let attrs: Retained<NSDictionary<NSString, objc2::runtime::AnyObject>> =
+        NSDictionary::from_slices(&[font_key, color_key], &objects);
     // SAFETY: the attributes are the documented key/value types (NSFont, NSColor).
     unsafe { NSAttributedString::new_with_attributes(&NSString::from_str(title), &attrs) }
 }
 
 /// The room the title takes right of the icon, gap included; 0 with no title.
 pub fn text_width(title: &str) -> f64 {
-    if title.is_empty() { 0.0 } else { GAP + text(title).size().width.ceil() }
+    if title.is_empty() {
+        0.0
+    } else {
+        GAP + text(title).size().width.ceil()
+    }
 }
 
 /// A stub: a rounded rectangle.
@@ -67,7 +73,10 @@ fn notches(rect: NSRect, radius: f64) -> [Retained<NSBezierPath>; 2] {
 }
 
 fn inset(r: NSRect, d: f64) -> NSRect {
-    NSRect::new(NSPoint::new(r.origin.x + d, r.origin.y + d), NSSize::new(r.size.width - 2.0 * d, r.size.height - 2.0 * d))
+    NSRect::new(
+        NSPoint::new(r.origin.x + d, r.origin.y + d),
+        NSSize::new(r.size.width - 2.0 * d, r.size.height - 2.0 * d),
+    )
 }
 
 fn clear(ctx: &NSGraphicsContext, path: &NSBezierPath) {
@@ -110,8 +119,16 @@ fn draw_icon(ctx: &NSGraphicsContext, origin: NSPoint) {
 }
 
 /// Draws into a fresh `width`×`height` pt bitmap at `scale` pixels per point.
-fn draw_rep(width: f64, height: f64, scale: f64, draw: impl FnOnce(&NSGraphicsContext)) -> Option<Retained<NSBitmapImageRep>> {
-    let (w, h) = ((width * scale).ceil() as isize, (height * scale).ceil() as isize);
+fn draw_rep(
+    width: f64,
+    height: f64,
+    scale: f64,
+    draw: impl FnOnce(&NSGraphicsContext),
+) -> Option<Retained<NSBitmapImageRep>> {
+    let (w, h) = (
+        (width * scale).ceil() as isize,
+        (height * scale).ceil() as isize,
+    );
     // SAFETY: null planes let AppKit allocate the buffer; 8-bit RGBA, non-planar, computed row
     // bytes: a supported combination. The colour space name is an AppKit constant.
     let rep = unsafe {
@@ -156,21 +173,30 @@ fn render(width: f64, height: f64, draw: impl FnOnce(&NSGraphicsContext)) -> Opt
         let line = unsafe { std::slice::from_raw_parts(data.add(y * row), wu * 4) };
         rgba.extend_from_slice(line);
     }
-    Some(Rendered { rgba, width_px: w as u32, height_px: h as u32 })
+    Some(Rendered {
+        rgba,
+        width_px: w as u32,
+        height_px: h as u32,
+    })
 }
 
 /// The icon alone (MenuBarIcon.image).
 pub fn icon() -> Option<Rendered> {
-    render(ICON_SIDE, ICON_SIDE, |ctx| draw_icon(ctx, NSPoint::new(0.0, 0.0)))
+    render(ICON_SIDE, ICON_SIDE, |ctx| {
+        draw_icon(ctx, NSPoint::new(0.0, 0.0))
+    })
 }
 
 /// The icon alone as a PNG at `scale` (1 → 18 px, 2 → 36 px): the committed
 /// `icons/tray-icon.png` / `tray-icon@2x.png` are written by the `write_tray_icons` test.
 pub fn icon_png(scale: f64) -> Option<Vec<u8>> {
-    let rep = draw_rep(ICON_SIDE, ICON_SIDE, scale, |ctx| draw_icon(ctx, NSPoint::new(0.0, 0.0)))?;
+    let rep = draw_rep(ICON_SIDE, ICON_SIDE, scale, |ctx| {
+        draw_icon(ctx, NSPoint::new(0.0, 0.0))
+    })?;
     let props: Retained<NSDictionary<NSString, objc2::runtime::AnyObject>> = NSDictionary::new();
     // SAFETY: an empty property dictionary is valid for PNG.
-    let data = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &props) }?;
+    let data =
+        unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &props) }?;
     Some(data.to_vec())
 }
 
@@ -188,7 +214,10 @@ pub fn label(title: &str, visible: Option<f64>) -> Option<Rendered> {
     render(ICON_SIDE + shown, height, |ctx| {
         draw_icon(ctx, NSPoint::new(0.0, (height - ICON_SIDE) / 2.0));
         // The text's start sits against the icon; what doesn't fit yet is past the right edge.
-        text.drawAtPoint(NSPoint::new(ICON_SIDE + GAP, (height - text_size.height) / 2.0));
+        text.drawAtPoint(NSPoint::new(
+            ICON_SIDE + GAP,
+            (height - text_size.height) / 2.0,
+        ));
     })
 }
 
@@ -198,7 +227,11 @@ pub fn steps(from: f64, to: f64, count: usize) -> Vec<f64> {
         .map(|i| {
             let t = i as f64 / count as f64;
             let eased = 1.0 - (1.0 - t).powi(3);
-            if i == count { to } else { from + (to - from) * eased }
+            if i == count {
+                to
+            } else {
+                from + (to - from) * eased
+            }
         })
         .collect()
 }
@@ -219,7 +252,13 @@ pub const SLIDE_STEP_MS: u64 = 18;
 impl Slide {
     /// `MenuBarLabel.animate(from:to:)`, called when the title changes. Returns the generation and
     /// widths to step through, or `None` when nothing slides (same width, or Reduce Motion).
-    pub fn begin(&mut self, old: &str, new: &str, width: impl Fn(&str) -> f64, reduce_motion: bool) -> Option<(u64, Vec<f64>)> {
+    pub fn begin(
+        &mut self,
+        old: &str,
+        new: &str,
+        width: impl Fn(&str) -> f64,
+        reduce_motion: bool,
+    ) -> Option<(u64, Vec<f64>)> {
         let from = self.visible.unwrap_or_else(|| width(old));
         let to = width(new);
         if from == to || reduce_motion {
@@ -227,7 +266,11 @@ impl Slide {
         }
         self.generation += 1;
         // Growing shows the new text as it comes out; shrinking keeps the old text going back in.
-        self.sliding = if to < from { Some(self.sliding.take().unwrap_or_else(|| old.to_owned())) } else { None };
+        self.sliding = if to < from {
+            Some(self.sliding.take().unwrap_or_else(|| old.to_owned()))
+        } else {
+            None
+        };
         Some((self.generation, steps(from, to, SLIDE_STEPS)))
     }
 
@@ -278,14 +321,23 @@ mod tests {
     fn full() {
         let text = text_width("00:12:40");
         assert!(text > 4.0);
-        assert_eq!(png_like_width(&label("00:12:40", None).expect("label")), grid(ICON_SIDE + text));
+        assert_eq!(
+            png_like_width(&label("00:12:40", None).expect("label")),
+            grid(ICON_SIDE + text)
+        );
     }
 
     #[test]
     fn partial() {
         let text = text_width("00:12:40");
-        assert_eq!(png_like_width(&label("00:12:40", Some(text / 2.0)).expect("half")), grid(ICON_SIDE + text / 2.0));
-        assert_eq!(png_like_width(&label("00:12:40", Some(0.0)).expect("none")), ICON_SIDE);
+        assert_eq!(
+            png_like_width(&label("00:12:40", Some(text / 2.0)).expect("half")),
+            grid(ICON_SIDE + text / 2.0)
+        );
+        assert_eq!(
+            png_like_width(&label("00:12:40", Some(0.0)).expect("none")),
+            ICON_SIDE
+        );
     }
 
     #[test]
@@ -294,7 +346,10 @@ mod tests {
         assert_eq!(s.len(), 12);
         assert_eq!(s.last().copied(), Some(60.0));
         assert!(s.windows(2).all(|w| w[0] <= w[1]));
-        assert!(s[0] > 60.0 / 12.0, "eases out: the first step is bigger than an even one");
+        assert!(
+            s[0] > 60.0 / 12.0,
+            "eases out: the first step is bigger than an even one"
+        );
         assert_eq!(steps(60.0, 0.0, 12).last().copied(), Some(0.0));
     }
 
@@ -309,7 +364,10 @@ mod tests {
         assert_eq!((r.width_px, r.height_px), (36, 36));
         let alpha: Vec<u8> = r.rgba.chunks(4).map(|p| p[3]).collect();
         assert!(alpha.contains(&255), "the front stub is filled");
-        assert!(alpha.iter().filter(|&&a| a == 0).count() > 36 * 36 / 3, "mostly transparent");
+        assert!(
+            alpha.iter().filter(|&&a| a == 0).count() > 36 * 36 / 3,
+            "mostly transparent"
+        );
     }
 
     /// Regenerates the committed template icons: `cargo test -p itop-wrap -- --ignored write_tray_icons`.
@@ -338,7 +396,11 @@ mod tests {
         assert_eq!(slide.shown("00:00:01"), ("00:00:01", None));
 
         let (g, _) = slide.begin("00:00:09", "", w, false).expect("shrinks");
-        assert_eq!(slide.shown(""), ("00:00:09", None), "keeps drawing the old text");
+        assert_eq!(
+            slide.shown(""),
+            ("00:00:09", None),
+            "keeps drawing the old text"
+        );
         slide.step(g, 40.0);
         // Interrupted mid-slide by a new title: starts from the visible width, old slide stops.
         let (g2, widths) = slide.begin("", "3", w, false).expect("turns around");

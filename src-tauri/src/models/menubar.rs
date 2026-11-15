@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::list::Phase;
-use super::records::{SidebarItem, TicketGroup};
 use super::new_ticket::{NewTicketInstance, NewTicketStart};
+use super::records::{SidebarItem, TicketGroup};
 use super::workspace::{State, Workspace};
 use crate::error::AppError;
 
@@ -65,9 +65,17 @@ pub struct MenuSection {
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum MenuContent {
     Loading,
-    Failed { text: String },
-    Empty { text: String },
-    List { running: Option<MenuRow>, sections: Vec<MenuSection>, height: i64 },
+    Failed {
+        text: String,
+    },
+    Empty {
+        text: String,
+    },
+    List {
+        running: Option<MenuRow>,
+        sections: Vec<MenuSection>,
+        height: i64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -115,7 +123,9 @@ impl Workspace {
                 MenuRowRight::Running
             } else {
                 match timer.totals.get(&id) {
-                    Some(&s) if s > 0 => MenuRowRight::Spent { text: TimeFormat::total(s) },
+                    Some(&s) if s > 0 => MenuRowRight::Spent {
+                        text: TimeFormat::total(s),
+                    },
                     _ => MenuRowRight::None,
                 }
             },
@@ -126,7 +136,12 @@ impl Workspace {
                     enabled: !timer.saving,
                     help: timer.running.as_ref().map_or_else(
                         || "Start timer".to_owned(),
-                        |r| format!("Stops the timer on {}, saves its time, and starts one here", r.r#ref),
+                        |r| {
+                            format!(
+                                "Stops the timer on {}, saves its time, and starts one here",
+                                r.r#ref
+                            )
+                        },
                     ),
                 }
             } else {
@@ -142,14 +157,25 @@ impl Workspace {
         let query = &st.menubar.query;
         let content = match &mine.phase {
             Phase::Loading => MenuContent::Loading,
-            Phase::Failed(m) => MenuContent::Failed { text: format!("Couldn't load your tickets. {m}") },
+            Phase::Failed(m) => MenuContent::Failed {
+                text: format!("Couldn't load your tickets. {m}"),
+            },
             Phase::Loaded => {
                 // MB-8: My tickets minus resolved/closed, the panel's search, the shared sort, only
                 // Escalated TTR, Escalated TTO, Assigned and Pending.
-                let open: Vec<itop_kit::Ticket> =
-                    mine.tickets.iter().filter(|t| t.status != "resolved" && t.status != "closed").cloned().collect();
+                let open: Vec<itop_kit::Ticket> = mine
+                    .tickets
+                    .iter()
+                    .filter(|t| t.status != "resolved" && t.status != "closed")
+                    .cloned()
+                    .collect();
                 let filtered = TicketSearch::filter_query(&open, query);
-                let groups = TicketList::groups(&filtered, me, itop_kit::TicketListView::Mine, st.options.sort);
+                let groups = TicketList::groups(
+                    &filtered,
+                    me,
+                    itop_kit::TicketListView::Mine,
+                    st.options.sort,
+                );
                 let sections: Vec<itop_kit::TicketSection> = menu_bar_status::GROUP_ORDER
                     .iter()
                     .filter_map(|g| groups.iter().find(|s| s.group == *g).cloned())
@@ -167,7 +193,9 @@ impl Workspace {
                     let pinned = menu_bar_status::pin_running(&sections, running_id.as_deref());
                     let rows: i64 = sections.iter().map(|s| s.tickets.len() as i64).sum();
                     let height = 420.min(
-                        (pinned.sections.len() as i64 + i64::from(pinned.running.is_some())) * 30 + rows * 48 + 6,
+                        (pinned.sections.len() as i64 + i64::from(pinned.running.is_some())) * 30
+                            + rows * 48
+                            + 6,
                     );
                     MenuContent::List {
                         running: pinned.running.as_ref().map(|t| self.menu_row(st, t)),
@@ -191,11 +219,16 @@ impl Workspace {
             query: query.clone(),
             content,
             refreshing: mine.refreshing,
-            updated_text: mine.updated_at.map(|at| format!("Updated {}", self.0.fmt.relative_named(at, now))),
+            updated_text: mine
+                .updated_at
+                .map(|at| format!("Updated {}", self.0.fmt.relative_named(at, now))),
         }
     }
 
-    pub(crate) async fn dispatch_menubar(&self, intent: MenuBarIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_menubar(
+        &self,
+        intent: MenuBarIntent,
+    ) -> Result<serde_json::Value, AppError> {
         let native = self.0.ctx.native.clone();
         match intent {
             MenuBarIntent::SetQuery { query } => {
@@ -205,9 +238,14 @@ impl Workspace {
             // `MenuBarPanelHost.openTicket` (MB-12): My tickets, its search cleared, the ticket
             // selected, the main window forward.
             MenuBarIntent::OpenTicket { ticket_id } => {
-                let known = self.lock().lists[0].tickets.iter().any(|t| t.id() == ticket_id);
+                let known = self.lock().lists[0]
+                    .tickets
+                    .iter()
+                    .any(|t| t.id() == ticket_id);
                 if !known {
-                    return Err(AppError::invalid_intent(format!("No ticket {ticket_id} in My tickets.")));
+                    return Err(AppError::invalid_intent(format!(
+                        "No ticket {ticket_id} in My tickets."
+                    )));
                 }
                 self.shell_select(SidebarItem::MyTickets).await;
                 self.set_query(super::records::ListScope::Mine, "");
@@ -224,7 +262,9 @@ impl Workspace {
             MenuBarIntent::NewTicket => {
                 native.hide_menubar_panel();
                 if let Some(s) = self.standalone().cloned() {
-                    s.new_tickets.request(NewTicketInstance::Window, NewTicketStart::default()).await;
+                    s.new_tickets
+                        .request(NewTicketInstance::Window, NewTicketStart::default())
+                        .await;
                 }
             }
             MenuBarIntent::Refresh => self.list_refresh(super::records::ListScope::Mine).await,

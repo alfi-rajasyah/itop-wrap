@@ -34,17 +34,25 @@ pub struct Fmt {
     pub log_locale: DateLocale,
 }
 
-const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
 impl Fmt {
     /// en_US in the Mac's time zone.
     pub fn local() -> Self {
-        Fmt { zone: Zone::Local, log_locale: DateLocale::EnUs }
+        Fmt {
+            zone: Zone::Local,
+            log_locale: DateLocale::EnUs,
+        }
     }
 
     /// en_US at UTC, for tests.
     pub fn utc() -> Self {
-        Fmt { zone: Zone::Fixed(Utc.fix()), log_locale: DateLocale::EnUs }
+        Fmt {
+            zone: Zone::Fixed(Utc.fix()),
+            log_locale: DateLocale::EnUs,
+        }
     }
 
     fn naive(&self, d: DateTime<Utc>) -> NaiveDateTime {
@@ -66,7 +74,11 @@ impl Fmt {
     pub fn time_short(&self, d: DateTime<Utc>) -> String {
         let n = self.naive(d);
         let (pm, hour) = n.hour12();
-        format!("{hour}:{:02}{AM_PM_SPACE}{}", n.minute(), if pm { "PM" } else { "AM" })
+        format!(
+            "{hour}:{:02}{AM_PM_SPACE}{}",
+            n.minute(),
+            if pm { "PM" } else { "AM" }
+        )
     }
 
     /// "Nov 16, 2026".
@@ -83,7 +95,11 @@ impl Fmt {
 
     /// `TimerModel.time(_:)`: the time alone when `d` is today, otherwise date and time (TMR-16).
     pub fn since(&self, d: DateTime<Utc>, now: DateTime<Utc>) -> String {
-        if self.naive(d).date() == self.naive(now).date() { self.time_short(d) } else { self.date_time(d) }
+        if self.naive(d).date() == self.naive(now).date() {
+            self.time_short(d)
+        } else {
+            self.date_time(d)
+        }
     }
 
     /// "now", "45 seconds ago", "2 minutes ago", "3 hours ago", "yesterday", "4 days ago",
@@ -100,13 +116,29 @@ impl Fmt {
         } else if s < 86_400 {
             (s / 3600, "hour", None)
         } else if s < 7 * 86_400 {
-            (s / 86_400, "day", Some(if past { "yesterday" } else { "tomorrow" }))
+            (
+                s / 86_400,
+                "day",
+                Some(if past { "yesterday" } else { "tomorrow" }),
+            )
         } else if s < 30 * 86_400 {
-            (s / (7 * 86_400), "week", Some(if past { "last week" } else { "next week" }))
+            (
+                s / (7 * 86_400),
+                "week",
+                Some(if past { "last week" } else { "next week" }),
+            )
         } else if s < 365 * 86_400 {
-            (s / (30 * 86_400), "month", Some(if past { "last month" } else { "next month" }))
+            (
+                s / (30 * 86_400),
+                "month",
+                Some(if past { "last month" } else { "next month" }),
+            )
         } else {
-            (s / (365 * 86_400), "year", Some(if past { "last year" } else { "next year" }))
+            (
+                s / (365 * 86_400),
+                "year",
+                Some(if past { "last year" } else { "next year" }),
+            )
         };
         if value == 0 {
             return "now".to_owned();
@@ -117,7 +149,11 @@ impl Fmt {
             return named.to_owned();
         }
         let plural = if value == 1 { "" } else { "s" };
-        if past { format!("{value} {unit}{plural} ago") } else { format!("in {value} {unit}{plural}") }
+        if past {
+            format!("{value} {unit}{plural} ago")
+        } else {
+            format!("in {value} {unit}{plural}")
+        }
     }
 }
 
@@ -128,7 +164,11 @@ pub fn byte_count(bytes: u64) -> String {
         return "Zero KB".to_owned();
     }
     if bytes < 1000 {
-        return if bytes == 1 { "1 byte".to_owned() } else { format!("{bytes} bytes") };
+        return if bytes == 1 {
+            "1 byte".to_owned()
+        } else {
+            format!("{bytes} bytes")
+        };
     }
     let units = [("KB", 0usize), ("MB", 1), ("GB", 2), ("TB", 2), ("PB", 2)];
     let mut value = bytes as f64 / 1000.0;
@@ -144,13 +184,19 @@ pub fn byte_count(bytes: u64) -> String {
     }
     let (unit, decimals) = units[i];
     let text = format!("{value:.decimals$}");
-    let text = if text.contains('.') { text.trim_end_matches('0').trim_end_matches('.').to_owned() } else { text };
+    let text = if text.contains('.') {
+        text.trim_end_matches('0').trim_end_matches('.').to_owned()
+    } else {
+        text
+    };
     format!("{} {unit}", group_thousands(&text))
 }
 
 /// "1234.5" → "1,234.5".
 fn group_thousands(number: &str) -> String {
-    let (int, frac) = number.split_once('.').map_or((number, None), |(a, b)| (a, Some(b)));
+    let (int, frac) = number
+        .split_once('.')
+        .map_or((number, None), |(a, b)| (a, Some(b)));
     let mut out = String::new();
     for (i, c) in int.chars().enumerate() {
         if i > 0 && (int.len() - i) % 3 == 0 {
@@ -171,7 +217,9 @@ mod tests {
     use chrono::TimeZone;
 
     fn at(y: i32, mo: u32, d: u32, h: u32, mi: u32) -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(y, mo, d, h, mi, 0).single().expect("valid date")
+        Utc.with_ymd_and_hms(y, mo, d, h, mi, 0)
+            .single()
+            .expect("valid date")
     }
 
     #[test]
@@ -180,7 +228,10 @@ mod tests {
         assert_eq!(f.time_short(at(2026, 11, 16, 9, 12)), "9:12\u{202F}AM");
         assert_eq!(f.time_short(at(2026, 11, 16, 0, 5)), "12:05\u{202F}AM");
         assert_eq!(f.time_short(at(2026, 11, 16, 13, 0)), "1:00\u{202F}PM");
-        assert_eq!(f.date_time(at(2026, 11, 16, 9, 12)), "Nov 16, 2026 at 9:12\u{202F}AM");
+        assert_eq!(
+            f.date_time(at(2026, 11, 16, 9, 12)),
+            "Nov 16, 2026 at 9:12\u{202F}AM"
+        );
     }
 
     #[test]
@@ -188,7 +239,10 @@ mod tests {
         let f = Fmt::utc();
         let now = at(2026, 11, 16, 15, 0);
         assert_eq!(f.since(at(2026, 11, 16, 10, 42), now), "10:42\u{202F}AM");
-        assert_eq!(f.since(at(2026, 11, 15, 10, 42), now), "Nov 15, 2026 at 10:42\u{202F}AM");
+        assert_eq!(
+            f.since(at(2026, 11, 15, 10, 42), now),
+            "Nov 15, 2026 at 10:42\u{202F}AM"
+        );
     }
 
     #[test]
@@ -196,12 +250,30 @@ mod tests {
         let f = Fmt::utc();
         let now = at(2026, 11, 16, 15, 0);
         assert_eq!(f.relative_named(now, now), "now");
-        assert_eq!(f.relative_named(now - chrono::Duration::seconds(45), now), "45 seconds ago");
-        assert_eq!(f.relative_named(now - chrono::Duration::seconds(60), now), "1 minute ago");
-        assert_eq!(f.relative_named(now - chrono::Duration::minutes(2), now), "2 minutes ago");
-        assert_eq!(f.relative_named(now - chrono::Duration::hours(3), now), "3 hours ago");
-        assert_eq!(f.relative_named(now - chrono::Duration::days(1), now), "yesterday");
-        assert_eq!(f.relative_named(now - chrono::Duration::days(4), now), "4 days ago");
+        assert_eq!(
+            f.relative_named(now - chrono::Duration::seconds(45), now),
+            "45 seconds ago"
+        );
+        assert_eq!(
+            f.relative_named(now - chrono::Duration::seconds(60), now),
+            "1 minute ago"
+        );
+        assert_eq!(
+            f.relative_named(now - chrono::Duration::minutes(2), now),
+            "2 minutes ago"
+        );
+        assert_eq!(
+            f.relative_named(now - chrono::Duration::hours(3), now),
+            "3 hours ago"
+        );
+        assert_eq!(
+            f.relative_named(now - chrono::Duration::days(1), now),
+            "yesterday"
+        );
+        assert_eq!(
+            f.relative_named(now - chrono::Duration::days(4), now),
+            "4 days ago"
+        );
     }
 
     #[test]

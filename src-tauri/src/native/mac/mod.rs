@@ -19,8 +19,8 @@ use serde_json::Value;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Rect, TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent, Wry,
+    AppHandle, LogicalPosition, LogicalSize, Manager, Rect, TitleBarStyle, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry,
 };
 
 use crate::native::{ConvertTo, ConvertedImage, Native};
@@ -42,7 +42,13 @@ const SHELL_DEFAULT: (f64, f64) = (1180.0, 760.0);
 /// New Ticket is 480 pt wide (W/NewTicketView.swift:141); the UI may fit the height to its content.
 const NEW_TICKET_SIZE: (f64, f64) = (480.0, 640.0);
 /// The sidebar items in order, for View ▸ ⌘1…⌘5 (W/SessionModel.swift:5-31).
-pub const SECTIONS: [&str; 5] = ["My tickets", "Team tickets", "Config items", "Organizations", "People"];
+pub const SECTIONS: [&str; 5] = [
+    "My tickets",
+    "Team tickets",
+    "Config items",
+    "Organizations",
+    "People",
+];
 
 /// What the main window looks like for a `session` snapshot type (contract.md §6, AUTH-1, AUTH-9).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,7 +85,9 @@ impl Layout {
 pub fn panel_origin(icon: (f64, f64, f64, f64), screen: (f64, f64, f64, f64)) -> (f64, f64) {
     let (ix, iy, iw, ih) = icon;
     let (sx, _, sw, _) = screen;
-    let x = (ix + iw / 2.0 - PANEL_WIDTH / 2.0).min(sx + sw - PANEL_WIDTH - 8.0).max(sx + 8.0);
+    let x = (ix + iw / 2.0 - PANEL_WIDTH / 2.0)
+        .min(sx + sw - PANEL_WIDTH - 8.0)
+        .max(sx + 8.0);
     (x, iy + ih + 4.0)
 }
 
@@ -107,7 +115,11 @@ pub struct Shell {
 
 impl Shell {
     pub fn new(app: AppHandle<Wry>) -> Arc<Self> {
-        Arc::new(Self { app, router: OnceLock::new(), state: Mutex::default() })
+        Arc::new(Self {
+            app,
+            router: OnceLock::new(),
+            state: Mutex::default(),
+        })
     }
 
     fn state(&self) -> MutexGuard<'_, State> {
@@ -150,20 +162,21 @@ impl Shell {
         main.on_window_event(move |event| shell.main_window_event(event));
         self.state().layout = Some(Layout::Small);
 
-        let panel = WebviewWindowBuilder::new(&self.app, MENUBAR, WebviewUrl::App("menubar.html".into()))
-            .title("iTop Wrap")
-            .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
-            .decorations(false)
-            .transparent(true)
-            .resizable(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .visible_on_all_workspaces(true)
-            .accept_first_mouse(true)
-            .disable_drag_drop_handler()
-            .focused(false)
-            .visible(false)
-            .build()?;
+        let panel =
+            WebviewWindowBuilder::new(&self.app, MENUBAR, WebviewUrl::App("menubar.html".into()))
+                .title("iTop Wrap")
+                .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
+                .decorations(false)
+                .transparent(true)
+                .resizable(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .visible_on_all_workspaces(true)
+                .accept_first_mouse(true)
+                .disable_drag_drop_handler()
+                .focused(false)
+                .visible(false)
+                .build()?;
         appkit::make_menubar_panel(mtm, &panel);
         let shell = self.clone();
         panel.on_window_event(move |event| shell.panel_window_event(event));
@@ -188,7 +201,9 @@ impl Shell {
     }
 
     fn main_window_event(&self, event: &WindowEvent) {
-        let WindowEvent::CloseRequested { api, .. } = event else { return };
+        let WindowEvent::CloseRequested { api, .. } = event else {
+            return;
+        };
         if self.state().signed_in {
             // SHELL-16: signed in, the menu bar keeps working with the window closed.
             api.prevent_close();
@@ -204,7 +219,10 @@ impl Shell {
     fn panel_window_event(&self, event: &WindowEvent) {
         match event {
             WindowEvent::Focused(false) => {
-                let visible = self.window(MENUBAR).and_then(|w| w.is_visible().ok()).unwrap_or(false);
+                let visible = self
+                    .window(MENUBAR)
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false);
                 if visible {
                     self.state().panel_hidden_at = Some(Instant::now());
                     self.hide_panel();
@@ -229,7 +247,9 @@ impl Shell {
 
     /// The `session` snapshot changed: size the main window for it (call from any thread).
     pub fn session_snapshot(self: &Arc<Self>, snapshot: &Value) {
-        let Some(layout) = Layout::for_session(snapshot) else { return };
+        let Some(layout) = Layout::for_session(snapshot) else {
+            return;
+        };
         let shell = self.clone();
         on_main_async(&self.app, move |mtm| shell.apply_layout(mtm, layout));
     }
@@ -288,15 +308,19 @@ impl Shell {
             appkit::activate(mtm);
             return;
         }
-        let built = WebviewWindowBuilder::new(&self.app, NEW_TICKET, WebviewUrl::App("index.html?window=new-ticket".into()))
-            .title("New Ticket")
-            .inner_size(NEW_TICKET_SIZE.0, NEW_TICKET_SIZE.1)
-            .resizable(false)
-            .maximizable(false)
-            .disable_drag_drop_handler()
-            .center()
-            .visible(true)
-            .build();
+        let built = WebviewWindowBuilder::new(
+            &self.app,
+            NEW_TICKET,
+            WebviewUrl::App("index.html?window=new-ticket".into()),
+        )
+        .title("New Ticket")
+        .inner_size(NEW_TICKET_SIZE.0, NEW_TICKET_SIZE.1)
+        .resizable(false)
+        .maximizable(false)
+        .disable_drag_drop_handler()
+        .center()
+        .visible(true)
+        .build();
         match built {
             Ok(w) => {
                 appkit::exclude_from_windows_menu(mtm, &w);
@@ -333,16 +357,23 @@ impl Shell {
     }
 
     fn toggle_panel(&self, icon: Rect) {
-        let Some(panel) = self.window(MENUBAR) else { return };
+        let Some(panel) = self.window(MENUBAR) else {
+            return;
+        };
         if panel.is_visible().unwrap_or(false) {
             self.hide_panel();
             return;
         }
-        let just_hidden = self.state().panel_hidden_at.is_some_and(|t| t.elapsed() < Duration::from_millis(300));
+        let just_hidden = self
+            .state()
+            .panel_hidden_at
+            .is_some_and(|t| t.elapsed() < Duration::from_millis(300));
         if just_hidden {
             return;
         }
-        let Some(mtm) = MainThreadMarker::new() else { return };
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
         if let Some((x, y)) = self.panel_position(icon) {
             self.state().panel_origin = Some((x, y));
             let _ = panel.set_position(LogicalPosition::new(x, y));
@@ -354,13 +385,21 @@ impl Shell {
 
     fn panel_position(&self, icon: Rect) -> Option<(f64, f64)> {
         let probe = icon.position.to_physical::<f64>(1.0);
-        let monitor = self.app.monitor_from_point(probe.x, probe.y).ok().flatten().or_else(|| self.app.primary_monitor().ok().flatten())?;
+        let monitor = self
+            .app
+            .monitor_from_point(probe.x, probe.y)
+            .ok()
+            .flatten()
+            .or_else(|| self.app.primary_monitor().ok().flatten())?;
         let scale = monitor.scale_factor();
         let p = icon.position.to_logical::<f64>(scale);
         let s = icon.size.to_logical::<f64>(scale);
         let mp = monitor.position().to_logical::<f64>(scale);
         let ms = monitor.size().to_logical::<f64>(scale);
-        Some(panel_origin((p.x, p.y, s.width, s.height), (mp.x, mp.y, ms.width, ms.height)))
+        Some(panel_origin(
+            (p.x, p.y, s.width, s.height),
+            (mp.x, mp.y, ms.width, ms.height),
+        ))
     }
 
     // MARK: menus (contract.md §6, KEY-1, KEY-2)
@@ -379,7 +418,9 @@ impl Shell {
 
     /// The app's menu handler (register once with `on_menu_event`).
     pub fn menu_event(self: &Arc<Self>, id: &str) {
-        let Some(mtm) = MainThreadMarker::new() else { return };
+        let Some(mtm) = MainThreadMarker::new() else {
+            return;
+        };
         let panel_key = self.panel_is_key();
         match id {
             "new-ticket" if panel_key => self.send(NativeEvent::PanelNewTicket),
@@ -393,7 +434,10 @@ impl Shell {
                 self.send(NativeEvent::MenuOpenMain);
             }
             other => {
-                if let Some(n) = other.strip_prefix("view-").and_then(|n| n.parse::<usize>().ok()) {
+                if let Some(n) = other
+                    .strip_prefix("view-")
+                    .and_then(|n| n.parse::<usize>().ok())
+                {
                     self.send(NativeEvent::MenuSelectSection(n));
                 }
             }
@@ -433,14 +477,22 @@ impl Shell {
         if self.state().tray.is_some() {
             return;
         }
-        let Some(icon) = self.tray_image() else { return };
+        let Some(icon) = self.tray_image() else {
+            return;
+        };
         let shell = self.clone();
         let built = TrayIconBuilder::with_id(TRAY_ID)
             .icon(icon)
             .icon_as_template(true)
             .show_menu_on_left_click(false)
             .on_tray_icon_event(move |_, event| {
-                if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Down, rect, .. } = event {
+                if let TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Down,
+                    rect,
+                    ..
+                } = event
+                {
                     shell.toggle_panel(rect);
                 }
             })
@@ -462,7 +514,11 @@ impl Shell {
             (t.to_owned(), v)
         };
         let r = tray_draw::label(&title, visible)?;
-        Some(tauri::image::Image::new_owned(r.rgba, r.width_px, r.height_px))
+        Some(tauri::image::Image::new_owned(
+            r.rgba,
+            r.width_px,
+            r.height_px,
+        ))
     }
 
     fn render_tray(&self) {
@@ -505,7 +561,16 @@ impl Shell {
             let old = std::mem::replace(&mut s.tray_title, title.clone());
             let label_changed = s.tray_label != label;
             s.tray_label = label;
-            let plan = if old != title { s.slide.begin(&old, &title, tray_draw::text_width, appkit::reduce_motion(mtm)) } else { None };
+            let plan = if old != title {
+                s.slide.begin(
+                    &old,
+                    &title,
+                    tray_draw::text_width,
+                    appkit::reduce_motion(mtm),
+                )
+            } else {
+                None
+            };
             drop(s);
             if label_changed {
                 self.apply_tray_label();
@@ -564,9 +629,21 @@ fn build_menu(app: &AppHandle<Wry>, signed_in: bool) -> tauri::Result<Menu<Wry>>
 
     let file = Submenu::new(app, "File", true)?;
     if signed_in {
-        file.append(&MenuItem::with_id(app, "new-ticket", "New Ticket…", true, Some("CmdOrCtrl+N"))?)?;
+        file.append(&MenuItem::with_id(
+            app,
+            "new-ticket",
+            "New Ticket…",
+            true,
+            Some("CmdOrCtrl+N"),
+        )?)?;
     }
-    file.append(&MenuItem::with_id(app, "open-main", "Open iTop Wrap", true, Some("CmdOrCtrl+O"))?)?;
+    file.append(&MenuItem::with_id(
+        app,
+        "open-main",
+        "Open iTop Wrap",
+        true,
+        Some("CmdOrCtrl+O"),
+    )?)?;
     file.append(&sep()?)?;
     file.append(&PredefinedMenuItem::close_window(app, None)?)?;
 
@@ -588,7 +665,13 @@ fn build_menu(app: &AppHandle<Wry>, signed_in: bool) -> tauri::Result<Menu<Wry>>
     let view = Submenu::new(app, "View", true)?;
     if signed_in {
         for (i, title) in SECTIONS.iter().enumerate() {
-            view.append(&MenuItem::with_id(app, format!("view-{i}"), *title, true, Some(format!("CmdOrCtrl+{}", i + 1).as_str()))?)?;
+            view.append(&MenuItem::with_id(
+                app,
+                format!("view-{i}"),
+                *title,
+                true,
+                Some(format!("CmdOrCtrl+{}", i + 1).as_str()),
+            )?)?;
         }
         view.append(&sep()?)?;
     }
@@ -598,7 +681,12 @@ fn build_menu(app: &AppHandle<Wry>, signed_in: bool) -> tauri::Result<Menu<Wry>>
         app,
         "Window",
         true,
-        &[&PredefinedMenuItem::minimize(app, None)?, &PredefinedMenuItem::maximize(app, None)?, &sep()?, &PredefinedMenuItem::bring_all_to_front(app, None)?],
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::maximize(app, None)?,
+            &sep()?,
+            &PredefinedMenuItem::bring_all_to_front(app, None)?,
+        ],
     )?;
     window.set_as_windows_menu_for_nsapp()?;
     let help = Submenu::new(app, "Help", true)?;
@@ -687,11 +775,14 @@ impl Native for MacNative {
     }
 
     fn new_ticket_assign_to_me(&self) -> bool {
-        self.standard.bool(crate::prefs::keys::NEW_TICKET_ASSIGN_TO_ME).unwrap_or(true)
+        self.standard
+            .bool(crate::prefs::keys::NEW_TICKET_ASSIGN_TO_ME)
+            .unwrap_or(true)
     }
 
     fn set_new_ticket_assign_to_me(&self, on: bool) {
-        self.standard.set_bool(crate::prefs::keys::NEW_TICKET_ASSIGN_TO_ME, on);
+        self.standard
+            .set_bool(crate::prefs::keys::NEW_TICKET_ASSIGN_TO_ME, on);
     }
 }
 
@@ -702,10 +793,22 @@ mod tests {
 
     #[test]
     fn layouts_follow_the_session() {
-        assert_eq!(Layout::for_session(&json!({"type": "restoring"})), Some(Layout::Small));
-        assert_eq!(Layout::for_session(&json!({"type": "unreachable", "message": "x"})), Some(Layout::Small));
-        assert_eq!(Layout::for_session(&json!({"type": "signedOut", "form": {}})), Some(Layout::SignIn));
-        assert_eq!(Layout::for_session(&json!({"type": "signedIn"})), Some(Layout::Shell));
+        assert_eq!(
+            Layout::for_session(&json!({"type": "restoring"})),
+            Some(Layout::Small)
+        );
+        assert_eq!(
+            Layout::for_session(&json!({"type": "unreachable", "message": "x"})),
+            Some(Layout::Small)
+        );
+        assert_eq!(
+            Layout::for_session(&json!({"type": "signedOut", "form": {}})),
+            Some(Layout::SignIn)
+        );
+        assert_eq!(
+            Layout::for_session(&json!({"type": "signedIn"})),
+            Some(Layout::Shell)
+        );
         assert_eq!(Layout::for_session(&Value::Null), None);
         assert_eq!(Layout::Small.fixed_size(), Some((480.0, 320.0)));
         assert_eq!(Layout::SignIn.fixed_size(), Some((480.0, 520.0)));
@@ -714,8 +817,14 @@ mod tests {
     #[test]
     fn panel_sits_under_the_icon_inside_the_screen() {
         let screen = (0.0, 0.0, 1512.0, 982.0);
-        assert_eq!(panel_origin((1000.0, 0.0, 40.0, 24.0), screen), (840.0, 28.0));
-        assert_eq!(panel_origin((1490.0, 0.0, 22.0, 24.0), screen), (1512.0 - 360.0 - 8.0, 28.0));
+        assert_eq!(
+            panel_origin((1000.0, 0.0, 40.0, 24.0), screen),
+            (840.0, 28.0)
+        );
+        assert_eq!(
+            panel_origin((1490.0, 0.0, 22.0, 24.0), screen),
+            (1512.0 - 360.0 - 8.0, 28.0)
+        );
         assert_eq!(panel_origin((2.0, 0.0, 22.0, 24.0), screen), (8.0, 28.0));
     }
 }

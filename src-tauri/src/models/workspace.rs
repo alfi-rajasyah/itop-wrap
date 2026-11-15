@@ -14,22 +14,23 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use itop_kit::{
-    CurrentUser, ITopError, InlineImageError, InlineImageLoader, MenuBarStatus, ServiceCatalog, TeamDirectory,
-    Ticket as KitTicket, TicketScope, TicketService, TicketWrites, TimeTracking, TimerStore, WriteError,
+    CurrentUser, ITopError, InlineImageError, InlineImageLoader, MenuBarStatus, ServiceCatalog,
+    TeamDirectory, Ticket as KitTicket, TicketScope, TicketService, TicketWrites, TimeTracking,
+    TimerStore, WriteError,
 };
 use tokio::task::AbortHandle;
 
+use super::cmdb::CmdbModel;
 use super::detail::DetailState;
 use super::format::Fmt;
 use super::list::ListState;
 use super::menubar::MenuState;
-use super::options::OptionsState;
-use super::prefs::Prefs;
-use super::records::{ListScope, SidebarItem};
-use super::cmdb::CmdbModel;
 use super::new_ticket::NewTickets;
+use super::options::OptionsState;
 use super::orgs::OrgsModel;
 use super::people::PeopleModel;
+use super::prefs::Prefs;
+use super::records::{ListScope, SidebarItem};
 use super::seams::{ModelContext, WorkspaceLink};
 use super::sheets::{AssignState, PendingState, ResolveState};
 use super::shell::ShellState;
@@ -139,22 +140,24 @@ pub const WORKSPACE_MODEL_IDS: [&str; 19] = [
 
 impl Workspace {
     /// Swift `Workspace.init(session:)`. Call [`Workspace::start`] to begin the loops.
-    pub fn new(
-        ctx: ModelContext,
-        fmt: Fmt,
-        prefs: Arc<dyn Prefs>,
-        trace: bool,
-    ) -> Workspace {
+    pub fn new(ctx: ModelContext, fmt: Fmt, prefs: Arc<dyn Prefs>, trace: bool) -> Workspace {
         let client = ctx.session.client.clone();
         let host = client.server.host();
-        let host = if host.is_empty() { "the server".to_owned() } else { host.to_owned() };
+        let host = if host.is_empty() {
+            "the server".to_owned()
+        } else {
+            host.to_owned()
+        };
         let settings: Arc<dyn itop_kit::SettingsStore> = prefs.clone();
         let timer_store = TimerStore::new(settings);
         let now = ctx.native.now();
         let state = State {
             options: OptionsState::load(prefs.as_ref()),
             shell: ShellState::default(),
-            lists: [ListState::new(ListScope::Mine), ListState::new(ListScope::Team)],
+            lists: [
+                ListState::new(ListScope::Mine),
+                ListState::new(ListScope::Team),
+            ],
             details: Default::default(),
             assign: Default::default(),
             pending: Default::default(),
@@ -223,13 +226,21 @@ impl Workspace {
 
     /// `client.canWrite(className:key:)` for a ticket.
     pub(crate) fn can_write(&self, t: &KitTicket) -> bool {
-        self.0.ctx.session.client.can_write(t.ticket_class.raw_value(), &t.key)
+        self.0
+            .ctx
+            .session
+            .client
+            .can_write(t.ticket_class.raw_value(), &t.key)
     }
 
     /// Debug builds with `ITOPWRAP_TRACE=1`: one line per UI event (Swift `UITrace.log`).
     pub(crate) fn trace(&self, event: impl FnOnce() -> String) {
         if cfg!(debug_assertions) && self.0.trace {
-            eprintln!("{} [UI] {}", self.now().format("%Y-%m-%d %H:%M:%S%.3f"), event());
+            eprintln!(
+                "{} [UI] {}",
+                self.now().format("%Y-%m-%d %H:%M:%S%.3f"),
+                event()
+            );
         }
     }
 
@@ -246,7 +257,10 @@ impl Workspace {
     /// message otherwise (ERR-1).
     pub(crate) fn describe(&self, e: &ITopError) -> String {
         match e {
-            ITopError::Transport(_) => format!("Can't reach {}. Check your connection, then retry.", self.0.host),
+            ITopError::Transport(_) => format!(
+                "Can't reach {}. Check your connection, then retry.",
+                self.0.host
+            ),
             other => other.to_string(),
         }
     }
@@ -408,7 +422,10 @@ impl Workspace {
         let now = self.now();
         let (timer, menubar) = {
             let st = self.lock();
-            (self.timer_snapshot(&st, now), self.menubar_snapshot(&st, now))
+            (
+                self.timer_snapshot(&st, now),
+                self.menubar_snapshot(&st, now),
+            )
         };
         self.0.ctx.hub.publish("timer", &timer);
         self.0.ctx.hub.publish("menubar", &menubar);
@@ -417,7 +434,8 @@ impl Workspace {
 
     /// The tray title and label, from `Workspace.clock` like Swift's `MenuBarLabel`.
     pub(crate) fn tray_status(&self, st: &State) -> (String, String) {
-        let status = MenuBarStatus::new(st.lists[0].need_count(self.me()), st.timer.running.clone());
+        let status =
+            MenuBarStatus::new(st.lists[0].need_count(self.me()), st.timer.running.clone());
         (status.title(st.clock), status.accessibility_label(st.clock))
     }
 
@@ -486,7 +504,9 @@ impl WeakLink {
 #[async_trait::async_trait]
 impl WorkspaceLink for WeakLink {
     fn scope(&self) -> TicketScope {
-        self.ws().map(|ws| ws.lock().options.scope()).unwrap_or_default()
+        self.ws()
+            .map(|ws| ws.lock().options.scope())
+            .unwrap_or_default()
     }
 
     async fn open_ticket(&self, ticket: KitTicket) {

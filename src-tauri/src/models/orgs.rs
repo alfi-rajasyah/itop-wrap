@@ -115,17 +115,22 @@ impl State {
     /// `selected`: the chosen org, once the list has it.
     fn selected(&self) -> Option<&Organization> {
         let all = self.orgs.value()?;
-        all.iter().find(|o| Some(&o.id) == self.selected_id.as_ref())
+        all.iter()
+            .find(|o| Some(&o.id) == self.selected_id.as_ref())
     }
 
     /// `visible`: filtered locally on "<name> <code>" (ORG-3).
     fn visible_orgs(&self) -> Vec<&Organization> {
-        let Some(all) = self.orgs.value() else { return Vec::new() };
+        let Some(all) = self.orgs.value() else {
+            return Vec::new();
+        };
         let q = trim_whitespaces(&self.query).to_lowercase();
         if q.is_empty() {
             return all.iter().collect();
         }
-        all.iter().filter(|o| format!("{} {}", o.name, o.code).to_lowercase().contains(&q)).collect()
+        all.iter()
+            .filter(|o| format!("{} {}", o.name, o.code).to_lowercase().contains(&q))
+            .collect()
     }
 }
 
@@ -178,7 +183,10 @@ impl OrgsModel {
     /// The model stopped existing (sign-out).
     pub fn clear(&self) {
         let mut st = self.lock();
-        for h in [st.list_task.take(), st.detail_task.take()].into_iter().flatten() {
+        for h in [st.list_task.take(), st.detail_task.take()]
+            .into_iter()
+            .flatten()
+        {
             h.abort();
         }
         drop(st);
@@ -207,7 +215,10 @@ impl OrgsModel {
         st.shown_id = None;
         st.list_generation += 1;
         st.detail_generation += 1;
-        for h in [st.list_task.take(), st.detail_task.take()].into_iter().flatten() {
+        for h in [st.list_task.take(), st.detail_task.take()]
+            .into_iter()
+            .flatten()
+        {
             h.abort();
         }
         drop(st);
@@ -312,7 +323,9 @@ impl OrgsModel {
         let handle = tokio::spawn(async move {
             let Some(model) = me.upgrade() else { return };
             let host = text::host(&model.ctx.session);
-            let answer = OrgService::new(model.ctx.session.client.clone()).organizations().await;
+            let answer = OrgService::new(model.ctx.session.client.clone())
+                .organizations()
+                .await;
             let scope = model.link.scope();
             {
                 let mut st = model.lock();
@@ -417,7 +430,9 @@ impl OrgsModel {
     fn list_view(st: &State) -> OrgList {
         match &st.orgs {
             Loadable::Idle | Loadable::Loading => OrgList::Loading,
-            Loadable::Failed(e) => OrgList::Failed { text: format!("Couldn't load organizations. {e}") },
+            Loadable::Failed(e) => OrgList::Failed {
+                text: format!("Couldn't load organizations. {e}"),
+            },
             Loadable::Loaded(_) => {
                 let orgs = st.visible_orgs();
                 if orgs.is_empty() {
@@ -425,14 +440,22 @@ impl OrgsModel {
                         text: if st.query.is_empty() {
                             "Your iTop account can't see any organizations.".to_owned()
                         } else {
-                            format!("No organization matches \u{201C}{}\u{201D}.", trim_whitespaces(&st.query))
+                            format!(
+                                "No organization matches \u{201C}{}\u{201D}.",
+                                trim_whitespaces(&st.query)
+                            )
                         },
                     }
                 } else {
                     OrgList::Loaded {
                         orgs: orgs
                             .into_iter()
-                            .map(|o| OrgRow { id: o.id.clone(), name: o.name.clone(), code: o.code.clone(), open_count: o.open_count as i32 })
+                            .map(|o| OrgRow {
+                                id: o.id.clone(),
+                                name: o.name.clone(),
+                                code: o.code.clone(),
+                                open_count: o.open_count as i32,
+                            })
                             .collect(),
                     }
                 }
@@ -442,8 +465,13 @@ impl OrgsModel {
 
     fn detail_view(&self, st: &State, org: &Organization) -> OrgDetailView {
         let tickets = match &st.tickets {
-            Loadable::Idle | Loadable::Loading => TableState::Loading { text: format!("Loading {}'s tickets", org.name) },
-            Loadable::Failed(e) => TableState::Failed { text: format!("Couldn't load the tickets. {e}"), can_retry: true },
+            Loadable::Idle | Loadable::Loading => TableState::Loading {
+                text: format!("Loading {}'s tickets", org.name),
+            },
+            Loadable::Failed(e) => TableState::Failed {
+                text: format!("Couldn't load the tickets. {e}"),
+                can_retry: true,
+            },
             Loadable::Loaded(t) if t.is_empty() => TableState::Empty {
                 text: if st.scope == TicketScope::OPEN {
                     format!("{} has no open tickets.", org.name)
@@ -451,18 +479,32 @@ impl OrgsModel {
                     format!("{} has no tickets in this range.", org.name)
                 },
             },
-            Loadable::Loaded(t) => {
-                TableState::Loaded { table: table::table(t, &self.ctx.session.user, LastColumn::Assignee, &st.table) }
-            }
+            Loadable::Loaded(t) => TableState::Loaded {
+                table: table::table(t, &self.ctx.session.user, LastColumn::Assignee, &st.table),
+            },
         };
         OrgDetailView {
             id: org.id.clone(),
             name: org.name.clone(),
             code: org.code.clone(),
-            header_line: if org.code.is_empty() { "Organization".to_owned() } else { format!("Organization · {}", org.code) },
-            people_label: st.counts.map_or_else(|| "People".to_owned(), |c| format!("People {}", c.people)),
-            config_items_label: st.counts.map_or_else(|| "Config items".to_owned(), |c| format!("Config items {}", c.config_items)),
-            tickets_heading: if st.scope.include_closed { "Tickets" } else { "Open tickets" }.to_owned(),
+            header_line: if org.code.is_empty() {
+                "Organization".to_owned()
+            } else {
+                format!("Organization · {}", org.code)
+            },
+            people_label: st
+                .counts
+                .map_or_else(|| "People".to_owned(), |c| format!("People {}", c.people)),
+            config_items_label: st.counts.map_or_else(
+                || "Config items".to_owned(),
+                |c| format!("Config items {}", c.config_items),
+            ),
+            tickets_heading: if st.scope.include_closed {
+                "Tickets"
+            } else {
+                "Open tickets"
+            }
+            .to_owned(),
             tickets,
         }
     }
@@ -474,7 +516,8 @@ impl Model for OrgsModel {
         if model_id != MODEL_ID {
             return Err(AppError::unknown_model(model_id));
         }
-        let intent: OrgsIntent = serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
+        let intent: OrgsIntent =
+            serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
         match intent {
             OrgsIntent::SetQuery { query } => self.set_query(query),
             OrgsIntent::Select { id } => self.select(id),

@@ -52,7 +52,9 @@ impl SettingsStore for MemoryPrefs {
 
     fn set_string(&self, key: &str, value: Option<&str>) {
         match value {
-            Some(v) => self.lock().insert(key.to_owned(), Value::Text(v.to_owned())),
+            Some(v) => self
+                .lock()
+                .insert(key.to_owned(), Value::Text(v.to_owned())),
             None => self.lock().remove(key),
         };
     }

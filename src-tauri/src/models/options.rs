@@ -45,17 +45,31 @@ impl OptionsState {
         OptionsState {
             range: if RANGES.contains(&range) { range } else { 0 },
             include_closed: prefs.bool(INCLUDE_CLOSED_KEY).unwrap_or(false),
-            sort: KitSort::from_raw(&prefs.string(SORT_KEY).unwrap_or_default()).unwrap_or(KitSort::Priority),
-            page_size: if page_size == 0 { None } else { Some(page_size) },
+            sort: KitSort::from_raw(&prefs.string(SORT_KEY).unwrap_or_default())
+                .unwrap_or(KitSort::Priority),
+            page_size: if page_size == 0 {
+                None
+            } else {
+                Some(page_size)
+            },
         }
     }
 
     pub fn scope(&self) -> TicketScope {
-        TicketScope::new(self.include_closed, if self.range == 0 { None } else { Some(self.range) })
+        TicketScope::new(
+            self.include_closed,
+            if self.range == 0 {
+                None
+            } else {
+                Some(self.range)
+            },
+        )
     }
 
     pub fn is_default(&self) -> bool {
-        self.scope() == TicketScope::OPEN && self.sort == KitSort::Priority && self.page_size == DEFAULT_PAGE_SIZE
+        self.scope() == TicketScope::OPEN
+            && self.sort == KitSort::Priority
+            && self.page_size == DEFAULT_PAGE_SIZE
     }
 
     /// "Open tickets", "Open, last 30 days", "All tickets, any time", "All, last 30 days".
@@ -78,9 +92,16 @@ impl OptionsState {
             parts.push(self.sort.title().to_owned());
         }
         if self.page_size != DEFAULT_PAGE_SIZE {
-            parts.push(self.page_size.map_or_else(|| "All on one page".to_owned(), |n| format!("{n} per page")));
+            parts.push(
+                self.page_size
+                    .map_or_else(|| "All on one page".to_owned(), |n| format!("{n} per page")),
+            );
         }
-        if parts.is_empty() { None } else { Some(parts.join(" · ")) }
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join(" · "))
+        }
     }
 
     pub fn snapshot(&self) -> OptionsSnapshot {
@@ -91,16 +112,29 @@ impl OptionsState {
             sort: self.sort.into(),
             page_size: self.page_size,
             is_default: self.is_default(),
-            help: summary.clone().unwrap_or_else(|| "Open tickets, sorted by priority, 20 per page".to_owned()),
-            accessibility_label: format!("View options: {}", summary.as_deref().unwrap_or("default")),
+            help: summary
+                .clone()
+                .unwrap_or_else(|| "Open tickets, sorted by priority, 20 per page".to_owned()),
+            accessibility_label: format!(
+                "View options: {}",
+                summary.as_deref().unwrap_or("default")
+            ),
             summary,
             range_choices: RANGES
                 .iter()
-                .map(|&r| Choice { value: r, title: range_title(r).to_owned(), selected: r == self.range })
+                .map(|&r| Choice {
+                    value: r,
+                    title: range_title(r).to_owned(),
+                    selected: r == self.range,
+                })
                 .collect(),
             sort_choices: KitSort::ALL
                 .iter()
-                .map(|&s| Choice { value: s.into(), title: s.title().to_owned(), selected: s == self.sort })
+                .map(|&s| Choice {
+                    value: s.into(),
+                    title: s.title().to_owned(),
+                    selected: s == self.sort,
+                })
                 .collect(),
             page_size_choices: PAGE_SIZES
                 .iter()
@@ -174,21 +208,30 @@ pub enum OptionsIntent {
 }
 
 impl Workspace {
-    pub(crate) async fn dispatch_options(&self, intent: OptionsIntent) -> Result<serde_json::Value, crate::error::AppError> {
+    pub(crate) async fn dispatch_options(
+        &self,
+        intent: OptionsIntent,
+    ) -> Result<serde_json::Value, crate::error::AppError> {
         let before = self.lock().options.clone();
         let mut after = before.clone();
         match intent {
             OptionsIntent::SetRange { range } => {
                 if !RANGES.contains(&range) {
-                    return Err(crate::error::AppError::invalid_intent(format!("No range of {range} days.")));
+                    return Err(crate::error::AppError::invalid_intent(format!(
+                        "No range of {range} days."
+                    )));
                 }
                 after.range = range;
             }
-            OptionsIntent::SetIncludeClosed { include_closed } => after.include_closed = include_closed,
+            OptionsIntent::SetIncludeClosed { include_closed } => {
+                after.include_closed = include_closed
+            }
             OptionsIntent::SetSort { sort } => after.sort = sort.into(),
             OptionsIntent::SetPageSize { page_size } => {
                 if matches!(page_size, Some(n) if n <= 0) {
-                    return Err(crate::error::AppError::invalid_intent("A page size must be above zero."));
+                    return Err(crate::error::AppError::invalid_intent(
+                        "A page size must be above zero.",
+                    ));
                 }
                 after.page_size = page_size;
             }
@@ -210,7 +253,8 @@ impl Workspace {
         after.save(self.0.prefs.as_ref());
         let (sort, page_size) = (after.sort, after.page_size);
         let scope_changed = before.scope() != after.scope();
-        let page_reset = scope_changed || before.sort != after.sort || before.page_size != after.page_size;
+        let page_reset =
+            scope_changed || before.sort != after.sort || before.page_size != after.page_size;
         let shown = {
             let mut st = self.lock();
             st.options = after;
@@ -253,7 +297,15 @@ mod tests {
     fn pers_3_to_6_defaults_and_unknown_values() {
         let prefs = MemoryPrefs::new();
         let o = OptionsState::load(&prefs);
-        assert_eq!(o, OptionsState { range: 0, include_closed: false, sort: KitSort::Priority, page_size: Some(20) });
+        assert_eq!(
+            o,
+            OptionsState {
+                range: 0,
+                include_closed: false,
+                sort: KitSort::Priority,
+                page_size: Some(20)
+            }
+        );
         prefs.set_int(RANGE_KEY, 14);
         prefs.set_string(SORT_KEY, Some("bogus"));
         prefs.set_int(PAGE_SIZE_KEY, 0);
@@ -267,13 +319,23 @@ mod tests {
         prefs.set_int(PAGE_SIZE_KEY, 50);
         assert_eq!(
             OptionsState::load(&prefs),
-            OptionsState { range: 30, include_closed: true, sort: KitSort::LastUpdate, page_size: Some(50) }
+            OptionsState {
+                range: 30,
+                include_closed: true,
+                sort: KitSort::LastUpdate,
+                page_size: Some(50)
+            }
         );
     }
 
     #[test]
     fn list_41_default_view() {
-        let o = OptionsState { range: 0, include_closed: false, sort: KitSort::Priority, page_size: Some(20) };
+        let o = OptionsState {
+            range: 0,
+            include_closed: false,
+            sort: KitSort::Priority,
+            page_size: Some(20),
+        };
         assert!(o.is_default());
         assert_eq!(o.summary(), None);
         let s = o.snapshot();
@@ -283,22 +345,60 @@ mod tests {
 
     #[test]
     fn list_42_summary_parts() {
-        let o = OptionsState { range: 0, include_closed: true, sort: KitSort::LastUpdate, page_size: Some(50) };
-        assert_eq!(o.summary().as_deref(), Some("All tickets, any time · Last update, newest first · 50 per page"));
-        let o = OptionsState { range: 30, include_closed: false, sort: KitSort::Priority, page_size: None };
-        assert_eq!(o.summary().as_deref(), Some("Open, last 30 days · All on one page"));
-        let o = OptionsState { range: 7, include_closed: true, sort: KitSort::Priority, page_size: Some(20) };
+        let o = OptionsState {
+            range: 0,
+            include_closed: true,
+            sort: KitSort::LastUpdate,
+            page_size: Some(50),
+        };
+        assert_eq!(
+            o.summary().as_deref(),
+            Some("All tickets, any time · Last update, newest first · 50 per page")
+        );
+        let o = OptionsState {
+            range: 30,
+            include_closed: false,
+            sort: KitSort::Priority,
+            page_size: None,
+        };
+        assert_eq!(
+            o.summary().as_deref(),
+            Some("Open, last 30 days · All on one page")
+        );
+        let o = OptionsState {
+            range: 7,
+            include_closed: true,
+            sort: KitSort::Priority,
+            page_size: Some(20),
+        };
         assert_eq!(o.summary().as_deref(), Some("All, last 7 days"));
-        assert_eq!(o.snapshot().accessibility_label, "View options: All, last 7 days");
+        assert_eq!(
+            o.snapshot().accessibility_label,
+            "View options: All, last 7 days"
+        );
     }
 
     #[test]
     fn list_40_choices() {
-        let o = OptionsState { range: 7, include_closed: false, sort: KitSort::Newest, page_size: None };
+        let o = OptionsState {
+            range: 7,
+            include_closed: false,
+            sort: KitSort::Newest,
+            page_size: None,
+        };
         let v = serde_json::to_value(o.snapshot()).unwrap_or_default();
-        assert_eq!(v["rangeChoices"][1], serde_json::json!({"value":7,"title":"Last 7 days","selected":true}));
-        assert_eq!(v["sortChoices"][2], serde_json::json!({"value":"newest","title":"Opened, newest first","selected":true}));
-        assert_eq!(v["pageSizeChoices"][5], serde_json::json!({"value":null,"title":"All","selected":true}));
+        assert_eq!(
+            v["rangeChoices"][1],
+            serde_json::json!({"value":7,"title":"Last 7 days","selected":true})
+        );
+        assert_eq!(
+            v["sortChoices"][2],
+            serde_json::json!({"value":"newest","title":"Opened, newest first","selected":true})
+        );
+        assert_eq!(
+            v["pageSizeChoices"][5],
+            serde_json::json!({"value":null,"title":"All","selected":true})
+        );
         assert_eq!(v["pageSizeChoices"][0]["title"], "10 per page");
         assert_eq!(v["pageSize"], serde_json::Value::Null);
         assert_eq!(v["range"], 7);

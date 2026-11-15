@@ -29,7 +29,10 @@ impl RecordingSink {
 }
 impl SnapshotSink for RecordingSink {
     fn emit(&self, model: &str, snapshot: &Value) {
-        self.0.lock().unwrap_or_else(|e| e.into_inner()).push((model.to_owned(), snapshot.clone()));
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push((model.to_owned(), snapshot.clone()));
     }
 }
 
@@ -41,7 +44,10 @@ pub struct Hub {
 
 impl Hub {
     pub fn new(sink: Arc<dyn SnapshotSink>) -> Self {
-        Self { sink, latest: Arc::default() }
+        Self {
+            sink,
+            latest: Arc::default(),
+        }
     }
 
     /// Stores and emits `snapshot` for `model`. An unchanged snapshot is not emitted again, so
@@ -66,7 +72,12 @@ impl Hub {
 
     /// The model stopped existing (sign-out): its snapshot becomes `null`.
     pub fn clear(&self, model: &str) {
-        let had = self.latest.lock().unwrap_or_else(|e| e.into_inner()).remove(model).is_some();
+        let had = self
+            .latest
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(model)
+            .is_some();
         if had {
             self.sink.emit(model, &Value::Null);
         }
@@ -74,11 +85,21 @@ impl Hub {
 
     /// Every model id that currently has a snapshot.
     pub fn models(&self) -> Vec<String> {
-        self.latest.lock().unwrap_or_else(|e| e.into_inner()).keys().cloned().collect()
+        self.latest
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// The latest snapshot, or `null` when the model doesn't exist.
     pub fn get(&self, model: &str) -> Value {
-        self.latest.lock().unwrap_or_else(|e| e.into_inner()).get(model).cloned().unwrap_or(Value::Null)
+        self.latest
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(model)
+            .cloned()
+            .unwrap_or(Value::Null)
     }
 }

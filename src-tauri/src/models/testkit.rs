@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, TimeZone, Utc};
 use itop_kit::stub::{RecordedRequest, StubReply, StubServer};
-use itop_kit::{Credentials, CurrentUser, ITopClient, ServerAddress, Session, Team, Ticket, TicketClass};
+use itop_kit::{
+    Credentials, CurrentUser, ITopClient, ServerAddress, Session, Team, Ticket, TicketClass,
+};
 use serde_json::{Value, json};
 
 use super::format::Fmt;
@@ -17,7 +19,9 @@ use crate::hub::{Hub, RecordingSink};
 use crate::native::fake::FakeNative;
 
 pub fn now() -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(2026, 11, 16, 15, 0, 0).single().unwrap_or_default()
+    Utc.with_ymd_and_hms(2026, 11, 16, 15, 0, 0)
+        .single()
+        .unwrap_or_default()
 }
 
 pub fn me() -> CurrentUser {
@@ -44,9 +48,19 @@ pub fn ticket(key: &str, status: &str, agent: &str) -> Ticket {
         org_name: "Org A".into(),
         org_id: "4".into(),
         team_id: if agent == "0" { "0".into() } else { "3".into() },
-        team_name: if agent == "0" { String::new() } else { "Service desk".into() },
+        team_name: if agent == "0" {
+            String::new()
+        } else {
+            "Service desk".into()
+        },
         agent_id: agent.into(),
-        agent_name: if agent == "0" { String::new() } else if agent == "7" { "Agent Seven".into() } else { format!("Agent {agent}") },
+        agent_name: if agent == "0" {
+            String::new()
+        } else if agent == "7" {
+            "Agent Seven".into()
+        } else {
+            format!("Agent {agent}")
+        },
         start_date: None,
         last_update: None,
     }
@@ -62,7 +76,10 @@ fn ticket_object(t: &Ticket) -> (String, Value) {
         "last_update": t.last_update.map(|d| d.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M:%S").to_string()).unwrap_or_default(),
     });
     let cls = t.ticket_class.raw_value();
-    (format!("{cls}::{}", t.key), json!({"code": 0, "message": "", "class": cls, "key": t.key, "fields": fields}))
+    (
+        format!("{cls}::{}", t.key),
+        json!({"code": 0, "message": "", "class": cls, "key": t.key, "fields": fields}),
+    )
 }
 
 pub fn objects(list: Vec<(String, Value)>) -> Value {
@@ -73,7 +90,10 @@ pub fn objects(list: Vec<(String, Value)>) -> Value {
 
 /// One canned object of a class.
 pub fn object(class: &str, key: &str, fields: Value) -> (String, Value) {
-    (format!("{class}::{key}"), json!({"code": 0, "message": "", "class": class, "key": key, "fields": fields}))
+    (
+        format!("{class}::{key}"),
+        json!({"code": 0, "message": "", "class": class, "key": key, "fields": fields}),
+    )
 }
 
 pub type ListedFn = Box<dyn Fn(&Ticket, bool) -> bool + Send + Sync>;
@@ -101,7 +121,12 @@ pub struct FakeITop {
 impl Default for FakeITop {
     fn default() -> Self {
         let mine_listed: ListedFn = Box::new(|t: &Ticket, mine: bool| {
-            if mine { t.agent_id == "7" || (t.status == "escalated_tto" && t.agent_id == "0" && t.team_id == "3") } else { t.team_id == "3" }
+            if mine {
+                t.agent_id == "7"
+                    || (t.status == "escalated_tto" && t.agent_id == "0" && t.team_id == "3")
+            } else {
+                t.team_id == "3"
+            }
         });
         FakeITop {
             tickets: Mutex::default(),
@@ -152,7 +177,10 @@ impl FakeITop {
         let data = r.json_data();
         let op = data["operation"].as_str().unwrap_or("");
         let class = data["class"].as_str().unwrap_or("");
-        let key = data["key"].as_str().map(str::to_owned).unwrap_or_else(|| data["key"].to_string());
+        let key = data["key"]
+            .as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(|| data["key"].to_string());
         let reply = |v: Value| StubReply::json(&v.to_string());
         match op {
             "core/check_credentials" => {
@@ -164,26 +192,47 @@ impl FakeITop {
                 "1",
                 json!({"login": "agent", "contactid": 7, "first_name": "Agent", "last_name": "Seven", "profile_list": []}),
             )])),
-            "core/get" if class == "Person" && key.starts_with("SELECT Person WHERE id =") => reply(objects(vec![object(
-                "Person",
-                "7",
-                json!({"name": "Seven", "first_name": "Agent", "team_list": [{"team_id": 3, "team_name": "Service desk"}]}),
-            )])),
+            "core/get" if class == "Person" && key.starts_with("SELECT Person WHERE id =") => {
+                reply(objects(vec![object(
+                    "Person",
+                    "7",
+                    json!({"name": "Seven", "first_name": "Agent", "team_list": [{"team_id": 3, "team_name": "Service desk"}]}),
+                )]))
+            }
             "core/get" if class == "UserRequest" || class == "Incident" => {
                 let tickets = lock(&self.tickets).clone();
-                let of_class: Vec<&Ticket> = tickets.iter().filter(|t| t.ticket_class.raw_value() == class).collect();
+                let of_class: Vec<&Ticket> = tickets
+                    .iter()
+                    .filter(|t| t.ticket_class.raw_value() == class)
+                    .collect();
                 if let Some(rest) = key.split("ref = '").nth(1) {
                     let r = rest.trim_end_matches('\'');
-                    return reply(objects(of_class.iter().filter(|t| t.r#ref == r).map(|t| ticket_object(t)).collect()));
+                    return reply(objects(
+                        of_class
+                            .iter()
+                            .filter(|t| t.r#ref == r)
+                            .map(|t| ticket_object(t))
+                            .collect(),
+                    ));
                 }
                 if let Some(id) = key.split("WHERE id = ").nth(1) {
-                    return reply(objects(of_class.iter().filter(|t| t.key == id.trim()).map(|t| ticket_object(t)).collect()));
+                    return reply(objects(
+                        of_class
+                            .iter()
+                            .filter(|t| t.key == id.trim())
+                            .map(|t| ticket_object(t))
+                            .collect(),
+                    ));
                 }
                 if !key.starts_with("SELECT") {
                     // The detail, by key.
                     let detail = lock(&self.detail).clone();
                     return reply(objects(
-                        of_class.iter().filter(|t| t.key == key).map(|t| object(class, &t.key, detail.clone())).collect(),
+                        of_class
+                            .iter()
+                            .filter(|t| t.key == key)
+                            .map(|t| object(class, &t.key, detail.clone()))
+                            .collect(),
                     ));
                 }
                 if *lock(&self.offline) {
@@ -201,7 +250,12 @@ impl FakeITop {
                         .collect(),
                 ))
             }
-            "core/get" => reply(lock(&self.canned).get(class).cloned().unwrap_or_else(|| objects(vec![]))),
+            "core/get" => reply(
+                lock(&self.canned)
+                    .get(class)
+                    .cloned()
+                    .unwrap_or_else(|| objects(vec![])),
+            ),
             "core/apply_stimulus" => {
                 if let Some((code, message)) = lock(&self.refuse_stimulus).clone() {
                     return reply(json!({"code": 0, "message": "", "objects": {
@@ -213,9 +267,19 @@ impl FakeITop {
                 self.set(&key, |t| match stimulus {
                     "ev_assign" | "ev_reassign" => {
                         t.status = "assigned".into();
-                        t.agent_id = fields["agent_id"].as_str().map(str::to_owned).unwrap_or_else(|| fields["agent_id"].to_string());
-                        t.team_id = fields["team_id"].as_str().map(str::to_owned).unwrap_or_else(|| fields["team_id"].to_string());
-                        t.agent_name = if t.agent_id == "7" { "Agent Seven".into() } else { format!("Agent {}", t.agent_id) };
+                        t.agent_id = fields["agent_id"]
+                            .as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| fields["agent_id"].to_string());
+                        t.team_id = fields["team_id"]
+                            .as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| fields["team_id"].to_string());
+                        t.agent_name = if t.agent_id == "7" {
+                            "Agent Seven".into()
+                        } else {
+                            format!("Agent {}", t.agent_id)
+                        };
                     }
                     "ev_pending" => t.status = "pending".into(),
                     "ev_resolve" => t.status = "resolved".into(),
@@ -248,7 +312,14 @@ impl FakeITop {
 
 pub fn client(stub: &StubServer, writes: bool) -> ITopClient {
     let server = ServerAddress::new("https://itop.example.com").expect("a valid test address");
-    ITopClient::with_writes(server, Credentials::new("agent", "secret"), stub.transport(), writes, None, writes)
+    ITopClient::with_writes(
+        server,
+        Credentials::new("agent", "secret"),
+        stub.transport(),
+        writes,
+        None,
+        writes,
+    )
 }
 
 pub struct Harness {
@@ -269,7 +340,11 @@ pub struct Setup {
 
 impl Default for Setup {
     fn default() -> Self {
-        Setup { writes: true, prefs: MemoryPrefs::new(), user: me() }
+        Setup {
+            writes: true,
+            prefs: MemoryPrefs::new(),
+            user: me(),
+        }
     }
 }
 
@@ -286,10 +361,25 @@ impl Harness {
         let sink = Arc::new(RecordingSink::default());
         let hub = Hub::new(sink.clone());
         let prefs = Arc::new(setup.prefs);
-        let session = Arc::new(Session { client: client(&stub, setup.writes), user: setup.user });
-        let ctx = ModelContext { session, hub: hub.clone(), native: native.clone() };
+        let session = Arc::new(Session {
+            client: client(&stub, setup.writes),
+            user: setup.user,
+        });
+        let ctx = ModelContext {
+            session,
+            hub: hub.clone(),
+            native: native.clone(),
+        };
         let ws = Workspace::new(ctx, Fmt::utc(), prefs.clone(), false);
-        Harness { itop, stub, ws, native, sink, hub, prefs }
+        Harness {
+            itop,
+            stub,
+            ws,
+            native,
+            sink,
+            hub,
+            prefs,
+        }
     }
 
     /// Lets spawned tasks run (the stub answers at once).
@@ -310,7 +400,10 @@ impl Harness {
         self.stub
             .requests()
             .iter()
-            .filter(|r| r.operation().as_deref() == Some(op) && class.is_none_or(|c| r.class().as_deref() == Some(c)))
+            .filter(|r| {
+                r.operation().as_deref() == Some(op)
+                    && class.is_none_or(|c| r.class().as_deref() == Some(c))
+            })
             .count()
     }
 

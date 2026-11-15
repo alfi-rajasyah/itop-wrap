@@ -10,9 +10,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use super::format::Fmt;
+use super::new_ticket::NewTicketStart;
 use super::prefs::Prefs;
 use super::records::{ListScope, SidebarItem};
-use super::new_ticket::NewTicketStart;
 use super::seams::{Model, ModelContext};
 use super::session::{FocusField, SessionIntent, SessionModelState, SessionState, SignInResult};
 use super::workspace::{WORKSPACE_MODEL_IDS, Workspace};
@@ -44,7 +44,10 @@ pub fn session_service(
     env: &HashMap<String, String>,
 ) -> Result<SessionService, TransportError> {
     let switches = super::debug::switches(env, !cfg!(debug_assertions));
-    Ok(SessionService::new(secrets, itop_kit::SessionSettings::new(settings))?.with_write_access(switches.write_access))
+    Ok(
+        SessionService::new(secrets, itop_kit::SessionSettings::new(settings))?
+            .with_write_access(switches.write_access),
+    )
 }
 
 struct RouterInner {
@@ -73,7 +76,8 @@ fn is_known(model: &str) -> bool {
 impl AppRouter {
     /// Starts in `restoring`; send [`NativeEvent::Launched`] to run the restore (AUTH-1).
     pub fn new(config: AppConfig) -> AppRouter {
-        let session = SessionModelState::new(config.service.saved_server(), config.service.saved_user());
+        let session =
+            SessionModelState::new(config.service.saved_server(), config.service.saved_user());
         let router = AppRouter(Arc::new(RouterInner {
             service: config.service,
             prefs: config.prefs,
@@ -94,7 +98,11 @@ impl AppRouter {
 
     /// The signed-in workspace, if any.
     pub fn workspace(&self) -> Option<Workspace> {
-        self.0.workspace.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.0
+            .workspace
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     fn publish_session(&self) {
@@ -136,7 +144,11 @@ impl AppRouter {
                     ws.stop();
                     ws.clear_snapshots();
                 }
-                let ctx = ModelContext { session, hub: self.0.hub.clone(), native: self.0.native.clone() };
+                let ctx = ModelContext {
+                    session,
+                    hub: self.0.hub.clone(),
+                    native: self.0.native.clone(),
+                };
                 let ws = Workspace::new(ctx, self.0.fmt, self.0.prefs.clone(), self.0.trace);
                 ws.start();
                 *slot = Some(ws);
@@ -161,7 +173,10 @@ impl AppRouter {
         let (server, user) = {
             let mut s = self.session();
             if s.form.signing {
-                return SignInResult { ok: false, focus: None };
+                return SignInResult {
+                    ok: false,
+                    focus: None,
+                };
             }
             s.form.error = None;
             let user_empty = super::list::trim_spaces(&s.user).is_empty();
@@ -169,7 +184,14 @@ impl AppRouter {
             if s.form.missing_fields {
                 drop(s);
                 self.publish_session();
-                return SignInResult { ok: false, focus: Some(if user_empty { FocusField::User } else { FocusField::Password }) };
+                return SignInResult {
+                    ok: false,
+                    focus: Some(if user_empty {
+                        FocusField::User
+                    } else {
+                        FocusField::Password
+                    }),
+                };
             }
             s.form.signing = true;
             (s.server.clone(), s.user.clone())
@@ -191,14 +213,18 @@ impl AppRouter {
                 }
                 self.session().form.signing = false;
                 self.publish_session();
-                SignInResult { ok: true, focus: None }
+                SignInResult {
+                    ok: true,
+                    focus: None,
+                }
             }
             Err(e) => {
                 let error = match e {
                     SessionError::ITop(e) => e,
                     SessionError::Keychain(_) => ITopError::UnexpectedResponse,
                 };
-                let focus = (error == ITopError::InvalidCredentials).then_some(FocusField::Password);
+                let focus =
+                    (error == ITopError::InvalidCredentials).then_some(FocusField::Password);
                 {
                     let mut s = self.session();
                     s.form.error = Some(error);
@@ -238,7 +264,9 @@ impl AppRouter {
                 return serde_json::to_value(result).map_err(AppError::internal);
             }
             SessionIntent::RetryRestore => self.restore().await,
-            SessionIntent::SignInWithAnotherAccount => self.set_state(SessionState::SignedOut { notice: None }),
+            SessionIntent::SignInWithAnotherAccount => {
+                self.set_state(SessionState::SignedOut { notice: None })
+            }
             SessionIntent::SignOut => self.sign_out(),
         }
         Ok(Value::Null)
@@ -246,10 +274,15 @@ impl AppRouter {
 }
 
 /// Routes an intent to a workspace model (every id but `session`).
-pub(crate) async fn route_workspace(ws: &Workspace, model: &str, intent: Value) -> Result<Value, AppError> {
+pub(crate) async fn route_workspace(
+    ws: &Workspace,
+    model: &str,
+    intent: Value,
+) -> Result<Value, AppError> {
     {
         let scope_of = |id: &str| -> Result<ListScope, AppError> {
-            ListScope::from_raw(id.split_once(':').map_or("", |(_, s)| s)).ok_or_else(|| AppError::unknown_model(model))
+            ListScope::from_raw(id.split_once(':').map_or("", |(_, s)| s))
+                .ok_or_else(|| AppError::unknown_model(model))
         };
         match model {
             "shell" => ws.dispatch_shell(decode(intent)?).await,
@@ -257,16 +290,26 @@ pub(crate) async fn route_workspace(ws: &Workspace, model: &str, intent: Value) 
             "timer" => ws.dispatch_timer(decode(intent)?).await,
             "menubar" => ws.dispatch_menubar(decode(intent)?).await,
             m if m.starts_with("list:") => ws.dispatch_list(scope_of(m)?, decode(intent)?).await,
-            m if m.starts_with("detail:") => ws.dispatch_detail(scope_of(m)?, decode(intent)?).await,
-            m if m.starts_with("assign:") => ws.dispatch_assign(scope_of(m)?, decode(intent)?).await,
-            m if m.starts_with("pending:") => ws.dispatch_pending(scope_of(m)?, decode(intent)?).await,
-            m if m.starts_with("resolve:") => ws.dispatch_resolve(scope_of(m)?, decode(intent)?).await,
+            m if m.starts_with("detail:") => {
+                ws.dispatch_detail(scope_of(m)?, decode(intent)?).await
+            }
+            m if m.starts_with("assign:") => {
+                ws.dispatch_assign(scope_of(m)?, decode(intent)?).await
+            }
+            m if m.starts_with("pending:") => {
+                ws.dispatch_pending(scope_of(m)?, decode(intent)?).await
+            }
+            m if m.starts_with("resolve:") => {
+                ws.dispatch_resolve(scope_of(m)?, decode(intent)?).await
+            }
             "newTicket:sheet" | "newTicket:window" | "cmdb" | "orgs" | "people" => {
                 let Some(s) = ws.standalone().cloned() else {
                     return Err(AppError::internal(format!("{model} doesn't exist.")));
                 };
                 match model {
-                    "newTicket:sheet" | "newTicket:window" => s.new_tickets.dispatch(model, intent).await,
+                    "newTicket:sheet" | "newTicket:window" => {
+                        s.new_tickets.dispatch(model, intent).await
+                    }
                     "cmdb" => s.cmdb.dispatch(model, intent).await,
                     "orgs" => s.orgs.dispatch(model, intent).await,
                     _ => s.people.dispatch(model, intent).await,
@@ -286,7 +329,9 @@ impl Router for AppRouter {
         if model == "session" {
             return self.dispatch_session(decode(intent)?).await;
         }
-        let Some(ws) = self.workspace() else { return Err(AppError::not_signed_in()) };
+        let Some(ws) = self.workspace() else {
+            return Err(AppError::not_signed_in());
+        };
         route_workspace(&ws, model, intent).await
     }
 
@@ -297,7 +342,9 @@ impl Router for AppRouter {
             "inline-image" => {
                 let image = ws.0.images.image(id).await.ok()?;
                 let mime = if image.mimetype.is_empty() {
-                    itop_kit::LogImage::sniff(&image.data).map_or("application/octet-stream", |(m, _)| m).to_owned()
+                    itop_kit::LogImage::sniff(&image.data)
+                        .map_or("application/octet-stream", |(m, _)| m)
+                        .to_owned()
                 } else {
                     image.mimetype
                 };
@@ -340,17 +387,23 @@ impl Router for AppRouter {
             }
             NativeEvent::PanelNewTicket => {
                 if let Some(ws) = ws {
-                    let _ = ws.dispatch_menubar(super::menubar::MenuBarIntent::NewTicket).await;
+                    let _ = ws
+                        .dispatch_menubar(super::menubar::MenuBarIntent::NewTicket)
+                        .await;
                 }
             }
             NativeEvent::PanelOpenMain => {
                 if let Some(ws) = ws {
-                    let _ = ws.dispatch_menubar(super::menubar::MenuBarIntent::OpenMain).await;
+                    let _ = ws
+                        .dispatch_menubar(super::menubar::MenuBarIntent::OpenMain)
+                        .await;
                 }
             }
             NativeEvent::PanelRefresh => {
                 if let Some(ws) = ws {
-                    let _ = ws.dispatch_menubar(super::menubar::MenuBarIntent::Refresh).await;
+                    let _ = ws
+                        .dispatch_menubar(super::menubar::MenuBarIntent::Refresh)
+                        .await;
                 }
             }
             NativeEvent::PanelShown => {
@@ -361,7 +414,10 @@ impl Router for AppRouter {
             // The New Ticket window's close button: no draft kept (NEW-21).
             NativeEvent::NewTicketWindowClosed => {
                 if let Some(s) = ws.as_ref().and_then(|w| w.standalone()).cloned() {
-                    let _ = s.new_tickets.dispatch("newTicket:window", serde_json::json!({"type": "dismiss"})).await;
+                    let _ = s
+                        .new_tickets
+                        .dispatch("newTicket:window", serde_json::json!({"type": "dismiss"}))
+                        .await;
                 }
             }
         }

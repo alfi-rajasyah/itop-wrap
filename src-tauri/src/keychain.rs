@@ -10,9 +10,12 @@ use core_foundation::dictionary::CFDictionary;
 use core_foundation::string::CFString;
 use security_framework_sys::base::{errSecItemNotFound, errSecSuccess};
 use security_framework_sys::item::{
-    kSecAttrAccount, kSecAttrLabel, kSecAttrService, kSecClass, kSecClassGenericPassword, kSecReturnData, kSecValueData,
+    kSecAttrAccount, kSecAttrLabel, kSecAttrService, kSecClass, kSecClassGenericPassword,
+    kSecReturnData, kSecValueData,
 };
-use security_framework_sys::keychain_item::{SecItemAdd, SecItemCopyMatching, SecItemDelete, SecItemUpdate};
+use security_framework_sys::keychain_item::{
+    SecItemAdd, SecItemCopyMatching, SecItemDelete, SecItemUpdate,
+};
 
 use itop_kit::secret_store::{KeychainError, SecretStore};
 
@@ -38,13 +41,18 @@ macro_rules! sec {
 
 impl KeychainStore {
     pub fn new(service: impl Into<String>) -> Self {
-        Self { service: service.into() }
+        Self {
+            service: service.into(),
+        }
     }
 
     fn query_pairs(&self, account: &str) -> Vec<(CFString, CFType)> {
         vec![
             (sec!(kSecClass), sec!(kSecClassGenericPassword).as_CFType()),
-            (sec!(kSecAttrService), CFString::new(&self.service).as_CFType()),
+            (
+                sec!(kSecAttrService),
+                CFString::new(&self.service).as_CFType(),
+            ),
             (sec!(kSecAttrAccount), CFString::new(account).as_CFType()),
         ]
     }
@@ -82,7 +90,8 @@ impl SecretStore for KeychainStore {
         let query = Self::dict(&self.query_pairs(account));
         let update = Self::dict(&[(sec!(kSecValueData), data.as_CFType())]);
         // SAFETY: both dictionaries are valid for the duration of the call.
-        let status = unsafe { SecItemUpdate(query.as_concrete_TypeRef(), update.as_concrete_TypeRef()) };
+        let status =
+            unsafe { SecItemUpdate(query.as_concrete_TypeRef(), update.as_concrete_TypeRef()) };
         if status == errSecSuccess {
             return Ok(());
         }
@@ -91,18 +100,29 @@ impl SecretStore for KeychainStore {
         }
         let mut add = self.query_pairs(account);
         add.push((sec!(kSecValueData), data.as_CFType()));
-        add.push((sec!(kSecAttrLabel), CFString::new(&format!("{} ({account})", self.service)).as_CFType()));
+        add.push((
+            sec!(kSecAttrLabel),
+            CFString::new(&format!("{} ({account})", self.service)).as_CFType(),
+        ));
         let add = Self::dict(&add);
         // SAFETY: `add` is valid for the call; a null result pointer means "don't return the item".
         let status = unsafe { SecItemAdd(add.as_concrete_TypeRef(), std::ptr::null_mut()) };
-        if status == errSecSuccess { Ok(()) } else { Err(KeychainError { status }) }
+        if status == errSecSuccess {
+            Ok(())
+        } else {
+            Err(KeychainError { status })
+        }
     }
 
     fn delete_password(&self, account: &str) -> Result<(), KeychainError> {
         let query = Self::dict(&self.query_pairs(account));
         // SAFETY: `query` is valid for the duration of the call.
         let status = unsafe { SecItemDelete(query.as_concrete_TypeRef()) };
-        if status == errSecSuccess || status == errSecItemNotFound { Ok(()) } else { Err(KeychainError { status }) }
+        if status == errSecSuccess || status == errSecItemNotFound {
+            Ok(())
+        } else {
+            Err(KeychainError { status })
+        }
     }
 }
 
@@ -126,11 +146,17 @@ mod tests {
         let _ = store.delete_password(&account);
         assert_eq!(store.password(&account), Ok(None));
         store.set_password("first", &account).expect("add");
-        store.set_password("second", &account).expect("update in place");
+        store
+            .set_password("second", &account)
+            .expect("update in place");
         let read = store.password(&account);
         store.delete_password(&account).expect("delete");
         assert_eq!(read, Ok(Some("second".to_owned())));
         assert_eq!(store.password(&account), Ok(None));
-        assert_eq!(store.delete_password(&account), Ok(()), "a missing item is not an error");
+        assert_eq!(
+            store.delete_password(&account),
+            Ok(()),
+            "a missing item is not an error"
+        );
     }
 }

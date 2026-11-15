@@ -20,7 +20,10 @@ pub struct DebugSwitches {
 /// both build kinds are testable.
 pub fn switches(env: &HashMap<String, String>, release: bool) -> DebugSwitches {
     if release {
-        return DebugSwitches { write_access: WriteAccess::All, trace: false };
+        return DebugSwitches {
+            write_access: WriteAccess::All,
+            trace: false,
+        };
     }
     let refs: Vec<String> = env
         .get("ITOPWRAP_WRITE_TICKETS")
@@ -36,7 +39,10 @@ pub fn switches(env: &HashMap<String, String>, release: bool) -> DebugSwitches {
     } else {
         WriteAccess::Tickets { refs, new_tickets }
     };
-    DebugSwitches { write_access, trace: env.get("ITOPWRAP_TRACE").map(String::as_str) == Some("1") }
+    DebugSwitches {
+        write_access,
+        trace: env.get("ITOPWRAP_TRACE").map(String::as_str) == Some("1"),
+    }
 }
 
 /// The switches for this process and this build.
@@ -49,13 +55,28 @@ mod tests {
     use super::*;
 
     fn env(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-        pairs.iter().map(|(k, v)| ((*k).to_owned(), (*v).to_owned())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
     }
 
     #[test]
     fn dbg_1_release_allows_all_writes_and_ignores_switches() {
-        let s = switches(&env(&[("ITOPWRAP_WRITE_TICKETS", "R-000001"), ("ITOPWRAP_TRACE", "1")]), true);
-        assert_eq!(s, DebugSwitches { write_access: WriteAccess::All, trace: false });
+        let s = switches(
+            &env(&[
+                ("ITOPWRAP_WRITE_TICKETS", "R-000001"),
+                ("ITOPWRAP_TRACE", "1"),
+            ]),
+            true,
+        );
+        assert_eq!(
+            s,
+            DebugSwitches {
+                write_access: WriteAccess::All,
+                trace: false
+            }
+        );
     }
 
     #[test]
@@ -65,18 +86,33 @@ mod tests {
 
     #[test]
     fn dbg_2_write_tickets_are_trimmed_uppercased_and_empties_dropped() {
-        let s = switches(&env(&[("ITOPWRAP_WRITE_TICKETS", " r-079999, ,I-000002,")]), false);
+        let s = switches(
+            &env(&[("ITOPWRAP_WRITE_TICKETS", " r-079999, ,I-000002,")]),
+            false,
+        );
         assert_eq!(
             s.write_access,
-            WriteAccess::Tickets { refs: vec!["R-079999".into(), "I-000002".into()], new_tickets: false }
+            WriteAccess::Tickets {
+                refs: vec!["R-079999".into(), "I-000002".into()],
+                new_tickets: false
+            }
         );
     }
 
     #[test]
     fn dbg_3_write_new_alone_gives_an_empty_allowlist_plus_creation() {
         let s = switches(&env(&[("ITOPWRAP_WRITE_NEW", "1")]), false);
-        assert_eq!(s.write_access, WriteAccess::Tickets { refs: vec![], new_tickets: true });
-        assert_eq!(switches(&env(&[("ITOPWRAP_WRITE_NEW", "yes")]), false).write_access, WriteAccess::Off);
+        assert_eq!(
+            s.write_access,
+            WriteAccess::Tickets {
+                refs: vec![],
+                new_tickets: true
+            }
+        );
+        assert_eq!(
+            switches(&env(&[("ITOPWRAP_WRITE_NEW", "yes")]), false).write_access,
+            WriteAccess::Off
+        );
     }
 
     #[test]

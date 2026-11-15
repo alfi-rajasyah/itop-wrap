@@ -2,15 +2,15 @@
 
 pub mod app_router;
 pub mod cmdb;
-pub mod new_ticket;
-pub mod orgs;
-pub mod people;
 pub mod debug;
 pub mod detail;
 pub mod format;
 pub mod list;
 pub mod menubar;
+pub mod new_ticket;
 pub mod options;
+pub mod orgs;
+pub mod people;
 pub mod prefs;
 pub mod records;
 pub mod seams;

@@ -36,7 +36,10 @@ pub struct EventSink<R: Runtime> {
 
 impl<R: Runtime> EventSink<R> {
     pub fn new(app: AppHandle<R>, on_session: impl Fn(&Value) + Send + Sync + 'static) -> Self {
-        Self { app, on_session: Box::new(on_session) }
+        Self {
+            app,
+            on_session: Box::new(on_session),
+        }
     }
 }
 
@@ -62,7 +65,11 @@ pub async fn get_snapshot(state: State<'_, AppState>, model: String) -> Result<V
 
 /// contract.md §2 `dispatch`: resolves when the model has finished the intent.
 #[tauri::command]
-pub async fn dispatch(state: State<'_, AppState>, model: String, intent: Value) -> Result<Value, AppError> {
+pub async fn dispatch(
+    state: State<'_, AppState>,
+    model: String,
+    intent: Value,
+) -> Result<Value, AppError> {
     if !is_model_id(&model) {
         return Err(AppError::unknown_model(&model));
     }
@@ -86,7 +93,9 @@ pub fn is_openable_url(url: &str) -> bool {
 #[tauri::command]
 pub fn open_url(state: State<'_, AppState>, url: String) -> Result<(), AppError> {
     if !is_openable_url(&url) {
-        return Err(AppError::invalid_intent(format!("Only http, https and mailto links can be opened, not {url}.")));
+        return Err(AppError::invalid_intent(format!(
+            "Only http, https and mailto links can be opened, not {url}."
+        )));
     }
     state.native.open_url(&url);
     Ok(())
@@ -109,7 +118,11 @@ fn not_found() -> Response<Vec<u8>> {
 }
 
 /// The `itop` asynchronous URI scheme protocol: asks the router for the bytes.
-pub fn itop_protocol<R: Runtime>(ctx: UriSchemeContext<'_, R>, request: Request<Vec<u8>>, responder: UriSchemeResponder) {
+pub fn itop_protocol<R: Runtime>(
+    ctx: UriSchemeContext<'_, R>,
+    request: Request<Vec<u8>>,
+    responder: UriSchemeResponder,
+) {
     let Some(state) = ctx.app_handle().try_state::<AppState>() else {
         responder.respond(not_found());
         return;
@@ -141,7 +154,9 @@ mod tests {
 
     #[test]
     fn open_url_allows_only_web_and_mail() {
-        assert!(is_openable_url("https://itop.example.com/pages/UI.php?operation=details"));
+        assert!(is_openable_url(
+            "https://itop.example.com/pages/UI.php?operation=details"
+        ));
         assert!(is_openable_url("http://itop.local/"));
         assert!(is_openable_url("mailto:jane@example.com"));
         assert!(!is_openable_url("file:///etc/passwd"));
@@ -152,8 +167,14 @@ mod tests {
 
     #[test]
     fn asset_paths() {
-        assert_eq!(parse_asset_path("/inline-image/42"), Some(("inline-image", "42")));
-        assert_eq!(parse_asset_path("/draft-image/3F2A-11"), Some(("draft-image", "3F2A-11")));
+        assert_eq!(
+            parse_asset_path("/inline-image/42"),
+            Some(("inline-image", "42"))
+        );
+        assert_eq!(
+            parse_asset_path("/draft-image/3F2A-11"),
+            Some(("draft-image", "3F2A-11"))
+        );
         assert_eq!(parse_asset_path("/other/42"), None);
         assert_eq!(parse_asset_path("/inline-image/"), None);
         assert_eq!(parse_asset_path("/inline-image/1/2"), None);

@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use base64::Engine;
 use itop_kit::{
-    AttachmentRef, LogImage, LogImage as Img, TicketDetail, TicketLifecycle, TicketAction, TicketChange, TimeFormat,
-    Ticket as KitTicket, TicketList, TicketWrites, WriteError, ITopError,
+    AttachmentRef, ITopError, LogImage, LogImage as Img, Ticket as KitTicket, TicketAction,
+    TicketChange, TicketDetail, TicketLifecycle, TicketList, TicketWrites, TimeFormat, WriteError,
     log_image::Failure as ImageFailure, ticket_writes::Failure,
 };
 use serde::{Deserialize, Serialize};
@@ -19,8 +19,8 @@ use ts_rs::TS;
 use super::format::byte_count;
 use super::list::ListState;
 use super::records::{
-    AgentChip, ConfirmText, DraftImage, ImageIntakeItem, LinkedCI, ListScope, LogEntryView, LogTab, Notice, RichContent,
-    Ticket, rich_content, ticket_view, with_period,
+    AgentChip, ConfirmText, DraftImage, ImageIntakeItem, LinkedCI, ListScope, LogEntryView, LogTab,
+    Notice, RichContent, Ticket, rich_content, ticket_view, with_period,
 };
 use super::workspace::{State, Workspace};
 use crate::error::AppError;
@@ -87,7 +87,9 @@ impl DetailState {
     }
 
     fn key(&self) -> Option<String> {
-        self.ticket.as_ref().map(|t| ListState::draft_key(&t.id(), self.tab == LogTab::Private))
+        self.ticket
+            .as_ref()
+            .map(|t| ListState::draft_key(&t.id(), self.tab == LogTab::Private))
     }
 }
 
@@ -103,7 +105,12 @@ fn reload_key(t: &KitTicket) -> String {
 
 /// Initials of an agent: first letters of the first two words (W/TicketDetailView.swift:280).
 pub fn name_initials(name: &str) -> String {
-    name.split(' ').filter(|w| !w.is_empty()).take(2).filter_map(|w| w.chars().next()).flat_map(char::to_uppercase).collect()
+    name.split(' ')
+        .filter(|w| !w.is_empty())
+        .take(2)
+        .filter_map(|w| w.chars().next())
+        .flat_map(char::to_uppercase)
+        .collect()
 }
 
 // MARK: Snapshot types
@@ -133,7 +140,14 @@ pub enum PrimaryKind {
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum PrimaryAction {
     None,
-    Action { kind: PrimaryKind, label: String, help: String, teal: bool, enabled: bool, busy: bool },
+    Action {
+        kind: PrimaryKind,
+        label: String,
+        help: String,
+        teal: bool,
+        enabled: bool,
+        busy: bool,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -341,7 +355,11 @@ impl Workspace {
             if st.details[i].ticket.as_ref().map(KitTicket::id) != Some(t.id()) {
                 let instance = st.next_instance;
                 st.next_instance += 1;
-                st.details[i] = DetailState { instance, ticket: Some(t.clone()), ..DetailState::default() };
+                st.details[i] = DetailState {
+                    instance,
+                    ticket: Some(t.clone()),
+                    ..DetailState::default()
+                };
                 self.close_sheets(st, scope);
                 let ws = self.clone();
                 let opened = t.clone();
@@ -429,7 +447,9 @@ impl Workspace {
         let d = &st.details[i];
         let l = &st.lists[i];
         let Some(model_ticket) = &d.ticket else {
-            return DetailSnapshot::None { placeholder: "Select a ticket to see its details.".to_owned() };
+            return DetailSnapshot::None {
+                placeholder: "Select a ticket to see its details.".to_owned(),
+            };
         };
         let me = self.me();
         // The list's latest copy (DET-1).
@@ -443,14 +463,24 @@ impl Workspace {
         let timer_button = if timer.running.as_ref().is_some_and(|r| r.ticket_id() == id) {
             TimerButton::Running
         } else if let Some(since) = timer.web_stopwatches.get(&id) {
-            TimerButton::WebStopwatch { label: format!("Web stopwatch since {}", self.0.fmt.since(*since, self.now())) }
+            TimerButton::WebStopwatch {
+                label: format!(
+                    "Web stopwatch since {}",
+                    self.0.fmt.since(*since, self.now())
+                ),
+            }
         } else if timer.can_start(t, me) {
             TimerButton::Start {
                 enabled: can_write && !timer.saving,
                 help: if can_write {
                     timer.running.as_ref().map_or_else(
                         || "Start timer (⌘T)".to_owned(),
-                        |r| format!("Start timer: stops the one on {} and saves its time (⌘T)", r.r#ref),
+                        |r| {
+                            format!(
+                                "Start timer: stops the one on {} and saves its time (⌘T)",
+                                r.r#ref
+                            )
+                        },
                     )
                 } else {
                     "Changes to iTop are switched off in this build".to_owned()
@@ -461,7 +491,8 @@ impl Workspace {
         };
 
         let disabled = l.working.is_some() || !can_write;
-        let help_off = (!can_write).then(|| "Changes to iTop are switched off in this build".to_owned());
+        let help_off =
+            (!can_write).then(|| "Changes to iTop are switched off in this build".to_owned());
         let busy = l.working.as_deref() == Some(id.as_str());
         let action = |kind, label: &str, teal, help: String| PrimaryAction::Action {
             kind,
@@ -473,28 +504,45 @@ impl Workspace {
         };
         let primary_action = TicketLifecycle::primary(&t.status);
         let primary = match primary_action {
-            Some(TicketAction::Assign) if t.is_unassigned() => {
-                action(PrimaryKind::AssignToMe, "Assign to me", needs_you, format!("Assign {} to you", t.r#ref))
-            }
-            Some(TicketAction::Assign) => {
-                action(PrimaryKind::OpenAssign, "Assign ticket", needs_you, "Choose a team and agent".to_owned())
-            }
-            Some(TicketAction::Resolve) => {
-                action(PrimaryKind::OpenResolve, "Resolve ticket", needs_you, format!("Resolve {}", t.r#ref))
-            }
-            Some(TicketAction::Close) => {
-                action(PrimaryKind::ConfirmClose, "Close ticket", false, format!("Close {}", t.r#ref))
-            }
+            Some(TicketAction::Assign) if t.is_unassigned() => action(
+                PrimaryKind::AssignToMe,
+                "Assign to me",
+                needs_you,
+                format!("Assign {} to you", t.r#ref),
+            ),
+            Some(TicketAction::Assign) => action(
+                PrimaryKind::OpenAssign,
+                "Assign ticket",
+                needs_you,
+                "Choose a team and agent".to_owned(),
+            ),
+            Some(TicketAction::Resolve) => action(
+                PrimaryKind::OpenResolve,
+                "Resolve ticket",
+                needs_you,
+                format!("Resolve {}", t.r#ref),
+            ),
+            Some(TicketAction::Close) => action(
+                PrimaryKind::ConfirmClose,
+                "Close ticket",
+                false,
+                format!("Close {}", t.r#ref),
+            ),
             _ => PrimaryAction::None,
         };
 
         let actions = TicketLifecycle::actions(&t.status);
         let can_assign = TicketWrites::assign_stimulus(&t.status).is_some();
         let more = MoreMenu {
-            assign: (can_assign && (primary_action != Some(TicketAction::Assign) || t.is_unassigned())).then(|| {
-                MoreAssign {
-                    label: if t.is_unassigned() { "Assign to someone else…" } else { "Reassign…" }.to_owned(),
+            assign: (can_assign
+                && (primary_action != Some(TicketAction::Assign) || t.is_unassigned()))
+            .then(|| MoreAssign {
+                label: if t.is_unassigned() {
+                    "Assign to someone else…"
+                } else {
+                    "Reassign…"
                 }
+                .to_owned(),
             }),
             pending: actions.contains(&TicketAction::Pending),
             reopen: actions.contains(&TicketAction::Reopen),
@@ -505,15 +553,35 @@ impl Workspace {
 
         let mine = t.agent_id == me.contact_id;
         let strip = DetailStrip {
-            caller: if t.caller_name.is_empty() { "None".to_owned() } else { t.caller_name.clone() },
-            organization: if t.org_name.is_empty() { "None".to_owned() } else { t.org_name.clone() },
-            team: if t.team_name.is_empty() { "No team".to_owned() } else { t.team_name.clone() },
+            caller: if t.caller_name.is_empty() {
+                "None".to_owned()
+            } else {
+                t.caller_name.clone()
+            },
+            organization: if t.org_name.is_empty() {
+                "None".to_owned()
+            } else {
+                t.org_name.clone()
+            },
+            team: if t.team_name.is_empty() {
+                "No team".to_owned()
+            } else {
+                t.team_name.clone()
+            },
             agent: if t.is_unassigned() {
                 AgentChip::Unassigned
             } else {
                 AgentChip::Person {
-                    initials: if mine { me.initials() } else { name_initials(&t.agent_name) },
-                    name: if mine { "You".to_owned() } else { t.agent_name.clone() },
+                    initials: if mine {
+                        me.initials()
+                    } else {
+                        name_initials(&t.agent_name)
+                    },
+                    name: if mine {
+                        "You".to_owned()
+                    } else {
+                        t.agent_name.clone()
+                    },
                 }
             },
             spent: match timer.totals.get(&id) {
@@ -525,7 +593,11 @@ impl Workspace {
                 .map(|det| {
                     det.linked_cis
                         .iter()
-                        .map(|ci| LinkedCI { key: ci.id.clone(), class_name: ci.class_name.clone(), name: ci.name.clone() })
+                        .map(|ci| LinkedCI {
+                            key: ci.id.clone(),
+                            class_name: ci.class_name.clone(),
+                            name: ci.name.clone(),
+                        })
                         .collect()
                 })
                 .unwrap_or_default(),
@@ -534,10 +606,16 @@ impl Workspace {
         let base = self.base_url();
         let body = match &d.phase {
             DetailPhase::Loading => DetailBody::Loading,
-            DetailPhase::Failed(m) => DetailBody::Failed { text: format!("Couldn't load this ticket. {m}") },
+            DetailPhase::Failed(m) => DetailBody::Failed {
+                text: format!("Couldn't load this ticket. {m}"),
+            },
             DetailPhase::Loaded(det) => {
                 let is_public = d.tab == LogTab::Public;
-                let entries = if is_public { &det.public_log } else { &det.private_log };
+                let entries = if is_public {
+                    &det.public_log
+                } else {
+                    &det.private_log
+                };
                 let now = self.now();
                 DetailBody::Loaded {
                     service_line: (!det.service_name.is_empty()).then(|| {
@@ -547,22 +625,32 @@ impl Workspace {
                             .collect::<Vec<_>>()
                             .join(" › ")
                     }),
-                    description: if det.description.is_empty() && !det.description_html.contains("<img") {
+                    description: if det.description.is_empty()
+                        && !det.description_html.contains("<img")
+                    {
                         None
                     } else {
-                        Some(rich_content(Some(&det.description_html), &det.description, base, Some(&web_url)))
+                        Some(rich_content(
+                            Some(&det.description_html),
+                            &det.description,
+                            base,
+                            Some(&web_url),
+                        ))
                     },
                     tab: d.tab,
                     entries: entries
                         .iter()
                         .map(|e| LogEntryView {
                             id: e.id,
-                            header: [Some(e.author.clone()), e.date.map(|dt| self.0.fmt.log_date(dt, now))]
-                                .into_iter()
-                                .flatten()
-                                .filter(|s| !s.is_empty())
-                                .collect::<Vec<_>>()
-                                .join(" · "),
+                            header: [
+                                Some(e.author.clone()),
+                                e.date.map(|dt| self.0.fmt.log_date(dt, now)),
+                            ]
+                            .into_iter()
+                            .flatten()
+                            .filter(|s| !s.is_empty())
+                            .collect::<Vec<_>>()
+                            .join(" · "),
                             is_private: !is_public,
                             content: rich_content(e.html.as_deref(), &e.text, base, Some(&web_url)),
                         })
@@ -571,7 +659,8 @@ impl Workspace {
                         if is_public {
                             "No public entries yet.".to_owned()
                         } else {
-                            "No private entries yet. Only agents can see the private log.".to_owned()
+                            "No private entries yet. Only agents can see the private log."
+                                .to_owned()
                         }
                     }),
                 }
@@ -581,13 +670,21 @@ impl Workspace {
         let a = &d.attachments;
         let attachments = match &a.items {
             Some(items) => Attachments::Loaded {
-                items: items.iter().map(|x| AttachmentItem { id: x.id.clone(), name: x.name.clone() }).collect(),
+                items: items
+                    .iter()
+                    .map(|x| AttachmentItem {
+                        id: x.id.clone(),
+                        name: x.name.clone(),
+                    })
+                    .collect(),
                 downloading_id: a.saving.clone(),
                 saved: a.saved.clone(),
                 error: a.error.clone(),
             },
             None => match &a.error {
-                Some(e) => Attachments::Failed { text: format!("Couldn't list attachments. {e}") },
+                Some(e) => Attachments::Failed {
+                    text: format!("Couldn't list attachments. {e}"),
+                },
                 None => Attachments::Loading,
             },
         };
@@ -632,7 +729,9 @@ impl Workspace {
                 format!("Uploading {} images to iTop", images.len())
             }))
         } else if !can_write {
-            Some(Notice::ok("Adding entries is switched off in this build, so nothing is sent to iTop."))
+            Some(Notice::ok(
+                "Adding entries is switched off in this build, so nothing is sent to iTop.",
+            ))
         } else {
             None
         };
@@ -659,10 +758,24 @@ impl Workspace {
                 "Write a public entry, the caller sees it"
             }
             .to_owned(),
-            accessibility_label: if is_private { "Private entry" } else { "Public entry" }.to_owned(),
-            send_label: if is_private { "Add to private log" } else { "Add to public log" }.to_owned(),
-            send_help: if can_write { "Add the entry (⌘↩)" } else { "Changes to iTop are switched off in this build" }
-                .to_owned(),
+            accessibility_label: if is_private {
+                "Private entry"
+            } else {
+                "Public entry"
+            }
+            .to_owned(),
+            send_label: if is_private {
+                "Add to private log"
+            } else {
+                "Add to public log"
+            }
+            .to_owned(),
+            send_help: if can_write {
+                "Add the entry (⌘↩)"
+            } else {
+                "Changes to iTop are switched off in this build"
+            }
+            .to_owned(),
             editable: can_write,
             can_send,
             sending: d.sending,
@@ -688,17 +801,28 @@ impl Workspace {
     pub(crate) fn detail_ticket(&self, st: &State, scope: ListScope) -> Option<KitTicket> {
         let i = scope.index();
         let model = st.details[i].ticket.as_ref()?;
-        Some(st.lists[i].ticket(Some(&model.id())).unwrap_or(model).clone())
+        Some(
+            st.lists[i]
+                .ticket(Some(&model.id()))
+                .unwrap_or(model)
+                .clone(),
+        )
     }
 
-    pub(crate) async fn dispatch_detail(&self, scope: ListScope, intent: DetailIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_detail(
+        &self,
+        scope: ListScope,
+        intent: DetailIntent,
+    ) -> Result<serde_json::Value, AppError> {
         let i = scope.index();
         let (ticket, instance) = {
             let st = self.lock();
             (self.detail_ticket(&st, scope), st.details[i].instance)
         };
         let Some(ticket) = ticket else {
-            return Err(AppError::invalid_intent("No ticket is shown in this detail."));
+            return Err(AppError::invalid_intent(
+                "No ticket is shown in this detail.",
+            ));
         };
         match intent {
             DetailIntent::Retry => self.detail_load(scope, instance).await,
@@ -708,8 +832,14 @@ impl Workspace {
             }
             DetailIntent::CopyRef => self.detail_copy_ref(scope, instance, &ticket),
             DetailIntent::AssignToMe => self.list_assign_to_me(scope, &ticket).await,
-            DetailIntent::Reopen => self.list_apply_from_header(scope, &TicketChange::Reopen, &ticket).await,
-            DetailIntent::Close => self.list_apply_from_header(scope, &TicketChange::Close, &ticket).await,
+            DetailIntent::Reopen => {
+                self.list_apply_from_header(scope, &TicketChange::Reopen, &ticket)
+                    .await
+            }
+            DetailIntent::Close => {
+                self.list_apply_from_header(scope, &TicketChange::Close, &ticket)
+                    .await
+            }
             DetailIntent::ToggleTimer => {
                 let snapshot = {
                     let st = self.lock();
@@ -740,9 +870,14 @@ impl Workspace {
                 let found = {
                     let mut st = self.lock();
                     let key = st.details[i].key().unwrap_or_default();
-                    let images = st.lists[i].draft_images.get(&key).cloned().unwrap_or_default();
+                    let images = st.lists[i]
+                        .draft_images
+                        .get(&key)
+                        .cloned()
+                        .unwrap_or_default();
                     if images.iter().any(|im| im.id == image_id) {
-                        let rest: Vec<LogImage> = images.into_iter().filter(|im| im.id != image_id).collect();
+                        let rest: Vec<LogImage> =
+                            images.into_iter().filter(|im| im.id != image_id).collect();
                         if rest.is_empty() {
                             st.lists[i].draft_images.remove(&key);
                         } else {
@@ -755,11 +890,15 @@ impl Workspace {
                     }
                 };
                 if !found {
-                    return Err(AppError::invalid_intent(format!("No image {image_id} in this entry.")));
+                    return Err(AppError::invalid_intent(format!(
+                        "No image {image_id} in this entry."
+                    )));
                 }
                 self.publish();
             }
-            DetailIntent::Send => return Ok(serde_json::Value::Bool(self.detail_send(scope).await)),
+            DetailIntent::Send => {
+                return Ok(serde_json::Value::Bool(self.detail_send(scope).await));
+            }
             DetailIntent::DownloadAttachment { attachment_id } => {
                 let found = {
                     let st = self.lock();
@@ -770,7 +909,9 @@ impl Workspace {
                         .and_then(|items| items.iter().find(|a| a.id == attachment_id).cloned())
                 };
                 let Some(a) = found else {
-                    return Err(AppError::invalid_intent(format!("No attachment {attachment_id} on this ticket.")));
+                    return Err(AppError::invalid_intent(format!(
+                        "No attachment {attachment_id} on this ticket."
+                    )));
                 };
                 self.detail_download(scope, instance, a).await;
             }
@@ -810,10 +951,16 @@ impl Workspace {
         for item in items {
             match self.log_image(&item) {
                 Ok(image) => accepted.push(image),
-                Err(ImageFailure::TooLarge { filename, max_mb }) => problems.push(format!("{filename} is larger than {max_mb} MB.")),
+                Err(ImageFailure::TooLarge { filename, max_mb }) => {
+                    problems.push(format!("{filename} is larger than {max_mb} MB."))
+                }
                 Err(ImageFailure::UnsupportedType { .. }) => problems.push(format!(
                     "{} isn't an image iTop Wrap can add. Use PNG, JPEG or GIF.",
-                    if item.filename.is_empty() { "That file" } else { item.filename.as_str() }
+                    if item.filename.is_empty() {
+                        "That file"
+                    } else {
+                        item.filename.as_str()
+                    }
                 )),
             }
         }
@@ -829,10 +976,18 @@ impl Workspace {
         }
         {
             let mut st = self.lock();
-            st.details[i].send_error = if problems.is_empty() { None } else { Some(problems.join(" ")) };
+            st.details[i].send_error = if problems.is_empty() {
+                None
+            } else {
+                Some(problems.join(" "))
+            };
             if !accepted.is_empty() {
                 let key = st.details[i].key().unwrap_or_default();
-                st.lists[i].draft_images.entry(key).or_default().extend(accepted);
+                st.lists[i]
+                    .draft_images
+                    .entry(key)
+                    .or_default()
+                    .extend(accepted);
             }
         }
         self.publish();
@@ -854,10 +1009,23 @@ impl Workspace {
                     .0
                     .ctx
                     .native
-                    .convert_image(&item.data, if tiff { ConvertTo::Png } else { ConvertTo::Jpeg })
-                    .ok_or_else(|| ImageFailure::UnsupportedType { filename: item.filename.clone() })?;
+                    .convert_image(
+                        &item.data,
+                        if tiff {
+                            ConvertTo::Png
+                        } else {
+                            ConvertTo::Jpeg
+                        },
+                    )
+                    .ok_or_else(|| ImageFailure::UnsupportedType {
+                        filename: item.filename.clone(),
+                    })?;
                 let base = deleting_extension(&item.filename);
-                let name = if base.is_empty() { "Pasted image" } else { base };
+                let name = if base.is_empty() {
+                    "Pasted image"
+                } else {
+                    base
+                };
                 LogImage::new(converted.data, &format!("{name}.{}", converted.ext))
             }
             other => other,
@@ -871,14 +1039,21 @@ impl Workspace {
             let mut st = self.lock();
             let (key, private, t, instance) = {
                 let d = &st.details[i];
-                let (Some(key), Some(t)) = (d.key(), d.ticket.clone()) else { return false };
+                let (Some(key), Some(t)) = (d.key(), d.ticket.clone()) else {
+                    return false;
+                };
                 (key, d.tab == LogTab::Private, t, d.instance)
             };
             let text = st.lists[i].drafts.get(&key).cloned().unwrap_or_default();
-            let images = st.lists[i].draft_images.get(&key).cloned().unwrap_or_default();
+            let images = st.lists[i]
+                .draft_images
+                .get(&key)
+                .cloned()
+                .unwrap_or_default();
             let can_write = self.can_write(&t);
             let d = &mut st.details[i];
-            let can_send = can_write && !d.sending && (!text.trim().is_empty() || !images.is_empty());
+            let can_send =
+                can_write && !d.sending && (!text.trim().is_empty() || !images.is_empty());
             if !can_send {
                 return false;
             }
@@ -887,9 +1062,19 @@ impl Workspace {
             (key, private, t, instance, text, images)
         };
         let (key, private, t, instance, text, images) = prepared;
-        self.trace(|| format!("detail: adding an entry with {} images to {}", images.len(), t.id()));
+        self.trace(|| {
+            format!(
+                "detail: adding an entry with {} images to {}",
+                images.len(),
+                t.id()
+            )
+        });
         self.publish();
-        let result = self.0.writes.add_log_entry_with_images(&t, &text, &images, private).await;
+        let result = self
+            .0
+            .writes
+            .add_log_entry_with_images(&t, &text, &images, private)
+            .await;
         let ok = match result {
             Ok(()) => {
                 self.detail_load(scope, instance).await;
@@ -931,7 +1116,10 @@ impl Workspace {
     async fn save_panel(&self, name: &str) -> Option<std::path::PathBuf> {
         let native = self.0.ctx.native.clone();
         let name = name.to_owned();
-        tokio::task::spawn_blocking(move || native.save_panel(&name)).await.ok().flatten()
+        tokio::task::spawn_blocking(move || native.save_panel(&name))
+            .await
+            .ok()
+            .flatten()
     }
 
     /// `AttachmentsView.save` (DET-33, DET-34).
@@ -949,7 +1137,11 @@ impl Workspace {
             Ok(file) => match self.save_panel(&file.filename).await {
                 None => Ok(None),
                 Some(path) => match std::fs::write(&path, &file.data) {
-                    Ok(()) => Ok(Some(format!("Saved {} ({}).", file.filename, byte_count(file.data.len() as u64)))),
+                    Ok(()) => Ok(Some(format!(
+                        "Saved {} ({}).",
+                        file.filename,
+                        byte_count(file.data.len() as u64)
+                    ))),
                     Err(e) => Err(e.to_string()),
                 },
             },
@@ -961,7 +1153,9 @@ impl Workspace {
             if d.instance == instance {
                 match outcome {
                     Ok(saved) => d.attachments.saved = saved,
-                    Err(why) => d.attachments.error = Some(format!("Couldn't download {}. {why}", a.name)),
+                    Err(why) => {
+                        d.attachments.error = Some(format!("Couldn't download {}. {why}", a.name))
+                    }
                 }
                 d.attachments.saving = None;
             }
@@ -980,9 +1174,18 @@ pub fn intake_item(item: ImageIntakeItem) -> IntakeItem {
         .unwrap_or_default();
     let oversize = item.data_base64.is_none() && item.size > MAX_INTAKE_FILE_BYTES;
     let filename = if item.filename.is_empty() {
-        if is_tiff(&data) { "Pasted image.tiff" } else { "Pasted image.png" }.to_owned()
+        if is_tiff(&data) {
+            "Pasted image.tiff"
+        } else {
+            "Pasted image.png"
+        }
+        .to_owned()
     } else {
         item.filename
     };
-    IntakeItem { data, filename, oversize }
+    IntakeItem {
+        data,
+        filename,
+        oversize,
+    }
 }

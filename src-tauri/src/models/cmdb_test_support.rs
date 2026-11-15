@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use chrono::{TimeZone, Utc};
 use itop_kit::stub::{RecordedRequest, StubReply, StubServer};
-use itop_kit::{CurrentUser, Credentials, ITopClient, ServerAddress, Session, Team, Ticket, TicketScope};
+use itop_kit::{
+    Credentials, CurrentUser, ITopClient, ServerAddress, Session, Team, Ticket, TicketScope,
+};
 use serde_json::{Value, json};
 
 use crate::hub::{Hub, RecordingSink};
@@ -40,13 +42,22 @@ impl WorkspaceLink for FakeLink {
         *self.scope.lock().unwrap()
     }
     async fn open_ticket(&self, ticket: Ticket) {
-        self.calls.lock().unwrap().push(LinkCall::OpenTicket(ticket.id()));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(LinkCall::OpenTicket(ticket.id()));
     }
     async fn ticket_created(&self, ticket: Ticket, assign: bool) {
-        self.calls.lock().unwrap().push(LinkCall::Created(ticket.r#ref.clone(), assign));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(LinkCall::Created(ticket.r#ref.clone(), assign));
     }
     async fn select_section(&self, section: &str) {
-        self.calls.lock().unwrap().push(LinkCall::Section(section.to_owned()));
+        self.calls
+            .lock()
+            .unwrap()
+            .push(LinkCall::Section(section.to_owned()));
     }
 }
 
@@ -85,7 +96,10 @@ pub fn env(handler: impl Fn(&RecordedRequest) -> StubReply + Send + Sync + 'stat
 }
 
 /// `writes`: the client may create tickets.
-pub fn env_with(handler: impl Fn(&RecordedRequest) -> StubReply + Send + Sync + 'static, writes: bool) -> Env {
+pub fn env_with(
+    handler: impl Fn(&RecordedRequest) -> StubReply + Send + Sync + 'static,
+    writes: bool,
+) -> Env {
     let stub = StubServer::with_handler(handler);
     let client = ITopClient::with_writes(
         ServerAddress::new("itop.example.com").unwrap(),
@@ -95,16 +109,36 @@ pub fn env_with(handler: impl Fn(&RecordedRequest) -> StubReply + Send + Sync + 
         None,
         false,
     );
-    let native = Arc::new(FakeNative::new(Utc.with_ymd_and_hms(2026, 11, 16, 9, 0, 0).unwrap()));
+    let native = Arc::new(FakeNative::new(
+        Utc.with_ymd_and_hms(2026, 11, 16, 9, 0, 0).unwrap(),
+    ));
     let sink = Arc::new(RecordingSink::default());
     let hub = Hub::new(sink.clone());
-    let link = Arc::new(FakeLink { scope: Mutex::new(TicketScope::OPEN), calls: Mutex::default() });
-    let ctx = ModelContext { session: Arc::new(Session { client, user: me() }), hub: hub.clone(), native: native.clone() };
-    Env { stub, native, sink, hub, link, ctx }
+    let link = Arc::new(FakeLink {
+        scope: Mutex::new(TicketScope::OPEN),
+        calls: Mutex::default(),
+    });
+    let ctx = ModelContext {
+        session: Arc::new(Session { client, user: me() }),
+        hub: hub.clone(),
+        native: native.clone(),
+    };
+    Env {
+        stub,
+        native,
+        sink,
+        hub,
+        link,
+        ctx,
+    }
 }
 
 pub fn oql(r: &RecordedRequest) -> String {
-    r.json_data().get("key").and_then(Value::as_str).unwrap_or("").to_owned()
+    r.json_data()
+        .get("key")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned()
 }
 
 /// An iTop answer with these objects: `(key, fields)`.
@@ -130,7 +164,14 @@ pub fn empty() -> StubReply {
 }
 
 /// A ticket row's fields.
-pub fn ticket_fields(r: &str, title: &str, status: &str, priority: &str, agent: (&str, &str), team: &str) -> Value {
+pub fn ticket_fields(
+    r: &str,
+    title: &str,
+    status: &str,
+    priority: &str,
+    agent: (&str, &str),
+    team: &str,
+) -> Value {
     json!({
         "ref": r, "title": title, "status": status, "priority": priority,
         "caller_id_friendlyname": "Carl Caller", "org_id": "3", "org_id_friendlyname": "Acme",

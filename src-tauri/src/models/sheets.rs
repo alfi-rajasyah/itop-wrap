@@ -2,7 +2,10 @@
 //! W/LifecycleSheets.swift): their `@State` and `.task` loads, per list (ASG-6…13, LC-7…22).
 
 use chrono::{DateTime, Utc};
-use itop_kit::{Agent, Resolution, ResolutionCode, ServiceRef, Team, Ticket as KitTicket, TicketChange, TicketWrites, TimeFormat};
+use itop_kit::{
+    Agent, Resolution, ResolutionCode, ServiceRef, Team, Ticket as KitTicket, TicketChange,
+    TicketWrites, TimeFormat,
+};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -206,21 +209,43 @@ pub enum ResolveSheetIntent {
     Confirm,
 }
 
-fn dropdown(items: Vec<PickItem>, selected: Option<String>, placeholder: String, enabled: bool) -> Dropdown {
-    Dropdown { items, selected_id: selected, placeholder, enabled, search: None }
+fn dropdown(
+    items: Vec<PickItem>,
+    selected: Option<String>,
+    placeholder: String,
+    enabled: bool,
+) -> Dropdown {
+    Dropdown {
+        items,
+        selected_id: selected,
+        placeholder,
+        enabled,
+        search: None,
+    }
 }
 
 fn services_items(list: &[ServiceRef]) -> Vec<PickItem> {
-    list.iter().map(|s| PickItem { id: s.id.clone(), label: s.name.clone() }).collect()
+    list.iter()
+        .map(|s| PickItem {
+            id: s.id.clone(),
+            label: s.name.clone(),
+        })
+        .collect()
 }
 
-const TIMER_LINE: fn(&str) -> String = |clock| format!("Your timer stops and saves {clock} to this ticket.");
+const TIMER_LINE: fn(&str) -> String =
+    |clock| format!("Your timer stops and saves {clock} to this ticket.");
 
 impl Workspace {
     /// The sheet's `ticket`: the list's latest copy by id (contract §3).
     fn sheet_ticket(st: &State, scope: ListScope, stored: Option<&KitTicket>) -> Option<KitTicket> {
         let stored = stored?;
-        Some(st.lists[scope.index()].ticket(Some(&stored.id())).unwrap_or(stored).clone())
+        Some(
+            st.lists[scope.index()]
+                .ticket(Some(&stored.id()))
+                .unwrap_or(stored)
+                .clone(),
+        )
     }
 
     /// The detail went to another ticket (or none): its sheets go with it.
@@ -234,15 +259,22 @@ impl Workspace {
     /// LC-11, LC-20: "Your timer stops and saves 0:42 to this ticket." when it runs on the ticket.
     fn timer_line(st: &State, t: &KitTicket, now: DateTime<Utc>) -> Option<String> {
         let running = st.timer.running.as_ref()?;
-        (running.ticket_id() == t.id()).then(|| TIMER_LINE(&TimeFormat::clock((now - running.start).num_seconds())))
+        (running.ticket_id() == t.id())
+            .then(|| TIMER_LINE(&TimeFormat::clock((now - running.start).num_seconds())))
     }
 
-    fn open_ticket_for_sheet(&self, scope: ListScope, ticket_id: &str) -> Result<(KitTicket, u64), AppError> {
+    fn open_ticket_for_sheet(
+        &self,
+        scope: ListScope,
+        ticket_id: &str,
+    ) -> Result<(KitTicket, u64), AppError> {
         let mut st = self.lock();
         let t = st.lists[scope.index()]
             .ticket(Some(ticket_id))
             .cloned()
-            .ok_or_else(|| AppError::invalid_intent(format!("No ticket {ticket_id} in this list.")))?;
+            .ok_or_else(|| {
+                AppError::invalid_intent(format!("No ticket {ticket_id} in this list."))
+            })?;
         let instance = st.next_instance;
         st.next_instance += 1;
         Ok((t, instance))
@@ -258,17 +290,39 @@ impl Workspace {
         let me = self.me();
         let busy = st.lists[scope.index()].working.is_some();
         let yours = t.agent_id == me.contact_id;
-        let agents = if a.team.is_none() { Vec::new() } else { a.agents.value().cloned().unwrap_or_default() };
+        let agents = if a.team.is_none() {
+            Vec::new()
+        } else {
+            a.agents.value().cloned().unwrap_or_default()
+        };
         AssignSheetSnapshot::Open(Box::new(AssignSheetOpen {
             ticket_id: t.id(),
-            title: if t.is_unassigned() { format!("Assign {}", t.r#ref) } else { format!("Reassign {}", t.r#ref) },
+            title: if t.is_unassigned() {
+                format!("Assign {}", t.r#ref)
+            } else {
+                format!("Reassign {}", t.r#ref)
+            },
             subtitle: t.title.clone(),
             assign_to_me: AssignToMeButton {
                 enabled: !(busy || yours),
-                help: if yours { "It's already yours".to_owned() } else { format!("Assign {} to you", t.r#ref) },
+                help: if yours {
+                    "It's already yours".to_owned()
+                } else {
+                    format!("Assign {} to you", t.r#ref)
+                },
             },
             team: dropdown(
-                a.teams.value().map(|ts| ts.iter().map(|x| PickItem { id: x.id.clone(), label: x.name.clone() }).collect()).unwrap_or_default(),
+                a.teams
+                    .value()
+                    .map(|ts| {
+                        ts.iter()
+                            .map(|x| PickItem {
+                                id: x.id.clone(),
+                                label: x.name.clone(),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 a.team.as_ref().map(|x| x.id.clone()),
                 placeholder(&a.teams, "Loading teams…", "No teams found"),
                 a.teams.value().is_some(),
@@ -278,7 +332,11 @@ impl Workspace {
                     .iter()
                     .map(|x| PickItem {
                         id: x.id.clone(),
-                        label: if x.id == me.contact_id { format!("{} (you)", x.name) } else { x.name.clone() },
+                        label: if x.id == me.contact_id {
+                            format!("{} (you)", x.name)
+                        } else {
+                            x.name.clone()
+                        },
                     })
                     .collect(),
                 a.agent.as_ref().map(|x| x.id.clone()),
@@ -289,21 +347,36 @@ impl Workspace {
                 },
                 !(a.team.is_none() || a.agents.value().is_none()),
             ),
-            confirm_label: if t.is_unassigned() { "Assign ticket" } else { "Reassign ticket" }.to_owned(),
+            confirm_label: if t.is_unassigned() {
+                "Assign ticket"
+            } else {
+                "Reassign ticket"
+            }
+            .to_owned(),
             confirm_enabled: !(busy || a.team.is_none() || a.agent.is_none()),
             busy,
             error: a.error.clone(),
         }))
     }
 
-    pub(crate) async fn dispatch_assign(&self, scope: ListScope, intent: AssignSheetIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_assign(
+        &self,
+        scope: ListScope,
+        intent: AssignSheetIntent,
+    ) -> Result<serde_json::Value, AppError> {
         let i = scope.index();
         let null = serde_json::Value::Null;
         let text = |s: Option<String>| s.map_or(serde_json::Value::Null, serde_json::Value::String);
         if let AssignSheetIntent::Open { ticket_id } = &intent {
             let (t, instance) = self.open_ticket_for_sheet(scope, ticket_id)?;
-            self.lock().assign[i] =
-                AssignState { open: true, instance, ticket: Some(t.clone()), teams: Loadable::Loading, agents: Loadable::Loading, ..Default::default() };
+            self.lock().assign[i] = AssignState {
+                open: true,
+                instance,
+                ticket: Some(t.clone()),
+                teams: Loadable::Loading,
+                agents: Loadable::Loading,
+                ..Default::default()
+            };
             self.publish();
             let ws = self.clone();
             self.spawn(async move { ws.assign_load_teams(scope, instance, t).await });
@@ -345,13 +418,19 @@ impl Workspace {
                 Ok(text(error))
             }
             AssignSheetIntent::SetTeam { team_id } => {
-                let new = match &team_id {
-                    None => None,
-                    Some(id) => {
-                        let found = self.lock().assign[i].teams.value().and_then(|ts| ts.iter().find(|x| &x.id == id).cloned());
-                        Some(found.ok_or_else(|| AppError::invalid_intent(format!("No team {id}.")))?)
-                    }
-                };
+                let new =
+                    match &team_id {
+                        None => None,
+                        Some(id) => {
+                            let found = self.lock().assign[i]
+                                .teams
+                                .value()
+                                .and_then(|ts| ts.iter().find(|x| &x.id == id).cloned());
+                            Some(found.ok_or_else(|| {
+                                AppError::invalid_intent(format!("No team {id}."))
+                            })?)
+                        }
+                    };
                 self.assign_set_team(scope, instance, new);
                 Ok(null)
             }
@@ -365,9 +444,13 @@ impl Workspace {
                             let found = if a.team.is_none() {
                                 None
                             } else {
-                                a.agents.value().and_then(|xs| xs.iter().find(|x| &x.id == id).cloned())
+                                a.agents
+                                    .value()
+                                    .and_then(|xs| xs.iter().find(|x| &x.id == id).cloned())
                             };
-                            Some(found.ok_or_else(|| AppError::invalid_intent(format!("No agent {id}.")))?)
+                            Some(found.ok_or_else(|| {
+                                AppError::invalid_intent(format!("No agent {id}."))
+                            })?)
                         }
                     };
                 }
@@ -379,7 +462,9 @@ impl Workspace {
                     let st = self.lock();
                     (st.assign[i].team.clone(), st.assign[i].agent.clone())
                 };
-                let (Some(team), Some(agent)) = (team, agent) else { return Ok(null) };
+                let (Some(team), Some(agent)) = (team, agent) else {
+                    return Ok(null);
+                };
                 let message = self.list_assign(scope, &t, &team, &agent).await;
                 {
                     let mut st = self.lock();
@@ -476,7 +561,12 @@ impl Workspace {
 
     // MARK: Pending
 
-    pub(crate) fn pending_snapshot(&self, st: &State, scope: ListScope, now: DateTime<Utc>) -> PendingSheetSnapshot {
+    pub(crate) fn pending_snapshot(
+        &self,
+        st: &State,
+        scope: ListScope,
+        now: DateTime<Utc>,
+    ) -> PendingSheetSnapshot {
         let p = &st.pending[scope.index()];
         let Some(t) = Self::sheet_ticket(st, scope, p.ticket.as_ref()).filter(|_| p.open) else {
             return PendingSheetSnapshot::Closed;
@@ -488,7 +578,9 @@ impl Workspace {
             title: format!("Set {} to pending", t.r#ref),
             subtitle: t.title.clone(),
             reason: p.reason.clone(),
-            reason_required: RequiredMark { missing: p.tried && empty },
+            reason_required: RequiredMark {
+                missing: p.tried && empty,
+            },
             reason_error: (p.tried && empty).then(|| "Enter why the ticket is waiting.".to_owned()),
             timer_line: Self::timer_line(st, &t, now),
             error: p.error.clone(),
@@ -497,12 +589,21 @@ impl Workspace {
         }))
     }
 
-    pub(crate) async fn dispatch_pending(&self, scope: ListScope, intent: PendingSheetIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_pending(
+        &self,
+        scope: ListScope,
+        intent: PendingSheetIntent,
+    ) -> Result<serde_json::Value, AppError> {
         let i = scope.index();
         let null = serde_json::Value::Null;
         if let PendingSheetIntent::Open { ticket_id } = &intent {
             let (t, instance) = self.open_ticket_for_sheet(scope, ticket_id)?;
-            self.lock().pending[i] = PendingState { open: true, instance, ticket: Some(t), ..Default::default() };
+            self.lock().pending[i] = PendingState {
+                open: true,
+                instance,
+                ticket: Some(t),
+                ..Default::default()
+            };
             self.publish();
             return Ok(null);
         }
@@ -536,7 +637,9 @@ impl Workspace {
                 if reason.trim().is_empty() {
                     return Ok(null);
                 }
-                let message = self.list_apply(scope, &TicketChange::Pending { reason }, &t).await;
+                let message = self
+                    .list_apply(scope, &TicketChange::Pending { reason }, &t)
+                    .await;
                 {
                     let mut st = self.lock();
                     let p = &mut st.pending[i];
@@ -555,45 +658,74 @@ impl Workspace {
 
     // MARK: Resolve
 
-    pub(crate) fn resolve_snapshot(&self, st: &State, scope: ListScope, now: DateTime<Utc>) -> ResolveSheetSnapshot {
+    pub(crate) fn resolve_snapshot(
+        &self,
+        st: &State,
+        scope: ListScope,
+        now: DateTime<Utc>,
+    ) -> ResolveSheetSnapshot {
         let r = &st.resolve[scope.index()];
         let Some(t) = Self::sheet_ticket(st, scope, r.ticket.as_ref()).filter(|_| r.open) else {
             return ResolveSheetSnapshot::Closed;
         };
         let working = &st.lists[scope.index()].working;
         let solution_empty = r.solution.trim().is_empty();
-        let subcats = if r.service.is_none() { Vec::new() } else { r.subcategories.value().cloned().unwrap_or_default() };
+        let subcats = if r.service.is_none() {
+            Vec::new()
+        } else {
+            r.subcategories.value().cloned().unwrap_or_default()
+        };
         ResolveSheetSnapshot::Open(Box::new(ResolveSheetOpen {
             ticket_id: t.id(),
             title: format!("Resolve {}", t.r#ref),
             subtitle: t.title.clone(),
             service: dropdown(
-                r.services.value().map(|s| services_items(s)).unwrap_or_default(),
+                r.services
+                    .value()
+                    .map(|s| services_items(s))
+                    .unwrap_or_default(),
                 r.service.as_ref().map(|s| s.id.clone()),
                 placeholder(&r.services, "Loading services…", "No services found"),
                 r.services.value().is_some(),
             ),
-            service_required: RequiredMark { missing: r.tried && r.service.is_none() },
+            service_required: RequiredMark {
+                missing: r.tried && r.service.is_none(),
+            },
             subcategory: dropdown(
                 services_items(&subcats),
                 r.subcategory.as_ref().map(|s| s.id.clone()),
                 if r.service.is_none() {
                     "Choose a service first".to_owned()
                 } else {
-                    placeholder(&r.subcategories, "Loading subcategories…", "This service has no subcategories")
+                    placeholder(
+                        &r.subcategories,
+                        "Loading subcategories…",
+                        "This service has no subcategories",
+                    )
                 },
                 !(r.service.is_none() || r.subcategories.value().is_none()),
             ),
-            subcategory_required: RequiredMark { missing: r.tried && r.subcategory.is_none() },
+            subcategory_required: RequiredMark {
+                missing: r.tried && r.subcategory.is_none(),
+            },
             code: dropdown(
-                ResolutionCode::standard().iter().map(|c| PickItem { id: c.id.clone(), label: c.name() }).collect(),
+                ResolutionCode::standard()
+                    .iter()
+                    .map(|c| PickItem {
+                        id: c.id.clone(),
+                        label: c.name(),
+                    })
+                    .collect(),
                 r.code.as_ref().map(|c| c.id.clone()),
                 "Choose…".to_owned(),
                 true,
             ),
             solution: r.solution.clone(),
-            solution_required: RequiredMark { missing: r.tried && solution_empty },
-            solution_error: (r.tried && solution_empty).then(|| "Describe what fixed it. The caller sees this.".to_owned()),
+            solution_required: RequiredMark {
+                missing: r.tried && solution_empty,
+            },
+            solution_error: (r.tried && solution_empty)
+                .then(|| "Describe what fixed it. The caller sees this.".to_owned()),
             timer_line: Self::timer_line(st, &t, now),
             error: r.error.clone(),
             busy: working.as_deref() == Some(t.id().as_str()),
@@ -601,7 +733,11 @@ impl Workspace {
         }))
     }
 
-    pub(crate) async fn dispatch_resolve(&self, scope: ListScope, intent: ResolveSheetIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_resolve(
+        &self,
+        scope: ListScope,
+        intent: ResolveSheetIntent,
+    ) -> Result<serde_json::Value, AppError> {
         let i = scope.index();
         let null = serde_json::Value::Null;
         if let ResolveSheetIntent::Open { ticket_id } = &intent {
@@ -637,14 +773,19 @@ impl Workspace {
                 Ok(null)
             }
             ResolveSheetIntent::SetService { service_id } => {
-                let new = match &service_id {
-                    None => None,
-                    Some(id) => {
-                        let found =
-                            self.lock().resolve[i].services.value().and_then(|xs| xs.iter().find(|x| &x.id == id).cloned());
-                        Some(found.ok_or_else(|| AppError::invalid_intent(format!("No service {id}.")))?)
-                    }
-                };
+                let new =
+                    match &service_id {
+                        None => None,
+                        Some(id) => {
+                            let found = self.lock().resolve[i]
+                                .services
+                                .value()
+                                .and_then(|xs| xs.iter().find(|x| &x.id == id).cloned());
+                            Some(found.ok_or_else(|| {
+                                AppError::invalid_intent(format!("No service {id}."))
+                            })?)
+                        }
+                    };
                 self.resolve_set_service(scope, instance, new);
                 Ok(null)
             }
@@ -658,9 +799,13 @@ impl Workspace {
                             let found = if r.service.is_none() {
                                 None
                             } else {
-                                r.subcategories.value().and_then(|xs| xs.iter().find(|x| &x.id == id).cloned())
+                                r.subcategories
+                                    .value()
+                                    .and_then(|xs| xs.iter().find(|x| &x.id == id).cloned())
                             };
-                            Some(found.ok_or_else(|| AppError::invalid_intent(format!("No subcategory {id}.")))?)
+                            Some(found.ok_or_else(|| {
+                                AppError::invalid_intent(format!("No subcategory {id}."))
+                            })?)
                         }
                     };
                 }
@@ -674,7 +819,9 @@ impl Workspace {
                         ResolutionCode::standard()
                             .into_iter()
                             .find(|c| &c.id == id)
-                            .ok_or_else(|| AppError::invalid_intent(format!("No resolution code {id}.")))?,
+                            .ok_or_else(|| {
+                                AppError::invalid_intent(format!("No resolution code {id}."))
+                            })?,
                     ),
                 };
                 self.lock().resolve[i].code = code;
@@ -693,14 +840,23 @@ impl Workspace {
                     r.tried = true;
                     match (&r.service, &r.subcategory, &r.code) {
                         (Some(s), Some(sub), Some(code)) if !r.solution.trim().is_empty() => {
-                            Some(Resolution::new(s.id.clone(), sub.id.clone(), code.id.clone(), r.solution.clone()))
+                            Some(Resolution::new(
+                                s.id.clone(),
+                                sub.id.clone(),
+                                code.id.clone(),
+                                r.solution.clone(),
+                            ))
                         }
                         _ => None,
                     }
                 };
                 self.publish();
-                let Some(resolution) = fields else { return Ok(null) };
-                let message = self.list_apply(scope, &TicketChange::Resolve(resolution), &t).await;
+                let Some(resolution) = fields else {
+                    return Ok(null);
+                };
+                let message = self
+                    .list_apply(scope, &TicketChange::Resolve(resolution), &t)
+                    .await;
                 {
                     let mut st = self.lock();
                     let r = &mut st.resolve[i];
@@ -738,7 +894,9 @@ impl Workspace {
         let loaded = {
             let st = self.lock();
             let d = &st.details[i];
-            d.loaded().filter(|_| d.ticket.as_ref().map(KitTicket::id) == Some(t.id())).cloned()
+            d.loaded()
+                .filter(|_| d.ticket.as_ref().map(KitTicket::id) == Some(t.id()))
+                .cloned()
         };
         let loaded = match loaded {
             Some(d) => Some(d),
@@ -752,7 +910,11 @@ impl Workspace {
             }
             match loaded.filter(|d| TicketWrites::is_id(&d.service_id) && d.service_id != "0") {
                 Some(d) => {
-                    let name = if d.service_name.is_empty() { format!("Service {}", d.service_id) } else { d.service_name.clone() };
+                    let name = if d.service_name.is_empty() {
+                        format!("Service {}", d.service_id)
+                    } else {
+                        d.service_name.clone()
+                    };
                     let current = ServiceRef::new(d.service_id.clone(), name);
                     if !all.iter().any(|s| s.id == current.id) {
                         all.insert(0, current.clone());
@@ -807,7 +969,12 @@ impl Workspace {
         }
     }
 
-    async fn resolve_load_subcategories(&self, scope: ListScope, instance: u64, chosen: ServiceRef) {
+    async fn resolve_load_subcategories(
+        &self,
+        scope: ListScope,
+        instance: u64,
+        chosen: ServiceRef,
+    ) {
         let i = scope.index();
         {
             let mut st = self.lock();

@@ -21,16 +21,33 @@ fn handler(r: &RecordedRequest) -> StubReply {
     let class = r.class().unwrap_or_default();
     let key = oql(r);
     match class.as_str() {
-        "Person" if key.contains("org_id = 3") => objects_found("Person", &[("11", agent()), ("12", caller())], Some(140)),
+        "Person" if key.contains("org_id = 3") => {
+            objects_found("Person", &[("11", agent()), ("12", caller())], Some(140))
+        }
         "Person" if key.contains("'%none%'") => empty(),
         "Person" if key.contains("'%fail%'") => StubReply::failure(-1009),
-        "Person" if key.contains("'%many%'") => objects_found("Person", &[("11", agent()), ("12", caller())], Some(240)),
+        "Person" if key.contains("'%many%'") => {
+            objects_found("Person", &[("11", agent()), ("12", caller())], Some(240))
+        }
         "Person" => objects_found("Person", &[("12", caller()), ("11", agent())], Some(2)),
         "UserRequest" if key.contains("agent_id = 11") => objects(
             "UserRequest",
             &[
-                ("412", ticket_fields("R-000412", "VPN down", "assigned", "2", ("11", "Jo Agent"), "1")),
-                ("413", ticket_fields("R-000413", "Mail", "pending", "3", ("11", "Jo Agent"), "1")),
+                (
+                    "412",
+                    ticket_fields(
+                        "R-000412",
+                        "VPN down",
+                        "assigned",
+                        "2",
+                        ("11", "Jo Agent"),
+                        "1",
+                    ),
+                ),
+                (
+                    "413",
+                    ticket_fields("R-000413", "Mail", "pending", "3", ("11", "Jo Agent"), "1"),
+                ),
             ],
         ),
         _ => empty(),
@@ -58,8 +75,14 @@ async fn search(m: &PeopleModel, q: &str) {
 async fn ppl_01_idle_text_and_placeholder() {
     let e = env(handler);
     let _m = model(&e);
-    assert_eq!(snap(&e)["results"], json!({"type": "idle", "text": "Search by name, for example a caller or an agent."}));
-    assert_eq!(snap(&e)["placeholder"], "Select a person to see their details and tickets.");
+    assert_eq!(
+        snap(&e)["results"],
+        json!({"type": "idle", "text": "Search by name, for example a caller or an agent."})
+    );
+    assert_eq!(
+        snap(&e)["placeholder"],
+        "Select a person to see their details and tickets."
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -102,11 +125,17 @@ async fn ppl_03_banner_when_more_found() {
     let e = env(handler);
     let m = model(&e);
     search(&m, "many").await;
-    assert_eq!(snap(&e)["results"]["banner"], "Showing 2 of 240 people. Type more of the name to narrow it down.");
+    assert_eq!(
+        snap(&e)["results"]["banner"],
+        "Showing 2 of 240 people. Type more of the name to narrow it down."
+    );
     m.show_org("3", "Acme");
     m.appear();
     settle().await;
-    assert_eq!(snap(&e)["results"]["banner"], "Showing 2 of 140 people. Search by name to find someone.");
+    assert_eq!(
+        snap(&e)["results"]["banner"],
+        "Showing 2 of 140 people. Search by name to find someone."
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -119,13 +148,25 @@ async fn ppl_04_states() {
         json!({"type": "failed", "text": "Couldn't search iTop. Can't reach itop.example.com. Check your connection, then retry."})
     );
     search(&m, "none ").await;
-    assert_eq!(snap(&e)["results"], json!({"type": "empty", "text": "Nobody matches \u{201C}none\u{201D}."}));
-    let scoped = env(|r: &RecordedRequest| if r.class().as_deref() == Some("Person") { empty() } else { handler(r) });
+    assert_eq!(
+        snap(&e)["results"],
+        json!({"type": "empty", "text": "Nobody matches \u{201C}none\u{201D}."})
+    );
+    let scoped = env(|r: &RecordedRequest| {
+        if r.class().as_deref() == Some("Person") {
+            empty()
+        } else {
+            handler(r)
+        }
+    });
     let m = model(&scoped);
     m.show_org("9", "Empty Org");
     m.appear();
     settle().await;
-    assert_eq!(snap(&scoped)["results"], json!({"type": "empty", "text": "Nobody in this organization."}));
+    assert_eq!(
+        snap(&scoped)["results"],
+        json!({"type": "empty", "text": "Nobody in this organization."})
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -182,7 +223,10 @@ async fn ppl_08_09_10_agent_detail() {
     assert_eq!(d["teams"], "Network, Service desk");
     assert_eq!(d["tab"], "assigned");
     assert_eq!(d["assignedLabel"], "Assigned to them");
-    assert_eq!(d["tickets"], json!({"type": "loading", "text": "Loading tickets"}));
+    assert_eq!(
+        d["tickets"],
+        json!({"type": "loading", "text": "Loading tickets"})
+    );
     settle().await;
     let d = snap(&e)["detail"].clone();
     assert_eq!(d["assignedLabel"], "Assigned to them 2");
@@ -203,7 +247,10 @@ async fn ppl_08_09_10_caller_detail_starts_on_reported() {
     assert_eq!(d["phone"], Value::Null);
     assert_eq!(d["teams"], Value::Null);
     assert_eq!(d["tab"], "reported");
-    assert_eq!(d["tickets"], json!({"type": "empty", "text": "No open tickets reported by Ann Caller."}));
+    assert_eq!(
+        d["tickets"],
+        json!({"type": "empty", "text": "No open tickets reported by Ann Caller."})
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -214,23 +261,46 @@ async fn ppl_10_11_13_range_change_keeps_tab() {
     send(&m, json!({"type": "select", "id": "11"})).await;
     settle().await;
     send(&m, json!({"type": "setTab", "tab": "reported"})).await;
-    assert_eq!(snap(&e)["detail"]["tickets"]["text"], "No open tickets reported by Jo Agent.");
+    assert_eq!(
+        snap(&e)["detail"]["tickets"]["text"],
+        "No open tickets reported by Jo Agent."
+    );
     e.link.set_scope(TicketScope::new(false, Some(7)));
     m.scope_changed();
     settle().await;
     let d = snap(&e)["detail"].clone();
     assert_eq!(d["tab"], "reported");
-    assert_eq!(d["tickets"]["text"], "No tickets in this range reported by Jo Agent.");
+    assert_eq!(
+        d["tickets"]["text"],
+        "No tickets in this range reported by Jo Agent."
+    );
     let q: Vec<String> = e.oql().into_iter().filter(|q| q.contains("= 11")).collect();
-    assert!(q.iter().any(|q| q.contains("agent_id = 11") && q.contains("INTERVAL 7 DAY")), "{q:?}");
-    assert!(q.iter().any(|q| q.contains("caller_id = 11") && q.contains("INTERVAL 7 DAY")), "{q:?}");
+    assert!(
+        q.iter()
+            .any(|q| q.contains("agent_id = 11") && q.contains("INTERVAL 7 DAY")),
+        "{q:?}"
+    );
+    assert!(
+        q.iter()
+            .any(|q| q.contains("caller_id = 11") && q.contains("INTERVAL 7 DAY")),
+        "{q:?}"
+    );
     send(&m, json!({"type": "setTab", "tab": "assigned"})).await;
-    assert_eq!(snap(&e)["detail"]["tickets"]["table"]["sections"][0]["group"], "assigned");
+    assert_eq!(
+        snap(&e)["detail"]["tickets"]["table"]["sections"][0]["group"],
+        "assigned"
+    );
 }
 
 #[tokio::test(start_paused = true)]
 async fn ppl_13_failure_has_no_retry() {
-    let e = env(|r: &RecordedRequest| if r.class().as_deref() == Some("UserRequest") { StubReply::failure(-1009) } else { handler(r) });
+    let e = env(|r: &RecordedRequest| {
+        if r.class().as_deref() == Some("UserRequest") {
+            StubReply::failure(-1009)
+        } else {
+            handler(r)
+        }
+    });
     let m = model(&e);
     search(&m, "jo").await;
     send(&m, json!({"type": "select", "id": "11"})).await;
@@ -252,7 +322,10 @@ async fn ppl_14_table_columns_per_tab_and_paging() {
     send(&m, json!({"type": "setTicketPage", "page": 2})).await;
     let t = snap(&e)["detail"]["tickets"]["table"].clone();
     assert_eq!(t["pager"]["label"], "2–2 of 2");
-    assert_eq!(t["sections"][0]["rows"][0]["assignee"], json!({"type": "person", "initials": "JA", "name": "Jo Agent"}));
+    assert_eq!(
+        t["sections"][0]["rows"][0]["assignee"],
+        json!({"type": "person", "initials": "JA", "name": "Jo Agent"})
+    );
     // Another tab shows other tickets: back to page 1 there.
     send(&m, json!({"type": "setTab", "tab": "reported"})).await;
     send(&m, json!({"type": "setTab", "tab": "assigned"})).await;
@@ -288,10 +361,33 @@ async fn people_snapshot_json_shape() {
         k.sort();
         k
     };
-    assert_eq!(keys(&s), ["detail", "placeholder", "query", "results", "scope", "selectedId"]);
+    assert_eq!(
+        keys(&s),
+        [
+            "detail",
+            "placeholder",
+            "query",
+            "results",
+            "scope",
+            "selectedId"
+        ]
+    );
     assert_eq!(keys(&s["results"]), ["banner", "people", "type"]);
     assert_eq!(
         keys(&s["detail"]),
-        ["assignedLabel", "displayName", "email", "id", "initials", "kindLine", "organization", "phone", "reportedLabel", "tab", "teams", "tickets"]
+        [
+            "assignedLabel",
+            "displayName",
+            "email",
+            "id",
+            "initials",
+            "kindLine",
+            "organization",
+            "phone",
+            "reportedLabel",
+            "tab",
+            "teams",
+            "tickets"
+        ]
     );
 }

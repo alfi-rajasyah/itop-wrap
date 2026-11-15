@@ -1,7 +1,7 @@
 //! What the standalone models (new ticket, CMDB, orgs, people) need from the rest of the workspace.
-use std::sync::Arc;
-use itop_kit::{Session, Ticket, TicketScope};
 use crate::{hub::Hub, native::Native};
+use itop_kit::{Session, Ticket, TicketScope};
+use std::sync::Arc;
 
 /// Shared by every model of one signed-in session.
 #[derive(Clone)]
@@ -28,5 +28,9 @@ pub trait WorkspaceLink: Send + Sync {
 #[async_trait::async_trait]
 pub trait Model: Send + Sync {
     /// Handles an intent addressed to `model_id`; returns the intent's result (contract.ts ResultOf).
-    async fn dispatch(&self, model_id: &str, intent: serde_json::Value) -> Result<serde_json::Value, crate::error::AppError>;
+    async fn dispatch(
+        &self,
+        model_id: &str,
+        intent: serde_json::Value,
+    ) -> Result<serde_json::Value, crate::error::AppError>;
 }

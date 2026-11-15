@@ -17,14 +17,14 @@ use ts_rs::TS;
 use super::seams::{Model, ModelContext, WorkspaceLink};
 use crate::error::AppError;
 
-#[path = "cmdb_text.rs"]
-pub mod text;
 #[cfg(test)]
 #[path = "cmdb_test_support.rs"]
 pub(crate) mod test_support;
 #[cfg(test)]
 #[path = "cmdb_tests.rs"]
 mod tests;
+#[path = "cmdb_text.rs"]
+pub mod text;
 
 use text::{OrgScope, SearchRun, character_count, describe, status_label, trim_whitespaces};
 
@@ -62,12 +62,21 @@ pub struct CIChip {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum CIResults {
-    Idle { text: String },
+    Idle {
+        text: String,
+    },
     Searching,
-    Failed { text: String },
-    Empty { text: String },
+    Failed {
+        text: String,
+    },
+    Empty {
+        text: String,
+    },
     /// `header`: "1 result", "3 results", "First 50 results".
-    Loaded { header: String, items: Vec<CIRow> },
+    Loaded {
+        header: String,
+        items: Vec<CIRow>,
+    },
 }
 
 /// One cell of the CI fields grid.
@@ -96,8 +105,12 @@ pub struct CITicketRow {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum CIDetailBody {
-    Loading { text: String },
-    Failed { text: String },
+    Loading {
+        text: String,
+    },
+    Failed {
+        text: String,
+    },
     #[serde(rename_all = "camelCase")]
     Loaded {
         fields: Vec<CIDetailField>,
@@ -261,7 +274,9 @@ impl CmdbModel {
     /// The model stopped existing (sign-out).
     pub fn clear(&self) {
         let mut st = self.lock();
-        let State { search, results, .. } = &mut *st;
+        let State {
+            search, results, ..
+        } = &mut *st;
         search.cancel(results);
         if let Some(h) = st.detail_task.take() {
             h.abort();
@@ -288,7 +303,9 @@ impl CmdbModel {
     pub fn disappear(&self) {
         let mut st = self.lock();
         st.visible = false;
-        let State { search, results, .. } = &mut *st;
+        let State {
+            search, results, ..
+        } = &mut *st;
         search.cancel(results);
         st.search.task_id = None;
         st.detail_generation += 1;
@@ -347,7 +364,10 @@ impl CmdbModel {
         let current_id = st.current.as_ref().map(ConfigItem::id);
         if st.selected_id != current_id
             && let Results::Loaded(items) = &st.results
-            && let Some(item) = items.iter().find(|i| Some(i.id()) == st.selected_id).cloned()
+            && let Some(item) = items
+                .iter()
+                .find(|i| Some(i.id()) == st.selected_id)
+                .cloned()
         {
             st.current = Some(item);
         }
@@ -369,7 +389,9 @@ impl CmdbModel {
     /// `copyName(_:)`: the name on the pasteboard, "Copied" for 2 s (CMDB-11, POLL-9).
     fn copy_name(&self) {
         let mut st = self.lock();
-        let Some(name) = st.current.as_ref().map(|c| c.name.clone()) else { return };
+        let Some(name) = st.current.as_ref().map(|c| c.name.clone()) else {
+            return;
+        };
         self.ctx.native.copy_text(&name);
         st.copied = true;
         drop(st);
@@ -387,7 +409,11 @@ impl CmdbModel {
     // MARK: Search (`search()`, W/CMDBModel.swift:75-98)
 
     fn task_id(st: &State) -> String {
-        format!("{}{}", st.query, st.scope.as_ref().map_or("", |s| s.0.as_str()))
+        format!(
+            "{}{}",
+            st.query,
+            st.scope.as_ref().map_or("", |s| s.0.as_str())
+        )
     }
 
     /// `.task(id: query + scope id)`: a new id restarts the search while the list is on screen.
@@ -398,7 +424,9 @@ impl CmdbModel {
     }
 
     fn start_search(&self, st: &mut State) {
-        let State { search, results, .. } = &mut *st;
+        let State {
+            search, results, ..
+        } = &mut *st;
         search.cancel(results);
         let fetch = Self::search_start(st);
         st.search.task_id = Some(Self::task_id(st));
@@ -421,7 +449,9 @@ impl CmdbModel {
         }
         if let Some((id, _)) = &st.scope {
             let key = format!("org:{id}");
-            if st.searched.as_deref() == Some(key.as_str()) && matches!(st.results, Results::Loaded(_)) {
+            if st.searched.as_deref() == Some(key.as_str())
+                && matches!(st.results, Results::Loaded(_))
+            {
                 return None;
             }
             st.results = Results::Searching;
@@ -516,7 +546,9 @@ impl CmdbModel {
             let Some(model) = me.upgrade() else { return };
             model.publish();
             let host = text::host(&model.ctx.session);
-            let answer = CMDBService::new(model.ctx.session.client.clone()).detail(&item).await;
+            let answer = CMDBService::new(model.ctx.session.client.clone())
+                .detail(&item)
+                .await;
             {
                 let mut st = model.lock();
                 if st.detail_generation != generation {
@@ -554,7 +586,10 @@ impl CmdbModel {
     fn build(&self, st: &State) -> CMDBSnapshot {
         CMDBSnapshot {
             query: st.query.clone(),
-            scope: st.scope.as_ref().map(|(id, name)| OrgScope { org_id: id.clone(), org_name: name.clone() }),
+            scope: st.scope.as_ref().map(|(id, name)| OrgScope {
+                org_id: id.clone(),
+                org_name: name.clone(),
+            }),
             results: Self::results_view(st),
             selected_id: st.selected_id.clone(),
             current: st.current.as_ref().map(|item| self.detail_view(st, item)),
@@ -564,11 +599,18 @@ impl CmdbModel {
 
     fn results_view(st: &State) -> CIResults {
         match &st.results {
-            Results::Idle => CIResults::Idle { text: "Search by name, for example a server or application.".to_owned() },
+            Results::Idle => CIResults::Idle {
+                text: "Search by name, for example a server or application.".to_owned(),
+            },
             Results::Searching => CIResults::Searching,
-            Results::Failed(e) => CIResults::Failed { text: format!("Couldn't search iTop. {e}") },
+            Results::Failed(e) => CIResults::Failed {
+                text: format!("Couldn't search iTop. {e}"),
+            },
             Results::Loaded(items) if items.is_empty() => CIResults::Empty {
-                text: format!("No config items match \u{201C}{}\u{201D}.", trim_whitespaces(&st.query)),
+                text: format!(
+                    "No config items match \u{201C}{}\u{201D}.",
+                    trim_whitespaces(&st.query)
+                ),
             },
             Results::Loaded(items) => {
                 let n = items.len();
@@ -603,19 +645,34 @@ impl CmdbModel {
     fn detail_view(&self, st: &State, item: &ConfigItem) -> CIDetailView {
         let session = &self.ctx.session;
         let status = match &st.detail {
-            Detail::Loaded(d) => d.fields.iter().find(|f| f.label == "Status").map(|f| f.value.clone()),
+            Detail::Loaded(d) => d
+                .fields
+                .iter()
+                .find(|f| f.label == "Status")
+                .map(|f| f.value.clone()),
             _ => None,
         };
-        let header_line = std::iter::once(item.class_label()).chain(status).collect::<Vec<_>>().join(" · ");
+        let header_line = std::iter::once(item.class_label())
+            .chain(status)
+            .collect::<Vec<_>>()
+            .join(" · ");
         let body = match &st.detail {
-            Detail::Loading => CIDetailBody::Loading { text: format!("Loading {} from iTop", item.name) },
-            Detail::Failed(e) => CIDetailBody::Failed { text: format!("Couldn't load this config item. {e}") },
+            Detail::Loading => CIDetailBody::Loading {
+                text: format!("Loading {} from iTop", item.name),
+            },
+            Detail::Failed(e) => CIDetailBody::Failed {
+                text: format!("Couldn't load this config item. {e}"),
+            },
             Detail::Loaded(d) => {
                 let chip = |r: &itop_kit::CIRef| CIChip {
                     key: r.id.clone(),
                     class_name: r.class_name.clone(),
                     name: r.name.clone(),
-                    help: format!("{}: open {}", ConfigItem::label_for_class(&r.class_name), r.name),
+                    help: format!(
+                        "{}: open {}",
+                        ConfigItem::label_for_class(&r.class_name),
+                        r.name
+                    ),
                 };
                 let names: Vec<String> = d.used_by.iter().map(|r| r.name.clone()).collect();
                 let used_by_sentence = if d.used_by.is_empty() {
@@ -630,7 +687,14 @@ impl CmdbModel {
                 };
                 let me = &session.user;
                 CIDetailBody::Loaded {
-                    fields: d.fields.iter().map(|f| CIDetailField { label: f.label.clone(), value: f.value.clone() }).collect(),
+                    fields: d
+                        .fields
+                        .iter()
+                        .map(|f| CIDetailField {
+                            label: f.label.clone(),
+                            value: f.value.clone(),
+                        })
+                        .collect(),
                     description: (!d.description.is_empty()).then(|| d.description.clone()),
                     depends_on: d.depends_on.iter().map(chip).collect(),
                     used_by: d.used_by.iter().map(chip).collect(),
@@ -656,7 +720,10 @@ impl CmdbModel {
                             ),
                         })
                         .collect(),
-                    open_tickets_empty_text: d.open_tickets.is_empty().then(|| format!("No open tickets on {}.", item.name)),
+                    open_tickets_empty_text: d
+                        .open_tickets
+                        .is_empty()
+                        .then(|| format!("No open tickets on {}.", item.name)),
                 }
             }
         };
@@ -685,12 +752,17 @@ impl Model for CmdbModel {
         if model_id != MODEL_ID {
             return Err(AppError::unknown_model(model_id));
         }
-        let intent: CMDBIntent = serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
+        let intent: CMDBIntent =
+            serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
         match intent {
             CMDBIntent::SetQuery { query } => self.set_query(query),
             CMDBIntent::ClearScope => self.clear_scope(),
             CMDBIntent::Select { id } => self.select(id),
-            CMDBIntent::OpenCI { key, class_name, name } => self.open_item(ConfigItem::new(key, class_name, name, ""), true),
+            CMDBIntent::OpenCI {
+                key,
+                class_name,
+                name,
+            } => self.open_item(ConfigItem::new(key, class_name, name, ""), true),
             CMDBIntent::RetryDetail => self.retry_detail().await,
             CMDBIntent::CopyName => self.copy_name(),
         }

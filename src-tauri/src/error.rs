@@ -23,15 +23,23 @@ pub enum AppError {
 
 impl AppError {
     pub fn not_signed_in() -> Self {
-        Self::NotSignedIn { message: "Not signed in.".into() }
+        Self::NotSignedIn {
+            message: "Not signed in.".into(),
+        }
     }
     pub fn unknown_model(id: &str) -> Self {
-        Self::UnknownModel { message: format!("No model named {id}.") }
+        Self::UnknownModel {
+            message: format!("No model named {id}."),
+        }
     }
     pub fn invalid_intent(why: impl std::fmt::Display) -> Self {
-        Self::InvalidIntent { message: why.to_string() }
+        Self::InvalidIntent {
+            message: why.to_string(),
+        }
     }
     pub fn internal(why: impl std::fmt::Display) -> Self {
-        Self::Internal { message: why.to_string() }
+        Self::Internal {
+            message: why.to_string(),
+        }
     }
 }

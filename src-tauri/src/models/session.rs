@@ -128,14 +128,26 @@ impl SessionModelState {
     pub fn new(saved_server: Option<String>, saved_user: Option<String>) -> Self {
         let server = saved_server.unwrap_or_else(|| "https://".to_owned());
         let user = saved_user.unwrap_or_default();
-        let form = FormState { signing: false, missing_fields: false, error: None, initial_focus: initial_focus(&server, &user) };
-        SessionModelState { state: SessionState::Restoring, server, user, form }
+        let form = FormState {
+            signing: false,
+            missing_fields: false,
+            error: None,
+            initial_focus: initial_focus(&server, &user),
+        };
+        SessionModelState {
+            state: SessionState::Restoring,
+            server,
+            user,
+            form,
+        }
     }
 
     /// The `LoginView` message, in priority order (AUTH-15…19).
     pub fn message(&self, notice: Option<&str>) -> Option<LoginMessage> {
         if self.form.missing_fields {
-            return Some(LoginMessage::MissingFields { text: "Enter your username and password.".to_owned() });
+            return Some(LoginMessage::MissingFields {
+                text: "Enter your username and password.".to_owned(),
+            });
         }
         match &self.form.error {
             Some(ITopError::RestNotAllowed) => Some(LoginMessage::RestRefused {
@@ -145,7 +157,9 @@ impl SessionModelState {
                     self.user
                 ),
             }),
-            Some(e) => Some(LoginMessage::Error { text: e.to_string() }),
+            Some(e) => Some(LoginMessage::Error {
+                text: e.to_string(),
+            }),
             None => notice.map(|n| LoginMessage::Notice { text: n.to_owned() }),
         }
     }
@@ -157,13 +171,17 @@ impl SessionModelState {
                 form: LoginForm {
                     server: self.server.clone(),
                     user: self.user.clone(),
-                    http_warning: trim_spaces(&self.server).to_lowercase().starts_with("http://"),
+                    http_warning: trim_spaces(&self.server)
+                        .to_lowercase()
+                        .starts_with("http://"),
                     signing_in: self.form.signing,
                     message: self.message(notice.as_deref()),
                     initial_focus: self.form.initial_focus,
                 },
             },
-            SessionState::Unreachable(message) => SessionSnapshot::Unreachable { message: message.clone() },
+            SessionState::Unreachable(message) => SessionSnapshot::Unreachable {
+                message: message.clone(),
+            },
             SessionState::SignedIn(session) => SessionSnapshot::SignedIn {
                 display_name: session.user.display_name.clone(),
                 host: super::shell::account_host(session.client.server.host()),
@@ -190,9 +208,9 @@ impl SessionModelState {
         match result {
             Ok(Some(session)) => SessionState::SignedIn(std::sync::Arc::new(session)),
             Ok(None) => SessionState::SignedOut { notice: None },
-            Err(SessionError::ITop(ITopError::InvalidCredentials)) => {
-                SessionState::SignedOut { notice: Some("Your password was rejected. Sign in again.".to_owned()) }
-            }
+            Err(SessionError::ITop(ITopError::InvalidCredentials)) => SessionState::SignedOut {
+                notice: Some("Your password was rejected. Sign in again.".to_owned()),
+            },
             Err(e) => SessionState::Unreachable(e.to_string()),
         }
     }

@@ -33,7 +33,9 @@ use core_foundation::boolean::CFBoolean;
 use core_foundation::data::CFData;
 use core_foundation::number::CFNumber;
 use core_foundation::string::CFString;
-use core_foundation_sys::preferences::{CFPreferencesAppSynchronize, CFPreferencesCopyAppValue, CFPreferencesSetAppValue};
+use core_foundation_sys::preferences::{
+    CFPreferencesAppSynchronize, CFPreferencesCopyAppValue, CFPreferencesSetAppValue,
+};
 
 use itop_kit::session::SettingsStore;
 
@@ -59,7 +61,9 @@ pub mod keys {
 pub fn debug_settings_name() -> Option<String> {
     #[cfg(debug_assertions)]
     {
-        std::env::var("ITOPWRAP_SETTINGS").ok().filter(|s| !s.is_empty())
+        std::env::var("ITOPWRAP_SETTINGS")
+            .ok()
+            .filter(|s| !s.is_empty())
     }
     #[cfg(not(debug_assertions))]
     {
@@ -84,7 +88,9 @@ pub struct Prefs {
 impl Prefs {
     /// A domain by name (an app id or a suite name).
     pub fn domain(domain: impl Into<String>) -> Self {
-        Self { domain: domain.into() }
+        Self {
+            domain: domain.into(),
+        }
     }
 
     /// The app's standard domain (`UserDefaults.standard` of the Swift app).
@@ -110,7 +116,9 @@ impl Prefs {
         let app = CFString::new(&self.domain);
         // SAFETY: both arguments are valid CFStrings that outlive the call; the result follows the
         // Create rule (we own it), or is null when there is no value.
-        let raw = unsafe { CFPreferencesCopyAppValue(key.as_concrete_TypeRef(), app.as_concrete_TypeRef()) };
+        let raw = unsafe {
+            CFPreferencesCopyAppValue(key.as_concrete_TypeRef(), app.as_concrete_TypeRef())
+        };
         if raw.is_null() {
             return None;
         }
@@ -141,7 +149,10 @@ impl Prefs {
             return String::from_utf8(d.bytes().to_vec()).ok();
         }
         if let Some(n) = value.downcast::<CFNumber>() {
-            return n.to_i64().map(|i| i.to_string()).or_else(|| n.to_f64().map(|f| f.to_string()));
+            return n
+                .to_i64()
+                .map(|i| i.to_string())
+                .or_else(|| n.to_f64().map(|f| f.to_string()));
         }
         None
     }
@@ -184,7 +195,9 @@ impl Prefs {
         if let Some(d) = value.downcast::<CFData>() {
             return Some(d.bytes().to_vec());
         }
-        value.downcast::<CFString>().map(|s| s.to_string().into_bytes())
+        value
+            .downcast::<CFString>()
+            .map(|s| s.to_string().into_bytes())
     }
 
     pub fn set_string(&self, key: &str, value: Option<&str>) {
@@ -200,7 +213,10 @@ impl Prefs {
     }
 
     pub fn set_data(&self, key: &str, value: Option<&[u8]>) {
-        self.put(key, value.map(|v| CFData::from_buffer(v).as_CFType()).as_ref());
+        self.put(
+            key,
+            value.map(|v| CFData::from_buffer(v).as_CFType()).as_ref(),
+        );
     }
 
     pub fn remove(&self, key: &str) {
@@ -246,7 +262,10 @@ mod tests {
     struct Scratch(Prefs);
     impl Scratch {
         fn new(tag: &str) -> Self {
-            Self(Prefs::domain(format!("io.github.alfi-rajasyah.itopwrap.tests.{tag}.{}", std::process::id())))
+            Self(Prefs::domain(format!(
+                "io.github.alfi-rajasyah.itopwrap.tests.{tag}.{}",
+                std::process::id()
+            )))
         }
     }
     impl Drop for Scratch {
@@ -289,7 +308,10 @@ mod tests {
         let p = &p.0;
         let json = r#"{"ticketClass":"UserRequest","ticketKey":"12","ref":"R-000012","title":"Café","orgID":"3","start":785000000}"#;
         p.set_data(keys::TIMER_RUNNING, Some(json.as_bytes()));
-        assert_eq!(SettingsStore::string(p, keys::TIMER_RUNNING).as_deref(), Some(json));
+        assert_eq!(
+            SettingsStore::string(p, keys::TIMER_RUNNING).as_deref(),
+            Some(json)
+        );
         SettingsStore::set_string(p, keys::TIMER_RUNNING, None);
         assert_eq!(p.data(keys::TIMER_RUNNING), None);
     }

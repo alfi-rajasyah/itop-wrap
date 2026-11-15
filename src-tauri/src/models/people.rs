@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
 
-use super::cmdb::text::{self, Loadable, OrgScope, SearchRun, character_count, describe, trim_whitespaces};
+use super::cmdb::text::{
+    self, Loadable, OrgScope, SearchRun, character_count, describe, trim_whitespaces,
+};
 use super::orgs::table::{self, LastColumn, TableOptions, TableState};
 use super::seams::{Model, ModelContext, WorkspaceLink};
 use crate::error::AppError;
@@ -49,12 +51,21 @@ pub struct PersonRow {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum PeopleResults {
-    Idle { text: String },
+    Idle {
+        text: String,
+    },
     Searching,
-    Failed { text: String },
-    Empty { text: String },
+    Failed {
+        text: String,
+    },
+    Empty {
+        text: String,
+    },
     /// `banner`: "Showing 100 of 240 people. …" when more were found than shown.
-    Loaded { banner: Option<String>, people: Vec<PersonRow> },
+    Loaded {
+        banner: Option<String>,
+        people: Vec<PersonRow>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -131,7 +142,8 @@ struct State {
 impl State {
     fn selected(&self) -> Option<&Person> {
         let all = self.results.value()?;
-        all.iter().find(|p| Some(&p.id) == self.selected_id.as_ref())
+        all.iter()
+            .find(|p| Some(&p.id) == self.selected_id.as_ref())
     }
 
     fn current_tickets(&self) -> &Loadable<Vec<Ticket>> {
@@ -199,7 +211,9 @@ impl PeopleModel {
     /// The model stopped existing (sign-out).
     pub fn clear(&self) {
         let mut st = self.lock();
-        let State { search, results, .. } = &mut *st;
+        let State {
+            search, results, ..
+        } = &mut *st;
         search.cancel(results);
         if let Some(h) = st.detail_task.take() {
             h.abort();
@@ -226,7 +240,9 @@ impl PeopleModel {
     pub fn disappear(&self) {
         let mut st = self.lock();
         st.visible = false;
-        let State { search, results, .. } = &mut *st;
+        let State {
+            search, results, ..
+        } = &mut *st;
         search.cancel(results);
         st.search.task_id = None;
         st.detail_generation += 1;
@@ -330,7 +346,11 @@ impl PeopleModel {
     // MARK: Search (`search()`, W/OrgsModel.swift:138-165)
 
     fn task_id(st: &State) -> String {
-        format!("{}{}", st.query, st.scope.as_ref().map_or("", |s| s.0.as_str()))
+        format!(
+            "{}{}",
+            st.query,
+            st.scope.as_ref().map_or("", |s| s.0.as_str())
+        )
     }
 
     fn task_id_changed(&self, st: &mut State, active: bool, scope: TicketScope) {
@@ -340,7 +360,9 @@ impl PeopleModel {
     }
 
     fn start_search(&self, st: &mut State, scope: TicketScope) {
-        let State { search, results, .. } = &mut *st;
+        let State {
+            search, results, ..
+        } = &mut *st;
         search.cancel(results);
         let fetch = Self::search_start(st);
         st.search.task_id = Some(Self::task_id(st));
@@ -364,7 +386,9 @@ impl PeopleModel {
         }
         if let Some((id, _)) = &st.scope {
             let key = format!("org:{id}");
-            if st.searched.as_deref() == Some(key.as_str()) && matches!(st.results, Loadable::Loaded(_)) {
+            if st.searched.as_deref() == Some(key.as_str())
+                && matches!(st.results, Loadable::Loaded(_))
+            {
                 return None;
             }
             st.results = Loadable::Loading;
@@ -452,13 +476,19 @@ impl PeopleModel {
     }
 
     fn start_detail(&self, st: &mut State, keep_tab: bool, scope: TicketScope) {
-        let Some(person) = st.selected().cloned() else { return };
+        let Some(person) = st.selected().cloned() else {
+            return;
+        };
         st.detail_generation += 1;
         if let Some(h) = st.detail_task.take() {
             h.abort();
         }
         if !keep_tab {
-            st.tab = if person.is_agent() { PeopleTab::Assigned } else { PeopleTab::Reported };
+            st.tab = if person.is_agent() {
+                PeopleTab::Assigned
+            } else {
+                PeopleTab::Reported
+            };
         }
         st.assigned = Loadable::Loading;
         st.reported = Loadable::Loading;
@@ -473,7 +503,8 @@ impl PeopleModel {
             let service = OrgService::new(model.ctx.session.client.clone());
             let other = service.clone();
             let id = person.id.clone();
-            let reported = tokio::spawn(async move { other.tickets_reported_by(&id, &scope).await });
+            let reported =
+                tokio::spawn(async move { other.tickets_reported_by(&id, &scope).await });
             let assigned = service.tickets_assigned_to(&person.id, &scope).await;
             {
                 let mut st = model.lock();
@@ -511,7 +542,10 @@ impl PeopleModel {
     fn build(&self, st: &State) -> PeopleSnapshot {
         PeopleSnapshot {
             query: st.query.clone(),
-            scope: st.scope.as_ref().map(|(id, name)| OrgScope { org_id: id.clone(), org_name: name.clone() }),
+            scope: st.scope.as_ref().map(|(id, name)| OrgScope {
+                org_id: id.clone(),
+                org_name: name.clone(),
+            }),
             results: Self::results_view(st),
             selected_id: st.selected_id.clone(),
             detail: st.selected().map(|p| self.detail_view(st, p)),
@@ -521,14 +555,21 @@ impl PeopleModel {
 
     fn results_view(st: &State) -> PeopleResults {
         match &st.results {
-            Loadable::Idle => PeopleResults::Idle { text: "Search by name, for example a caller or an agent.".to_owned() },
+            Loadable::Idle => PeopleResults::Idle {
+                text: "Search by name, for example a caller or an agent.".to_owned(),
+            },
             Loadable::Loading => PeopleResults::Searching,
-            Loadable::Failed(e) => PeopleResults::Failed { text: format!("Couldn't search iTop. {e}") },
+            Loadable::Failed(e) => PeopleResults::Failed {
+                text: format!("Couldn't search iTop. {e}"),
+            },
             Loadable::Loaded(people) if people.is_empty() => PeopleResults::Empty {
                 text: if st.scope.is_some() {
                     "Nobody in this organization.".to_owned()
                 } else {
-                    format!("Nobody matches \u{201C}{}\u{201D}.", trim_whitespaces(&st.query))
+                    format!(
+                        "Nobody matches \u{201C}{}\u{201D}.",
+                        trim_whitespaces(&st.query)
+                    )
                 },
             },
             Loadable::Loaded(people) => {
@@ -557,12 +598,24 @@ impl PeopleModel {
     }
 
     fn detail_view(&self, st: &State, p: &Person) -> PersonDetailView {
-        let count = |l: &Loadable<Vec<Ticket>>| l.value().map_or_else(String::new, |t| format!(" {}", t.len()));
+        let count = |l: &Loadable<Vec<Ticket>>| {
+            l.value()
+                .map_or_else(String::new, |t| format!(" {}", t.len()))
+        };
         let open = st.ticket_scope == TicketScope::OPEN;
-        let kind = if open { "open tickets" } else { "tickets in this range" };
+        let kind = if open {
+            "open tickets"
+        } else {
+            "tickets in this range"
+        };
         let tickets = match st.current_tickets() {
-            Loadable::Idle | Loadable::Loading => TableState::Loading { text: "Loading tickets".to_owned() },
-            Loadable::Failed(e) => TableState::Failed { text: format!("Couldn't load the tickets. {e}"), can_retry: false },
+            Loadable::Idle | Loadable::Loading => TableState::Loading {
+                text: "Loading tickets".to_owned(),
+            },
+            Loadable::Failed(e) => TableState::Failed {
+                text: format!("Couldn't load the tickets. {e}"),
+                can_retry: false,
+            },
             Loadable::Loaded(t) if t.is_empty() => TableState::Empty {
                 text: match st.tab {
                     PeopleTab::Assigned => format!("No {kind} assigned to {}.", p.display_name),
@@ -570,23 +623,41 @@ impl PeopleModel {
                 },
             },
             Loadable::Loaded(t) => {
-                let last = if st.tab == PeopleTab::Assigned { LastColumn::Caller } else { LastColumn::Assignee };
-                TableState::Loaded { table: table::table(t, &self.ctx.session.user, last, &st.table) }
+                let last = if st.tab == PeopleTab::Assigned {
+                    LastColumn::Caller
+                } else {
+                    LastColumn::Assignee
+                };
+                TableState::Loaded {
+                    table: table::table(t, &self.ctx.session.user, last, &st.table),
+                }
             }
         };
         PersonDetailView {
             id: p.id.clone(),
             display_name: p.display_name.clone(),
             initials: p.initials(),
-            kind_line: [if p.is_agent() { "Agent" } else { "Caller" }, p.function.as_str()]
-                .into_iter()
-                .filter(|s| !s.is_empty())
-                .collect::<Vec<_>>()
-                .join(" · "),
-            organization: (!p.org_name.is_empty()).then(|| OrgScope { org_id: p.org_id.clone(), org_name: p.org_name.clone() }),
+            kind_line: [
+                if p.is_agent() { "Agent" } else { "Caller" },
+                p.function.as_str(),
+            ]
+            .into_iter()
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join(" · "),
+            organization: (!p.org_name.is_empty()).then(|| OrgScope {
+                org_id: p.org_id.clone(),
+                org_name: p.org_name.clone(),
+            }),
             email: (!p.email.is_empty()).then(|| p.email.clone()),
             phone: (!p.phone.is_empty()).then(|| p.phone.clone()),
-            teams: p.is_agent().then(|| p.teams.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", ")),
+            teams: p.is_agent().then(|| {
+                p.teams
+                    .iter()
+                    .map(|t| t.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }),
             tab: st.tab,
             assigned_label: format!("Assigned to them{}", count(&st.assigned)),
             reported_label: format!("Reported by them{}", count(&st.reported)),
@@ -601,7 +672,8 @@ impl Model for PeopleModel {
         if model_id != MODEL_ID {
             return Err(AppError::unknown_model(model_id));
         }
-        let intent: PeopleIntent = serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
+        let intent: PeopleIntent =
+            serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
         match intent {
             PeopleIntent::SetQuery { query } => self.set_query(query),
             PeopleIntent::ClearScope => self.clear_scope(),

@@ -4,7 +4,9 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use itop_kit::{CurrentUser, RunningTimer, Ticket as KitTicket, TicketClass, TimeFormat, TimerEntry};
+use itop_kit::{
+    CurrentUser, RunningTimer, Ticket as KitTicket, TicketClass, TimeFormat, TimerEntry,
+};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -49,7 +51,9 @@ impl TimerState {
     }
 
     pub fn is_running(&self, t: &KitTicket) -> bool {
-        self.running.as_ref().is_some_and(|r| r.ticket_id() == t.id())
+        self.running
+            .as_ref()
+            .is_some_and(|r| r.ticket_id() == t.id())
     }
 }
 
@@ -57,7 +61,8 @@ impl TimerState {
 pub fn ticket_for(timer: &RunningTimer) -> KitTicket {
     KitTicket {
         key: timer.ticket_key.clone(),
-        ticket_class: TicketClass::from_raw(&timer.ticket_class).unwrap_or(TicketClass::UserRequest),
+        ticket_class: TicketClass::from_raw(&timer.ticket_class)
+            .unwrap_or(TicketClass::UserRequest),
         r#ref: timer.r#ref.clone(),
         title: timer.title.clone(),
         status: String::new(),
@@ -149,7 +154,12 @@ impl Workspace {
                 text: n.text.clone(),
                 is_error: n.is_error,
                 can_retry: n.can_retry,
-                dismiss_label: if n.can_retry { "Discard this time" } else { "Dismiss" }.to_owned(),
+                dismiss_label: if n.can_retry {
+                    "Discard this time"
+                } else {
+                    "Dismiss"
+                }
+                .to_owned(),
             }),
         }
     }
@@ -160,15 +170,22 @@ impl Workspace {
         st.lists.iter().find_map(|l| l.ticket(Some(id)).cloned())
     }
 
-    pub(crate) async fn dispatch_timer(&self, intent: TimerIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_timer(
+        &self,
+        intent: TimerIntent,
+    ) -> Result<serde_json::Value, AppError> {
         match intent {
             TimerIntent::Start { ticket_id } => {
-                let t = self.timer_ticket(&ticket_id).ok_or_else(|| AppError::invalid_intent(format!("No ticket {ticket_id}.")))?;
+                let t = self
+                    .timer_ticket(&ticket_id)
+                    .ok_or_else(|| AppError::invalid_intent(format!("No ticket {ticket_id}.")))?;
                 self.timer_start(&t).await;
             }
             TimerIntent::Stop => self.timer_stop(None).await,
             TimerIntent::Toggle { ticket_id } => {
-                let t = self.timer_ticket(&ticket_id).ok_or_else(|| AppError::invalid_intent(format!("No ticket {ticket_id}.")))?;
+                let t = self
+                    .timer_ticket(&ticket_id)
+                    .ok_or_else(|| AppError::invalid_intent(format!("No ticket {ticket_id}.")))?;
                 if self.lock().timer.is_running(&t) {
                     self.timer_stop(None).await;
                 } else {
@@ -250,16 +267,27 @@ impl Workspace {
         let now = self.now();
         let (timer, entry) = {
             let mut st = self.lock();
-            let Some(timer) = st.timer.running.take() else { return };
+            let Some(timer) = st.timer.running.take() else {
+                return;
+            };
             let entry = TimerEntry::stop(&timer, now);
             (timer, entry)
         };
         self.0.timer_store.save(None);
-        self.trace(|| format!("timer: stopped on {}, {} s", timer.ticket_id(), entry.duration));
+        self.trace(|| {
+            format!(
+                "timer: stopped on {}, {} s",
+                timer.ticket_id(),
+                entry.duration
+            )
+        });
         let prefix = reason.map(|r| format!("{r} ")).unwrap_or_default();
         if entry.is_too_short() {
             self.lock().timer.notice = Some(TimerNoticeState {
-                text: format!("{prefix}The timer on {} ran under a minute, so nothing was saved.", timer.r#ref),
+                text: format!(
+                    "{prefix}The timer on {} ran under a minute, so nothing was saved.",
+                    timer.r#ref
+                ),
                 is_error: false,
                 can_retry: false,
             });
@@ -290,12 +318,19 @@ impl Workspace {
                     timer.failed = None;
                     *timer.totals.entry(ticket.id()).or_insert(0) += entry.duration;
                     let cap = if entry.capped {
-                        format!(" It stopped at {}, like iTop's own stopwatch.", TimeFormat::clock(entry.duration))
+                        format!(
+                            " It stopped at {}, like iTop's own stopwatch.",
+                            TimeFormat::clock(entry.duration)
+                        )
                     } else {
                         String::new()
                     };
                     timer.notice = Some(TimerNoticeState {
-                        text: format!("{prefix}Saved {} to {}.{cap}", TimeFormat::clock(entry.duration), ticket.r#ref),
+                        text: format!(
+                            "{prefix}Saved {} to {}.{cap}",
+                            TimeFormat::clock(entry.duration),
+                            ticket.r#ref
+                        ),
                         is_error: false,
                         can_retry: false,
                     });
@@ -303,7 +338,11 @@ impl Workspace {
                 Err(e) => {
                     let reason = with_period(&self.describe(&e));
                     timer.notice = Some(TimerNoticeState {
-                        text: format!("{prefix}Couldn't save {} to {}. {reason}", TimeFormat::clock(entry.duration), ticket.r#ref),
+                        text: format!(
+                            "{prefix}Couldn't save {} to {}. {reason}",
+                            TimeFormat::clock(entry.duration),
+                            ticket.r#ref
+                        ),
                         is_error: true,
                         can_retry: true,
                     });
@@ -320,9 +359,14 @@ impl Workspace {
     pub(crate) async fn timer_my_tickets_changed(&self, tickets: &[KitTicket]) {
         let reason = {
             let st = self.lock();
-            let Some(timer) = &st.timer.running else { return };
+            let Some(timer) = &st.timer.running else {
+                return;
+            };
             let id = timer.ticket_id();
-            if tickets.iter().any(|t| t.id() == id && st.timer.can_start(t, self.me())) {
+            if tickets
+                .iter()
+                .any(|t| t.id() == id && st.timer.can_start(t, self.me()))
+            {
                 return;
             }
             format!("{} left Assigned, so its timer stopped.", timer.r#ref)
@@ -339,9 +383,14 @@ impl Workspace {
 
     /// `refreshTotals(_:)` (TMR-17): open tickets only; a failure keeps the old totals.
     pub(crate) async fn timer_refresh_totals(&self, tickets: &[KitTicket]) {
-        let open: Vec<KitTicket> =
-            tickets.iter().filter(|t| t.status != "resolved" && t.status != "closed").cloned().collect();
-        let Ok(found) = self.0.tracking.totals(&open).await else { return };
+        let open: Vec<KitTicket> = tickets
+            .iter()
+            .filter(|t| t.status != "resolved" && t.status != "closed")
+            .cloned()
+            .collect();
+        let Ok(found) = self.0.tracking.totals(&open).await else {
+            return;
+        };
         self.lock().timer.totals.extend(found);
         self.publish();
     }
@@ -354,7 +403,13 @@ impl Workspace {
                 return;
             }
         }
-        let found = self.0.tracking.running_stopwatch(t, self.me()).await.ok().flatten();
+        let found = self
+            .0
+            .tracking
+            .running_stopwatch(t, self.me())
+            .await
+            .ok()
+            .flatten();
         {
             let mut st = self.lock();
             match found {

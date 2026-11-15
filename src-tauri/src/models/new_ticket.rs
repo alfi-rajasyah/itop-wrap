@@ -10,7 +10,10 @@
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use itop_kit::ticket_writes::Failure;
-use itop_kit::{ITopError, NewTicket, PickLists, ServiceCatalog, ServiceRef, TicketClass, TicketWrites, WriteError};
+use itop_kit::{
+    ITopError, NewTicket, PickLists, ServiceCatalog, ServiceRef, TicketClass, TicketWrites,
+    WriteError,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
@@ -63,12 +66,21 @@ pub struct NewTicketStart {
 impl NewTicketStart {
     /// "New ticket" on an organization (SHELL-12).
     pub fn for_org(org_id: &str, org_name: &str) -> Self {
-        Self { org_id: Some(org_id.to_owned()), org_name: Some(org_name.to_owned()), ..Self::default() }
+        Self {
+            org_id: Some(org_id.to_owned()),
+            org_name: Some(org_name.to_owned()),
+            ..Self::default()
+        }
     }
 
     /// "New ticket" on a config item: org matched by name, CI linked (SHELL-13).
     pub fn for_ci(key: &str, name: &str, org_name: &str) -> Self {
-        Self { org_id: None, org_name: Some(org_name.to_owned()), ci_id: Some(key.to_owned()), ci_name: Some(name.to_owned()) }
+        Self {
+            org_id: None,
+            org_name: Some(org_name.to_owned()),
+            ci_id: Some(key.to_owned()),
+            ci_name: Some(name.to_owned()),
+        }
     }
 }
 
@@ -290,11 +302,26 @@ impl Form {
     fn filled(&self) -> NewTicket {
         let mut d = self.draft.clone();
         d.org_id = self.org.as_ref().map_or_else(String::new, |r| r.id.clone());
-        d.caller_id = self.caller.as_ref().map_or_else(String::new, |r| r.id.clone());
-        d.service_id = self.service.as_ref().map_or_else(String::new, |r| r.id.clone());
-        d.subcategory_id = self.subcategory.as_ref().map_or_else(String::new, |r| r.id.clone());
-        d.impact = self.impact.as_ref().map_or_else(|| "1".to_owned(), |r| r.id.clone());
-        d.urgency = self.urgency.as_ref().map_or_else(|| "4".to_owned(), |r| r.id.clone());
+        d.caller_id = self
+            .caller
+            .as_ref()
+            .map_or_else(String::new, |r| r.id.clone());
+        d.service_id = self
+            .service
+            .as_ref()
+            .map_or_else(String::new, |r| r.id.clone());
+        d.subcategory_id = self
+            .subcategory
+            .as_ref()
+            .map_or_else(String::new, |r| r.id.clone());
+        d.impact = self
+            .impact
+            .as_ref()
+            .map_or_else(|| "1".to_owned(), |r| r.id.clone());
+        d.urgency = self
+            .urgency
+            .as_ref()
+            .map_or_else(|| "4".to_owned(), |r| r.id.clone());
         d
     }
 }
@@ -317,7 +344,9 @@ impl Shared {
 
     /// The instance's form, if it is still the opening `generation`.
     fn form(&mut self, instance: NewTicketInstance, generation: u64) -> Option<&mut Form> {
-        self.slot(instance).as_mut().filter(|f| f.generation == generation)
+        self.slot(instance)
+            .as_mut()
+            .filter(|f| f.generation == generation)
     }
 }
 
@@ -335,7 +364,12 @@ impl NewTickets {
             ctx,
             link,
             me: me.clone(),
-            state: Mutex::new(Shared { kept: None, sheet: None, window: None, next_generation: 0 }),
+            state: Mutex::new(Shared {
+                kept: None,
+                sheet: None,
+                window: None,
+                next_generation: 0,
+            }),
         });
         model.publish();
         model
@@ -349,7 +383,9 @@ impl NewTickets {
     fn publish(&self) {
         let st = self.lock();
         for instance in [NewTicketInstance::Sheet, NewTicketInstance::Window] {
-            self.ctx.hub.publish(instance.model_id(), &self.build(&st, instance));
+            self.ctx
+                .hub
+                .publish(instance.model_id(), &self.build(&st, instance));
         }
     }
 
@@ -402,30 +438,51 @@ impl NewTickets {
         {
             let mut st = self.lock();
             let kept = st.kept.clone();
-            let Some(form) = st.form(instance, generation) else { return };
+            let Some(form) = st.form(instance, generation) else {
+                return;
+            };
             // A kept draft wins over a plain start; a start from an org or CI begins fresh.
             match kept {
-                Some(kept) if form.start.org_id.is_none() && form.start.ci_id.is_none() => form.draft = kept,
+                Some(kept) if form.start.org_id.is_none() && form.start.ci_id.is_none() => {
+                    form.draft = kept
+                }
                 _ => form.draft.ci_id = form.start.ci_id.clone(),
             }
         }
         self.publish();
         let host = text::host(&self.ctx.session);
-        let answer = PickLists::new(self.ctx.session.client.clone()).organizations().await;
+        let answer = PickLists::new(self.ctx.session.client.clone())
+            .organizations()
+            .await;
         {
             let mut st = self.lock();
-            let Some(form) = st.form(instance, generation) else { return };
+            let Some(form) = st.form(instance, generation) else {
+                return;
+            };
             match answer {
                 Ok(all) => {
-                    let wanted = form.start.org_id.clone().or_else(|| (!form.draft.org_id.is_empty()).then(|| form.draft.org_id.clone()));
+                    let wanted = form.start.org_id.clone().or_else(|| {
+                        (!form.draft.org_id.is_empty()).then(|| form.draft.org_id.clone())
+                    });
                     let org = all
                         .iter()
                         .find(|o| Some(&o.id) == wanted.as_ref())
-                        .or_else(|| form.start.org_name.as_ref().and_then(|name| all.iter().find(|o| &o.name == name)))
+                        .or_else(|| {
+                            form.start
+                                .org_name
+                                .as_ref()
+                                .and_then(|name| all.iter().find(|o| &o.name == name))
+                        })
                         .cloned();
                     form.orgs = Loadable::Loaded(all);
-                    form.impact = PickLists::impacts().into_iter().find(|r| r.id == form.draft.impact).or(form.impact.take());
-                    form.urgency = PickLists::urgencies().into_iter().find(|r| r.id == form.draft.urgency).or(form.urgency.take());
+                    form.impact = PickLists::impacts()
+                        .into_iter()
+                        .find(|r| r.id == form.draft.impact)
+                        .or(form.impact.take());
+                    form.urgency = PickLists::urgencies()
+                        .into_iter()
+                        .find(|r| r.id == form.draft.urgency)
+                        .or(form.urgency.take());
                     if org.is_none() {
                         form.restoring = false;
                     }
@@ -456,7 +513,11 @@ impl NewTickets {
                 let Some(model) = me.upgrade() else { return };
                 match spawn {
                     Spawn::ForOrg(org) => model.load_for_org(instance, generation, org).await,
-                    Spawn::Subcategories(service) => model.load_subcategories(instance, generation, service).await,
+                    Spawn::Subcategories(service) => {
+                        model
+                            .load_subcategories(instance, generation, service)
+                            .await
+                    }
                 }
             });
         }
@@ -467,7 +528,9 @@ impl NewTickets {
     async fn load_for_org(&self, instance: NewTicketInstance, generation: u64, chosen: ServiceRef) {
         {
             let mut st = self.lock();
-            let Some(form) = st.form(instance, generation) else { return };
+            let Some(form) = st.form(instance, generation) else {
+                return;
+            };
             form.callers = Loadable::Loading;
             form.services = Loadable::Loading;
         }
@@ -502,13 +565,17 @@ impl NewTickets {
         let Ok(offered) = offered.await else { return };
         {
             let mut st = self.lock();
-            let Some(form) = st.form(instance, generation) else { return };
+            let Some(form) = st.form(instance, generation) else {
+                return;
+            };
             match offered {
                 Ok(s) => {
                     if form.org.as_ref() != Some(&chosen) {
                         return;
                     }
-                    let restore = form.restoring.then(|| s.iter().find(|x| x.id == form.draft.service_id).cloned());
+                    let restore = form
+                        .restoring
+                        .then(|| s.iter().find(|x| x.id == form.draft.service_id).cloned());
                     form.services = Loadable::Loaded(s);
                     if let Some(service) = restore {
                         let none = service.is_none();
@@ -529,25 +596,39 @@ impl NewTickets {
     }
 
     /// `loadSubcategories(_:)` (W/NewTicketView.swift:223-234).
-    async fn load_subcategories(&self, instance: NewTicketInstance, generation: u64, chosen: ServiceRef) {
+    async fn load_subcategories(
+        &self,
+        instance: NewTicketInstance,
+        generation: u64,
+        chosen: ServiceRef,
+    ) {
         {
             let mut st = self.lock();
-            let Some(form) = st.form(instance, generation) else { return };
+            let Some(form) = st.form(instance, generation) else {
+                return;
+            };
             form.subcategories = Loadable::Loading;
         }
         self.publish();
         let host = text::host(&self.ctx.session);
-        let found = ServiceCatalog::new(self.ctx.session.client.clone()).subcategories(&chosen.id).await;
+        let found = ServiceCatalog::new(self.ctx.session.client.clone())
+            .subcategories(&chosen.id)
+            .await;
         {
             let mut st = self.lock();
-            let Some(form) = st.form(instance, generation) else { return };
+            let Some(form) = st.form(instance, generation) else {
+                return;
+            };
             match found {
                 Ok(found) => {
                     if form.service.as_ref() != Some(&chosen) {
                         return;
                     }
                     if form.restoring {
-                        form.subcategory = found.iter().find(|x| x.id == form.draft.subcategory_id).cloned();
+                        form.subcategory = found
+                            .iter()
+                            .find(|x| x.id == form.draft.subcategory_id)
+                            .cloned();
                     }
                     form.subcategories = Loadable::Loaded(found);
                 }
@@ -568,7 +649,9 @@ impl NewTickets {
     ) -> Result<Value, AppError> {
         let generation = {
             let mut st = self.lock();
-            let Some(form) = st.slot(instance).as_mut() else { return Ok(Value::Null) };
+            let Some(form) = st.slot(instance).as_mut() else {
+                return Ok(Value::Null);
+            };
             change(form)?;
             form.generation
         };
@@ -586,9 +669,13 @@ impl NewTickets {
     fn cancel(&self, instance: NewTicketInstance) {
         let close_window = {
             let mut st = self.lock();
-            let Some(form) = st.slot(instance).as_ref() else { return };
+            let Some(form) = st.slot(instance).as_ref() else {
+                return;
+            };
             let d = form.filled();
-            let empty = d.org_id.is_empty() && trim_whitespaces(&d.title).is_empty() && trim_whitespaces(&d.description).is_empty();
+            let empty = d.org_id.is_empty()
+                && trim_whitespaces(&d.title).is_empty()
+                && trim_whitespaces(&d.description).is_empty();
             st.kept = if empty { None } else { Some(d) };
             self.close(&mut st, instance)
         };
@@ -642,7 +729,9 @@ impl NewTickets {
         let client = self.ctx.session.client.clone();
         let (generation, filled) = {
             let mut st = self.lock();
-            let Some(form) = st.slot(instance).as_mut() else { return Value::Null };
+            let Some(form) = st.slot(instance).as_mut() else {
+                return Value::Null;
+            };
             // The button is disabled while creating and when creation is off.
             if form.creating || !client.can_create_tickets() {
                 return Value::Null;
@@ -664,7 +753,11 @@ impl NewTickets {
                 let close_window = {
                     let mut st = self.lock();
                     st.kept = None;
-                    if st.form(instance, generation).is_some() { self.close(&mut st, instance) } else { false }
+                    if st.form(instance, generation).is_some() {
+                        self.close(&mut st, instance)
+                    } else {
+                        false
+                    }
                 };
                 if close_window {
                     self.ctx.native.close_new_ticket_window();
@@ -691,7 +784,11 @@ impl NewTickets {
         }
     }
 
-    async fn handle(&self, instance: NewTicketInstance, intent: NewTicketIntent) -> Result<Value, AppError> {
+    async fn handle(
+        &self,
+        instance: NewTicketInstance,
+        intent: NewTicketIntent,
+    ) -> Result<Value, AppError> {
         use NewTicketIntent as I;
         match intent {
             I::Open => {
@@ -708,18 +805,30 @@ impl NewTickets {
                 Ok(())
             }),
             I::SetCaller { id } => self.edit(instance, |f| {
-                let items = if f.org.is_some() { f.callers.value().map_or(&[][..], Vec::as_slice) } else { &[][..] };
+                let items = if f.org.is_some() {
+                    f.callers.value().map_or(&[][..], Vec::as_slice)
+                } else {
+                    &[][..]
+                };
                 f.caller = pick(items, id)?;
                 Ok(())
             }),
             I::SetService { id } => self.edit(instance, |f| {
-                let items = if f.org.is_some() { f.services.value().map_or(&[][..], Vec::as_slice) } else { &[][..] };
+                let items = if f.org.is_some() {
+                    f.services.value().map_or(&[][..], Vec::as_slice)
+                } else {
+                    &[][..]
+                };
                 let service = pick(items, id)?;
                 f.set_service(service);
                 Ok(())
             }),
             I::SetSubcategory { id } => self.edit(instance, |f| {
-                let items = if f.service.is_some() { f.subcategories.value().map_or(&[][..], Vec::as_slice) } else { &[][..] };
+                let items = if f.service.is_some() {
+                    f.subcategories.value().map_or(&[][..], Vec::as_slice)
+                } else {
+                    &[][..]
+                };
                 f.subcategory = pick(items, id)?;
                 Ok(())
             }),
@@ -767,12 +876,23 @@ impl NewTickets {
             NewTicketInstance::Sheet => st.sheet.as_ref(),
             NewTicketInstance::Window => st.window.as_ref(),
         };
-        let Some(f) = form else { return NewTicketSnapshot::Closed };
+        let Some(f) = form else {
+            return NewTicketSnapshot::Closed;
+        };
         let can_create = self.ctx.session.client.can_create_tickets();
         let org_name = f.org.as_ref().map(|o| o.name.as_str());
-        let mark = |empty: bool| RequiredMark { missing: f.tried && empty };
+        let mark = |empty: bool| RequiredMark {
+            missing: f.tried && empty,
+        };
         let items = |list: Option<&Vec<ServiceRef>>| -> Vec<PickItem> {
-            list.map_or_else(Vec::new, |l| l.iter().map(|r| PickItem { id: r.id.clone(), label: r.name.clone() }).collect())
+            list.map_or_else(Vec::new, |l| {
+                l.iter()
+                    .map(|r| PickItem {
+                        id: r.id.clone(),
+                        label: r.name.clone(),
+                    })
+                    .collect()
+            })
         };
         let id = |r: &Option<ServiceRef>| r.as_ref().map(|r| r.id.clone());
         let fixed = |list: Vec<ServiceRef>, selected: &Option<ServiceRef>| Dropdown {
@@ -790,26 +910,51 @@ impl NewTickets {
             organization: Dropdown {
                 items: items(f.orgs.value()),
                 selected_id: id(&f.org),
-                placeholder: placeholder(&f.orgs, "Loading organizations…", "No organizations found"),
+                placeholder: placeholder(
+                    &f.orgs,
+                    "Loading organizations…",
+                    "No organizations found",
+                ),
                 enabled: f.orgs.value().is_some(),
-                search: Some(DropdownSearch { prompt: "Search organizations".to_owned(), no_match: "No organization matches".to_owned() }),
+                search: Some(DropdownSearch {
+                    prompt: "Search organizations".to_owned(),
+                    no_match: "No organization matches".to_owned(),
+                }),
             },
             caller: Dropdown {
-                items: if has_org { items(f.callers.value()) } else { Vec::new() },
+                items: if has_org {
+                    items(f.callers.value())
+                } else {
+                    Vec::new()
+                },
                 selected_id: id(&f.caller),
                 placeholder: if has_org {
-                    placeholder(&f.callers, "Loading people…", &format!("Nobody in {}", org_name.unwrap_or("this organization")))
+                    placeholder(
+                        &f.callers,
+                        "Loading people…",
+                        &format!("Nobody in {}", org_name.unwrap_or("this organization")),
+                    )
                 } else {
                     "Choose an organization first".to_owned()
                 },
                 enabled: has_org && f.callers.value().is_some(),
                 search: Some(DropdownSearch {
-                    prompt: format!("Search people in {}", org_name.unwrap_or("the organization")),
-                    no_match: format!("No caller in {} matches", org_name.unwrap_or("this organization")),
+                    prompt: format!(
+                        "Search people in {}",
+                        org_name.unwrap_or("the organization")
+                    ),
+                    no_match: format!(
+                        "No caller in {} matches",
+                        org_name.unwrap_or("this organization")
+                    ),
                 }),
             },
             service: Dropdown {
-                items: if has_org { items(f.services.value()) } else { Vec::new() },
+                items: if has_org {
+                    items(f.services.value())
+                } else {
+                    Vec::new()
+                },
                 selected_id: id(&f.service),
                 placeholder: if has_org {
                     placeholder(&f.services, "Loading…", "No services")
@@ -820,7 +965,11 @@ impl NewTickets {
                 search: None,
             },
             subcategory: Dropdown {
-                items: if has_service { items(f.subcategories.value()) } else { Vec::new() },
+                items: if has_service {
+                    items(f.subcategories.value())
+                } else {
+                    Vec::new()
+                },
                 selected_id: id(&f.subcategory),
                 placeholder: if has_service {
                     placeholder(&f.subcategories, "Loading…", "None for this service")
@@ -843,10 +992,16 @@ impl NewTickets {
                 title: mark(f.title_empty()),
                 description: mark(f.description_empty()),
             },
-            missing_text: if f.tried { f.first_missing().map(|m| format!("Fill in the {m} first.")) } else { None },
+            missing_text: if f.tried {
+                f.first_missing().map(|m| format!("Fill in the {m} first."))
+            } else {
+                None
+            },
             error: f.error.clone(),
-            disabled_text: (!can_create)
-                .then(|| "Creating tickets is switched off in this build, so nothing is sent to iTop.".to_owned()),
+            disabled_text: (!can_create).then(|| {
+                "Creating tickets is switched off in this build, so nothing is sent to iTop."
+                    .to_owned()
+            }),
             creating: f.creating,
             // `.disabled(creating || !source.canCreate)`.
             confirm_enabled: !f.creating && can_create,
@@ -909,8 +1064,10 @@ fn action_error(error: &WriteError, host: &str) -> String {
 #[async_trait::async_trait]
 impl Model for NewTickets {
     async fn dispatch(&self, model_id: &str, intent: Value) -> Result<Value, AppError> {
-        let instance = NewTicketInstance::from_model_id(model_id).ok_or_else(|| AppError::unknown_model(model_id))?;
-        let intent: NewTicketIntent = serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
+        let instance = NewTicketInstance::from_model_id(model_id)
+            .ok_or_else(|| AppError::unknown_model(model_id))?;
+        let intent: NewTicketIntent =
+            serde_json::from_value(intent).map_err(AppError::invalid_intent)?;
         self.handle(instance, intent).await
     }
 }

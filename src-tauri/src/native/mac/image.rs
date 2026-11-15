@@ -5,11 +5,18 @@
 
 use std::ffi::c_void;
 
-use objc2_core_foundation::{CFData, CFDictionary, CFMutableData, CFNumber, CFRetained, CFString, CFType, CGPoint, CGRect, CGSize};
-use objc2_core_graphics::{
-    CGBitmapContextCreate, CGBitmapContextCreateImage, CGColorSpace, CGContext, CGImage, CGImageAlphaInfo, CGInterpolationQuality,
+use objc2_core_foundation::{
+    CFData, CFDictionary, CFMutableData, CFNumber, CFRetained, CFString, CFType, CGPoint, CGRect,
+    CGSize,
 };
-use objc2_image_io::{CGImageDestination, CGImageSource, kCGImageDestinationLossyCompressionQuality, kCGImagePropertyOrientation};
+use objc2_core_graphics::{
+    CGBitmapContextCreate, CGBitmapContextCreateImage, CGColorSpace, CGContext, CGImage,
+    CGImageAlphaInfo, CGInterpolationQuality,
+};
+use objc2_image_io::{
+    CGImageDestination, CGImageSource, kCGImageDestinationLossyCompressionQuality,
+    kCGImagePropertyOrientation,
+};
 
 use crate::native::{ConvertTo, ConvertedImage};
 
@@ -24,7 +31,10 @@ pub fn target_size(w: usize, h: usize) -> (usize, usize) {
         return (w, h);
     }
     let scale = MAX_CONVERTED_SIDE / longest;
-    (((w as f64) * scale).round() as usize, ((h as f64) * scale).round() as usize)
+    (
+        ((w as f64) * scale).round() as usize,
+        ((h as f64) * scale).round() as usize,
+    )
 }
 
 pub fn convert(data: &[u8], to: ConvertTo) -> Option<ConvertedImage> {
@@ -43,7 +53,11 @@ pub fn convert(data: &[u8], to: ConvertTo) -> Option<ConvertedImage> {
     }
     let orientation = orientation(&source);
     let (tw, th) = target_size(w, h);
-    let image = if (tw, th) == (w, h) { image } else { scaled(&image, tw, th)? };
+    let image = if (tw, th) == (w, h) {
+        image
+    } else {
+        scaled(&image, tw, th)?
+    };
     let (uti, ext) = match to {
         ConvertTo::Png => ("public.png", "png"),
         ConvertTo::Jpeg => ("public.jpeg", "jpg"),
@@ -92,7 +106,10 @@ fn orientation(source: &CGImageSource) -> Option<i32> {
     }
     // SAFETY: non-null CF object owned by `props` (see above).
     let value: &CFType = unsafe { &*raw.cast::<CFType>() };
-    value.downcast_ref::<CFNumber>()?.as_i32().filter(|o| (2..=8).contains(o))
+    value
+        .downcast_ref::<CFNumber>()?
+        .as_i32()
+        .filter(|o| (2..=8).contains(o))
 }
 
 /// Draws `image` into a `w`×`h` RGBA bitmap, like Swift's scaled `NSBitmapImageRep`.
@@ -100,8 +117,17 @@ fn scaled(image: &CGImage, w: usize, h: usize) -> Option<CFRetained<CGImage>> {
     let space = CGColorSpace::new_device_rgb()?;
     // SAFETY: a null data pointer lets Core Graphics allocate the buffer; 8 bits per component,
     // bytes-per-row 0 = computed, premultiplied RGBA is a supported bitmap format.
-    let ctx: CFRetained<CGContext> =
-        unsafe { CGBitmapContextCreate(std::ptr::null_mut(), w, h, 8, 0, Some(&space), CGImageAlphaInfo::PremultipliedLast.0) }?;
+    let ctx: CFRetained<CGContext> = unsafe {
+        CGBitmapContextCreate(
+            std::ptr::null_mut(),
+            w,
+            h,
+            8,
+            0,
+            Some(&space),
+            CGImageAlphaInfo::PremultipliedLast.0,
+        )
+    }?;
     CGContext::set_interpolation_quality(Some(&ctx), CGInterpolationQuality::High);
     let rect = CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(w as f64, h as f64));
     CGContext::draw_image(Some(&ctx), rect, Some(image));
@@ -125,8 +151,18 @@ mod tests {
     fn make(w: usize, h: usize, uti: &'static str) -> Vec<u8> {
         let space = CGColorSpace::new_device_rgb().expect("rgb");
         // SAFETY: as in `scaled`.
-        let ctx = unsafe { CGBitmapContextCreate(std::ptr::null_mut(), w, h, 8, 0, Some(&space), CGImageAlphaInfo::PremultipliedLast.0) }
-            .expect("ctx");
+        let ctx = unsafe {
+            CGBitmapContextCreate(
+                std::ptr::null_mut(),
+                w,
+                h,
+                8,
+                0,
+                Some(&space),
+                CGImageAlphaInfo::PremultipliedLast.0,
+            )
+        }
+        .expect("ctx");
         let img = CGBitmapContextCreateImage(Some(&ctx)).expect("img");
         let out = CFMutableData::new(None, 0).expect("data");
         let uti = CFString::from_static_str(uti);
@@ -142,7 +178,12 @@ mod tests {
     fn size_of(data: &[u8]) -> (usize, usize) {
         let d = CFData::from_bytes(data);
         // SAFETY: as in `convert`.
-        let img = unsafe { CGImageSource::with_data(&d, None).expect("src").image_at_index(0, None).expect("img") };
+        let img = unsafe {
+            CGImageSource::with_data(&d, None)
+                .expect("src")
+                .image_at_index(0, None)
+                .expect("img")
+        };
         (CGImage::width(Some(&img)), CGImage::height(Some(&img)))
     }
 

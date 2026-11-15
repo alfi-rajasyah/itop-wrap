@@ -6,11 +6,11 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::records::{ConfirmText, LinkedCI, ListScope, SidebarItem, TicketLink};
 use super::new_ticket::{NewTicketInstance, NewTicketStart};
-use itop_kit::ConfigItem;
+use super::records::{ConfirmText, LinkedCI, ListScope, SidebarItem, TicketLink};
 use super::workspace::{State, Workspace};
 use crate::error::AppError;
+use itop_kit::ConfigItem;
 
 #[derive(Clone, Debug)]
 pub struct ShellState {
@@ -20,7 +20,9 @@ pub struct ShellState {
 impl Default for ShellState {
     /// My tickets at launch and after sign-in (SHELL-6).
     fn default() -> Self {
-        ShellState { selection: SidebarItem::MyTickets }
+        ShellState {
+            selection: SidebarItem::MyTickets,
+        }
     }
 }
 
@@ -115,7 +117,11 @@ pub enum ShellIntent {
 
 /// The server's host, or "iTop" (W/ShellView.swift:143).
 pub fn account_host(base_host: &str) -> String {
-    if base_host.is_empty() { "iTop".to_owned() } else { base_host.to_owned() }
+    if base_host.is_empty() {
+        "iTop".to_owned()
+    } else {
+        base_host.to_owned()
+    }
 }
 
 impl Workspace {
@@ -135,19 +141,31 @@ impl Workspace {
                 .collect(),
             content_title: st.shell.selection.title().to_owned(),
             need_count: need,
-            account: ShellAccount { initials: me.initials(), display_name: me.display_name.clone(), host: host.clone() },
+            account: ShellAccount {
+                initials: me.initials(),
+                display_name: me.display_name.clone(),
+                host: host.clone(),
+            },
             sign_out_confirm: ConfirmText {
                 title: format!("Sign out of {host}?"),
-                message: "Your password is removed from the Keychain. Your username stays filled in.".to_owned(),
+                message:
+                    "Your password is removed from the Keychain. Your username stays filled in."
+                        .to_owned(),
             },
         }
     }
 
-    pub(crate) async fn dispatch_shell(&self, intent: ShellIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_shell(
+        &self,
+        intent: ShellIntent,
+    ) -> Result<serde_json::Value, AppError> {
         let s = self.standalone().cloned();
         match intent {
             ShellIntent::Select { item } => self.shell_select(item).await,
-            ShellIntent::OpenTicket { ticket } => self.shell_open_ticket(&ticket.ticket_id, &ticket.r#ref).await,
+            ShellIntent::OpenTicket { ticket } => {
+                self.shell_open_ticket(&ticket.ticket_id, &ticket.r#ref)
+                    .await
+            }
             // SHELL-10: the org first, then the section, so it loads once.
             ShellIntent::OpenOrg { org_id, .. } => {
                 if let Some(s) = &s {
@@ -158,7 +176,12 @@ impl Workspace {
             // SHELL-11: the linked CI as the current CI, its org empty.
             ShellIntent::OpenCi { ci } => {
                 if let Some(s) = &s {
-                    s.cmdb.open(ConfigItem { key: ci.key, class_name: ci.class_name, name: ci.name, org_name: String::new() });
+                    s.cmdb.open(ConfigItem {
+                        key: ci.key,
+                        class_name: ci.class_name,
+                        name: ci.name,
+                        org_name: String::new(),
+                    });
                 }
                 self.shell_select(SidebarItem::ConfigItems).await;
             }
@@ -176,10 +199,16 @@ impl Workspace {
             }
             ShellIntent::NewTicket => self.request_new_ticket(NewTicketStart::default()).await,
             ShellIntent::NewTicketForOrg { org_id, org_name } => {
-                self.request_new_ticket(NewTicketStart::for_org(&org_id, &org_name)).await
+                self.request_new_ticket(NewTicketStart::for_org(&org_id, &org_name))
+                    .await
             }
-            ShellIntent::NewTicketForCi { key, name, org_name } => {
-                self.request_new_ticket(NewTicketStart::for_ci(&key, &name, &org_name)).await
+            ShellIntent::NewTicketForCi {
+                key,
+                name,
+                org_name,
+            } => {
+                self.request_new_ticket(NewTicketStart::for_ci(&key, &name, &org_name))
+                    .await
             }
         }
         Ok(serde_json::Value::Null)
@@ -225,17 +254,22 @@ impl Workspace {
         let Some(scope) = item.list() else { return };
         self.restart_search(scope);
         let ws = self.clone();
+        // Each reload runs as its own task: leaving the section stops the polling, never a reload
+        // half-way (which would leave the list `refreshing` for good).
         let handle = self.spawn(async move {
-            let loaded = matches!(ws.lock().lists[scope.index()].phase, super::list::Phase::Loaded);
+            let loaded = matches!(
+                ws.lock().lists[scope.index()].phase,
+                super::list::Phase::Loaded
+            );
             if !loaded {
-                ws.list_refresh(scope).await;
+                let _ = tokio::spawn(ws.list_refresh(scope)).await;
             }
             if scope != ListScope::Team {
                 return;
             }
             loop {
                 tokio::time::sleep(Duration::from_secs(120)).await;
-                ws.list_refresh(scope).await;
+                let _ = tokio::spawn(ws.list_refresh(scope)).await;
             }
         });
         if scope == ListScope::Team

@@ -40,7 +40,8 @@ pub struct OrgScope {
 pub fn is_swift_whitespace(c: char) -> bool {
     matches!(
         c,
-        '\t' | ' ' | '\u{A0}' | '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}'
+        '\t' | ' ' | '\u{A0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}'
     )
 }
 
@@ -64,14 +65,20 @@ pub fn character_count(s: &str) -> usize {
 /// `ErrorText.host`: the server's host, "the server" without one (W/Workspace.swift:31).
 pub fn host(session: &Session) -> String {
     let h = session.client.server.host();
-    if h.is_empty() { "the server".to_owned() } else { h.to_owned() }
+    if h.is_empty() {
+        "the server".to_owned()
+    } else {
+        h.to_owned()
+    }
 }
 
 /// `ErrorText.describe` (W/Theme.swift:85-92): network failures name the host, everything else
 /// is iTop's own text.
 pub fn describe(error: &ITopError, host: &str) -> String {
     match error {
-        ITopError::Transport(_) => format!("Can't reach {host}. Check your connection, then retry."),
+        ITopError::Transport(_) => {
+            format!("Can't reach {host}. Check your connection, then retry.")
+        }
         other => other.user_message(),
     }
 }
@@ -138,7 +145,12 @@ pub struct SearchRun<R> {
 
 impl<R> Default for SearchRun<R> {
     fn default() -> Self {
-        Self { generation: 0, previous: None, task_id: None, handle: None }
+        Self {
+            generation: 0,
+            previous: None,
+            task_id: None,
+            handle: None,
+        }
     }
 }
 
@@ -192,6 +204,9 @@ mod tests {
             describe(&ITopError::Transport(-1009), "itop.example.com"),
             "Can't reach itop.example.com. Check your connection, then retry."
         );
-        assert_eq!(describe(&ITopError::Http { status: 500 }, "h"), "The server answered with HTTP 500.");
+        assert_eq!(
+            describe(&ITopError::Http { status: 500 }, "h"),
+            "The server answered with HTTP 500."
+        );
     }
 }

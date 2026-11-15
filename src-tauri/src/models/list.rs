@@ -7,16 +7,17 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use itop_kit::{
-    Age, CurrentUser, LogImage, Team, Ticket as KitTicket, TicketChange, TicketList, TicketPage, TicketQueries,
-    TicketSearch, TicketSection as KitSection, TicketWrites, TimeFormat, WriteError, ticket_writes::Failure,
+    Age, CurrentUser, LogImage, Team, Ticket as KitTicket, TicketChange, TicketList, TicketPage,
+    TicketQueries, TicketSearch, TicketSection as KitSection, TicketWrites, TimeFormat, WriteError,
+    ticket_writes::Failure,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::options::OptionsState;
 use super::records::{
-    ListScope, Notice, Pager, PriorityMark, RowAgent, RowTime, TicketRow, TicketSection, pager, status_label,
-    ticket_view, with_period,
+    ListScope, Notice, Pager, PriorityMark, RowAgent, RowTime, TicketRow, TicketSection, pager,
+    status_label, ticket_view, with_period,
 };
 use super::workspace::{BoxFuture, State, Workspace};
 use crate::error::AppError;
@@ -41,7 +42,14 @@ pub enum Lookup {
 
 /// Foundation's `CharacterSet.whitespaces`: tab and the space separators, not newlines.
 pub fn trim_spaces(s: &str) -> &str {
-    s.trim_matches(|c: char| c == '\t' || (c.is_whitespace() && !matches!(c, '\n' | '\r' | '\u{0B}' | '\u{0C}' | '\u{85}' | '\u{2028}' | '\u{2029}')))
+    s.trim_matches(|c: char| {
+        c == '\t'
+            || (c.is_whitespace()
+                && !matches!(
+                    c,
+                    '\n' | '\r' | '\u{0B}' | '\u{0C}' | '\u{85}' | '\u{2028}' | '\u{2029}'
+                ))
+    })
 }
 
 pub struct ListState {
@@ -114,7 +122,10 @@ impl ListState {
     }
 
     pub fn need_count(&self, me: &CurrentUser) -> i64 {
-        self.tickets.iter().filter(|t| TicketList::needs_you(t, me)).count() as i64
+        self.tickets
+            .iter()
+            .filter(|t| TicketList::needs_you(t, me))
+            .count() as i64
     }
 
     pub fn is_searching(&self) -> bool {
@@ -128,12 +139,19 @@ impl ListState {
     /// Org filter, then search, then grouping (LIST-17).
     pub fn visible_sections(&self, me: &CurrentUser, options: &OptionsState) -> Vec<KitSection> {
         let orgs: HashSet<String> = self.org_filter.iter().cloned().collect();
-        let filtered = TicketSearch::filter_query(&TicketSearch::filter_orgs(&self.tickets, &orgs), &self.query);
+        let filtered = TicketSearch::filter_query(
+            &TicketSearch::filter_orgs(&self.tickets, &orgs),
+            &self.query,
+        );
         TicketList::groups(&filtered, me, self.scope.view(), options.sort)
     }
 
     pub fn current_page(&self, me: &CurrentUser, options: &OptionsState) -> TicketPage {
-        TicketPage::new(self.visible_sections(me, options), options.page_size, self.page)
+        TicketPage::new(
+            self.visible_sections(me, options),
+            options.page_size,
+            self.page,
+        )
     }
 
     pub fn org_choices(&self) -> Vec<String> {
@@ -142,7 +160,10 @@ impl ListState {
 
     /// `orgID(named:)`: the org id behind a name, for "See all of its tickets".
     pub fn org_id_named(&self, name: &str) -> Option<String> {
-        self.tickets.iter().find(|t| t.org_name == name && t.org_id != "0").map(|t| t.org_id.clone())
+        self.tickets
+            .iter()
+            .find(|t| t.org_name == name && t.org_id != "0")
+            .map(|t| t.org_id.clone())
     }
 
     /// The composer key for a ticket and log: "<ticketID>|public" / "|private".
@@ -288,7 +309,11 @@ pub fn updated_text(l: &ListState, now: DateTime<Utc>) -> String {
         }
         Some(at) => {
             let minutes = (now - at).num_seconds() / 60;
-            if minutes < 1 { "Updated just now".to_owned() } else { format!("Updated {minutes} min ago") }
+            if minutes < 1 {
+                "Updated just now".to_owned()
+            } else {
+                format!("Updated {minutes} min ago")
+            }
         }
     }
 }
@@ -319,22 +344,33 @@ impl Workspace {
         } else if t.agent_id == me.contact_id {
             RowAgent::You
         } else {
-            RowAgent::Name { name: t.agent_name.clone() }
+            RowAgent::Name {
+                name: t.agent_name.clone(),
+            }
         };
         let time = if !with_time {
             RowTime::None
-        } else if st.timer.running.as_ref().is_some_and(|r| r.ticket_id() == id) {
+        } else if st
+            .timer
+            .running
+            .as_ref()
+            .is_some_and(|r| r.ticket_id() == id)
+        {
             RowTime::Running
         } else {
             match st.timer.totals.get(&id) {
-                Some(&spent) if spent > 0 => RowTime::Spent { text: TimeFormat::total(spent) },
+                Some(&spent) if spent > 0 => RowTime::Spent {
+                    text: TimeFormat::total(spent),
+                },
                 _ => RowTime::None,
             }
         };
         TicketRow {
             ticket: ticket_view(t, me),
             age: t.start_date.map(|s| Age::short(s, now)),
-            opened_tooltip: t.start_date.map(|s| format!("Opened {}", self.0.fmt.date_time(s))),
+            opened_tooltip: t
+                .start_date
+                .map(|s| format!("Opened {}", self.0.fmt.date_time(s))),
             priority_mark: match t.priority {
                 1 => Some(PriorityMark::P1),
                 2 => Some(PriorityMark::P2),
@@ -345,7 +381,12 @@ impl Workspace {
         }
     }
 
-    pub(crate) fn list_snapshot(&self, st: &State, scope: ListScope, now: DateTime<Utc>) -> ListSnapshot {
+    pub(crate) fn list_snapshot(
+        &self,
+        st: &State,
+        scope: ListScope,
+        now: DateTime<Utc>,
+    ) -> ListSnapshot {
         let me = self.me();
         let l = &st.lists[scope.index()];
         let options = &st.options;
@@ -353,9 +394,12 @@ impl Workspace {
         let loaded = l.phase == Phase::Loaded;
         let content = match &l.phase {
             Phase::Loading => ListContent::Loading,
-            Phase::Failed(message) => ListContent::Failed { message: message.clone() },
+            Phase::Failed(message) => ListContent::Failed {
+                message: message.clone(),
+            },
             Phase::Loaded if l.has_no_teams(me) => ListContent::Message {
-                text: "You're not in any iTop team, so there are no team tickets to show.".to_owned(),
+                text: "You're not in any iTop team, so there are no team tickets to show."
+                    .to_owned(),
             },
             Phase::Loaded if l.tickets.is_empty() && !l.is_searching() => ListContent::Message {
                 text: if options.scope() != itop_kit::TicketScope::OPEN {
@@ -366,9 +410,12 @@ impl Workspace {
                     "Your teams have no open tickets.".to_owned()
                 },
             },
-            Phase::Loaded => ListContent::List { body: Box::new(self.list_body(st, scope, &page, now)) },
+            Phase::Loaded => ListContent::List {
+                body: Box::new(self.list_body(st, scope, &page, now)),
+            },
         };
-        let org_visible = scope == ListScope::Mine && (l.org_choices().len() > 1 || l.org_filter.is_some());
+        let org_visible =
+            scope == ListScope::Mine && (l.org_choices().len() > 1 || l.org_filter.is_some());
         ListSnapshot {
             scope,
             query: l.query.clone(),
@@ -378,16 +425,25 @@ impl Workspace {
             org_filter: OrgFilter {
                 visible: org_visible,
                 selected: l.org_filter.clone(),
-                label: l.org_filter.clone().unwrap_or_else(|| "All organizations".to_owned()),
-                help: l
+                label: l
                     .org_filter
-                    .as_ref()
-                    .map_or_else(|| "Filter by organization".to_owned(), |o| format!("Showing tickets for {o}")),
-                accessibility_label: format!("Filter by organization: {}", l.org_filter.as_deref().unwrap_or("all")),
+                    .clone()
+                    .unwrap_or_else(|| "All organizations".to_owned()),
+                help: l.org_filter.as_ref().map_or_else(
+                    || "Filter by organization".to_owned(),
+                    |o| format!("Showing tickets for {o}"),
+                ),
+                accessibility_label: format!(
+                    "Filter by organization: {}",
+                    l.org_filter.as_deref().unwrap_or("all")
+                ),
                 choices: l
                     .org_choices()
                     .into_iter()
-                    .map(|name| OrgChoice { selected: l.org_filter.as_ref() == Some(&name), name })
+                    .map(|name| OrgChoice {
+                        selected: l.org_filter.as_ref() == Some(&name),
+                        name,
+                    })
                     .collect(),
             },
             pager: if loaded { pager(&page) } else { Pager::None },
@@ -399,27 +455,42 @@ impl Workspace {
         }
     }
 
-    fn list_body(&self, st: &State, scope: ListScope, page: &TicketPage, now: DateTime<Utc>) -> ListBody {
+    fn list_body(
+        &self,
+        st: &State,
+        scope: ListScope,
+        page: &TicketPage,
+        now: DateTime<Utc>,
+    ) -> ListBody {
         let me = self.me();
         let l = &st.lists[scope.index()];
         let searching = l.is_searching();
         let org_no_match = match &l.org_filter {
-            Some(name) if l.visible_sections(me, &st.options).is_empty() && !searching => Some(OrgNoMatch {
-                text: format!("None of your tickets are for {name}."),
-                see_all: if scope == ListScope::Mine {
-                    l.org_id_named(name).map(|org_id| OrgLink { org_id, org_name: name.clone() })
-                } else {
-                    None
-                },
-            }),
+            Some(name) if l.visible_sections(me, &st.options).is_empty() && !searching => {
+                Some(OrgNoMatch {
+                    text: format!("None of your tickets are for {name}."),
+                    see_all: if scope == ListScope::Mine {
+                        l.org_id_named(name).map(|org_id| OrgLink {
+                            org_id,
+                            org_name: name.clone(),
+                        })
+                    } else {
+                        None
+                    },
+                })
+            }
             _ => None,
         };
         let lookup_bar = match l.lookup() {
-            Lookup::Searching(r) => Some(LookupBar::Searching { text: format!("Looking up {r} in iTop…") }),
-            Lookup::Missing(r) => {
-                Some(LookupBar::Missing { text: format!("{r} doesn't exist, or your iTop account can't see it.") })
-            }
-            Lookup::Failed(m) => Some(LookupBar::Failed { text: format!("Couldn't look that up: {m}") }),
+            Lookup::Searching(r) => Some(LookupBar::Searching {
+                text: format!("Looking up {r} in iTop…"),
+            }),
+            Lookup::Missing(r) => Some(LookupBar::Missing {
+                text: format!("{r} doesn't exist, or your iTop account can't see it."),
+            }),
+            Lookup::Failed(m) => Some(LookupBar::Failed {
+                text: format!("Couldn't look that up: {m}"),
+            }),
             Lookup::None | Lookup::Found(_) => None,
         };
         let extra_section = match l.lookup() {
@@ -437,7 +508,10 @@ impl Workspace {
             .then(|| format!("No tickets in your list match “{}”.", trim_spaces(&l.query)));
         ListBody {
             org_no_match,
-            refresh_error: l.refresh_error.as_ref().map(|e| format!("Couldn't refresh: {e}")),
+            refresh_error: l
+                .refresh_error
+                .as_ref()
+                .map(|e| format!("Couldn't refresh: {e}")),
             lookup_bar,
             show_notices: matches!(l.lookup(), Lookup::None | Lookup::Found(_)),
             notice: l.notice.clone(),
@@ -453,7 +527,15 @@ impl Workspace {
                     rows: s
                         .tickets
                         .iter()
-                        .map(|t| self.ticket_row(st, t, scope == ListScope::Team || t.is_unassigned(), true, now))
+                        .map(|t| {
+                            self.ticket_row(
+                                st,
+                                t,
+                                scope == ListScope::Team || t.is_unassigned(),
+                                true,
+                                now,
+                            )
+                        })
                         .collect(),
                 })
                 .collect(),
@@ -462,7 +544,11 @@ impl Workspace {
 
     // MARK: Intents
 
-    pub(crate) async fn dispatch_list(&self, scope: ListScope, intent: ListIntent) -> Result<serde_json::Value, AppError> {
+    pub(crate) async fn dispatch_list(
+        &self,
+        scope: ListScope,
+        intent: ListIntent,
+    ) -> Result<serde_json::Value, AppError> {
         let i = scope.index();
         match intent {
             ListIntent::SetQuery { query } => self.set_query(scope, &query),
@@ -478,7 +564,11 @@ impl Workspace {
                 {
                     let mut st = self.lock();
                     let l = &mut st.lists[i];
-                    let new = if l.org_filter.as_deref() == Some(name.as_str()) { None } else { Some(name) };
+                    let new = if l.org_filter.as_deref() == Some(name.as_str()) {
+                        None
+                    } else {
+                        Some(name)
+                    };
                     if new != l.org_filter {
                         l.org_filter = new;
                         l.page = 1;
@@ -512,7 +602,9 @@ impl Workspace {
                     t
                 };
                 let Some(t) = t else {
-                    return Err(AppError::invalid_intent(format!("No ticket {ticket_id} in this list.")));
+                    return Err(AppError::invalid_intent(format!(
+                        "No ticket {ticket_id} in this list."
+                    )));
                 };
                 self.publish();
                 self.list_assign_to_me(scope, &t).await;
@@ -586,7 +678,13 @@ impl Workspace {
                     l.phase = Phase::Loaded;
                     l.refresh_error = None;
                 }
-                self.trace(|| format!("{} list: reload finished, {} tickets", scope.raw(), tickets.len()));
+                self.trace(|| {
+                    format!(
+                        "{} list: reload finished, {} tickets",
+                        scope.raw(),
+                        tickets.len()
+                    )
+                });
                 self.publish();
                 self.refresh_lookup(scope).await;
                 {
@@ -633,10 +731,14 @@ impl Workspace {
         let found = {
             let mut st = self.lock();
             let l = &mut st.lists[i];
-            let Lookup::Found(found) = l.lookup() else { return };
+            let Lookup::Found(found) = l.lookup() else {
+                return;
+            };
             let found = found.clone();
             let id = found.id();
-            if l.just_changed.as_deref() == Some(id.as_str()) && l.selection.as_deref() != Some(id.as_str()) {
+            if l.just_changed.as_deref() == Some(id.as_str())
+                && l.selection.as_deref() != Some(id.as_str())
+            {
                 l.set_lookup(Lookup::None);
                 return;
             }
@@ -664,7 +766,10 @@ impl Workspace {
             let l = &mut st.lists[i];
             let q = trim_spaces(&l.query).to_owned();
             let ok = TicketQueries::ref_lookup(&q).is_some()
-                && !l.tickets.iter().any(|t| t.r#ref.to_lowercase() == q.to_lowercase());
+                && !l
+                    .tickets
+                    .iter()
+                    .any(|t| t.r#ref.to_lowercase() == q.to_lowercase());
             if !ok {
                 l.set_lookup(Lookup::None);
                 None
@@ -719,13 +824,18 @@ impl Workspace {
         self.publish();
         match self.0.writes.assign_to_me(t, self.me()).await {
             Ok(()) => {
-                self.lock().lists[i].notice = Some(Notice::ok(format!("{} is assigned to you.", t.r#ref)));
+                self.lock().lists[i].notice =
+                    Some(Notice::ok(format!("{} is assigned to you.", t.r#ref)));
                 self.publish();
                 self.list_refresh(scope).await;
             }
             Err(e) => {
                 let taken = matches!(e, WriteError::Failure(Failure::AlreadyTaken { .. }));
-                self.lock().lists[i].notice = Some(Notice::error(self.action_error(&e, t, &format!("assign {}", t.r#ref))));
+                self.lock().lists[i].notice = Some(Notice::error(self.action_error(
+                    &e,
+                    t,
+                    &format!("assign {}", t.r#ref),
+                )));
                 self.publish();
                 if taken {
                     self.list_refresh(scope).await;
@@ -743,10 +853,18 @@ impl Workspace {
             let mut st = self.lock();
             let l = &mut st.lists[scope.index()];
             match &l.notice {
-                Some(n) if !n.is_error => l.notice = Some(Notice::ok(format!("{} is created and assigned to you.", t.r#ref))),
+                Some(n) if !n.is_error => {
+                    l.notice = Some(Notice::ok(format!(
+                        "{} is created and assigned to you.",
+                        t.r#ref
+                    )))
+                }
                 Some(n) => {
                     let why = n.text.clone();
-                    l.notice = Some(Notice::error(format!("{} is created, but not assigned to you. {why}", t.r#ref)));
+                    l.notice = Some(Notice::error(format!(
+                        "{} is created, but not assigned to you. {why}",
+                        t.r#ref
+                    )));
                 }
                 None => {}
             }
@@ -755,7 +873,13 @@ impl Workspace {
     }
 
     /// `assign(_:team:agent:)`: the error text, or `None` when done (ASG-13).
-    pub(crate) async fn list_assign(&self, scope: ListScope, t: &KitTicket, team: &Team, agent: &itop_kit::Agent) -> Option<String> {
+    pub(crate) async fn list_assign(
+        &self,
+        scope: ListScope,
+        t: &KitTicket,
+        team: &Team,
+        agent: &itop_kit::Agent,
+    ) -> Option<String> {
         let i = scope.index();
         {
             let mut st = self.lock();
@@ -769,9 +893,15 @@ impl Workspace {
         self.publish();
         let result = match self.0.writes.assign(t, &team.id, &agent.id).await {
             Ok(()) => {
-                let who = if agent.id == self.me().contact_id { "you".to_owned() } else { agent.name.clone() };
-                self.lock().lists[i].notice =
-                    Some(Notice::ok(format!("{} is assigned to {who} in {}.", t.r#ref, team.name)));
+                let who = if agent.id == self.me().contact_id {
+                    "you".to_owned()
+                } else {
+                    agent.name.clone()
+                };
+                self.lock().lists[i].notice = Some(Notice::ok(format!(
+                    "{} is assigned to {who} in {}.",
+                    t.r#ref, team.name
+                )));
                 self.publish();
                 self.list_refresh(scope).await;
                 None
@@ -784,7 +914,12 @@ impl Workspace {
     }
 
     /// `apply(_:to:)`: pending, resolve, reopen or close, then a refresh (LC-1…6, LIST-30).
-    pub(crate) async fn list_apply(&self, scope: ListScope, change: &TicketChange, t: &KitTicket) -> Option<String> {
+    pub(crate) async fn list_apply(
+        &self,
+        scope: ListScope,
+        change: &TicketChange,
+        t: &KitTicket,
+    ) -> Option<String> {
         let i = scope.index();
         {
             let mut st = self.lock();
@@ -795,14 +930,26 @@ impl Workspace {
             l.working = Some(t.id());
             l.notice = None;
         }
-        self.trace(|| format!("{} list: {} on {}", scope.raw(), change.action().raw_value(), t.id()));
+        self.trace(|| {
+            format!(
+                "{} list: {} on {}",
+                scope.raw(),
+                change.action().raw_value(),
+                t.id()
+            )
+        });
         self.publish();
         match change {
             TicketChange::Pending { .. } => {
-                self.timer_stop_if_running(t, &format!("Setting {} to pending stopped its timer.", t.r#ref)).await;
+                self.timer_stop_if_running(
+                    t,
+                    &format!("Setting {} to pending stopped its timer.", t.r#ref),
+                )
+                .await;
             }
             TicketChange::Resolve(_) => {
-                self.timer_stop_if_running(t, &format!("Resolving {} stopped its timer.", t.r#ref)).await;
+                self.timer_stop_if_running(t, &format!("Resolving {} stopped its timer.", t.r#ref))
+                    .await;
             }
             _ => {}
         }
@@ -845,7 +992,12 @@ impl Workspace {
     }
 
     /// `applyFromHeader(_:to:)`: Reopen and Close have no sheet, so errors go to the notice.
-    pub(crate) async fn list_apply_from_header(&self, scope: ListScope, change: &TicketChange, t: &KitTicket) {
+    pub(crate) async fn list_apply_from_header(
+        &self,
+        scope: ListScope,
+        change: &TicketChange,
+        t: &KitTicket,
+    ) {
         if let Some(message) = self.list_apply(scope, change, t).await {
             self.lock().lists[scope.index()].notice = Some(Notice::error(message));
             self.publish();

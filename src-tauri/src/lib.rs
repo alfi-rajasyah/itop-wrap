@@ -75,7 +75,11 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
     let mut make_router = Some(make_router);
     let app = tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol("itop", commands::itop_protocol)
-        .invoke_handler(tauri::generate_handler![commands::get_snapshot, commands::dispatch, commands::open_url])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_snapshot,
+            commands::dispatch,
+            commands::open_url
+        ])
         .on_menu_event(|app, event| {
             if let Some(shell) = app.try_state::<Arc<Shell>>() {
                 shell.menu_event(event.id().as_ref());
@@ -85,8 +89,11 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
             let handle = app.handle().clone();
             let shell = Shell::new(handle.clone());
             let sink_shell = shell.clone();
-            let hub = Hub::new(Arc::new(EventSink::new(handle.clone(), move |s| sink_shell.session_snapshot(s))));
-            let native: Arc<dyn Native> = Arc::new(MacNative::new(shell.clone(), Prefs::standard()));
+            let hub = Hub::new(Arc::new(EventSink::new(handle.clone(), move |s| {
+                sink_shell.session_snapshot(s)
+            })));
+            let native: Arc<dyn Native> =
+                Arc::new(MacNative::new(shell.clone(), Prefs::standard()));
             let ctx = AppContext {
                 app: handle.clone(),
                 hub: hub.clone(),
@@ -100,7 +107,11 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
                 None => return Err("setup ran twice".into()),
             };
             shell.set_router(router.clone());
-            app.manage(AppState { hub, router, native });
+            app.manage(AppState {
+                hub,
+                router,
+                native,
+            });
             app.manage(shell.clone());
             let mtm = objc2::MainThreadMarker::new().ok_or("setup isn't on the main thread")?;
             shell.create_windows(mtm)?;
@@ -116,7 +127,10 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
         }
     };
     app.run(|app, event| {
-        if let RunEvent::Reopen { has_visible_windows, .. } = event
+        if let RunEvent::Reopen {
+            has_visible_windows,
+            ..
+        } = event
             && let Some(shell) = app.try_state::<Arc<Shell>>()
         {
             shell.reopen(has_visible_windows);

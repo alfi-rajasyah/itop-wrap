@@ -8,16 +8,19 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject};
 use objc2::{ClassType, MainThreadMarker, MainThreadOnly, define_class};
 use objc2_app_kit::{
-    NSAccessibility, NSApplication, NSEvent, NSEventMask, NSEventModifierFlags, NSModalResponseOK, NSPanel,
-    NSPasteboard, NSPasteboardTypeString, NSResponder, NSSavePanel, NSStatusItem, NSStatusWindowLevel, NSWindow,
-    NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
+    NSAccessibility, NSApplication, NSEvent, NSEventMask, NSEventModifierFlags, NSModalResponseOK,
+    NSPanel, NSPasteboard, NSPasteboardTypeString, NSResponder, NSSavePanel, NSStatusItem,
+    NSStatusWindowLevel, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
 };
 use objc2_foundation::{NSObject, NSObjectProtocol, NSString, NSURL};
 use tauri::{AppHandle, Runtime, WebviewWindow};
 
 /// Runs `f` on the main thread and waits for its result. Runs it inline when already there, so it
 /// never deadlocks the main thread; from another thread it blocks that thread until `f` is done.
-pub fn on_main<R: Runtime, T: Send + 'static>(app: &AppHandle<R>, f: impl FnOnce(MainThreadMarker) -> T + Send + 'static) -> Option<T> {
+pub fn on_main<R: Runtime, T: Send + 'static>(
+    app: &AppHandle<R>,
+    f: impl FnOnce(MainThreadMarker) -> T + Send + 'static,
+) -> Option<T> {
     if let Some(mtm) = MainThreadMarker::new() {
         return Some(f(mtm));
     }
@@ -32,7 +35,10 @@ pub fn on_main<R: Runtime, T: Send + 'static>(app: &AppHandle<R>, f: impl FnOnce
 }
 
 /// Runs `f` on the main thread without waiting (inline when already there).
-pub fn on_main_async<R: Runtime>(app: &AppHandle<R>, f: impl FnOnce(MainThreadMarker) + Send + 'static) {
+pub fn on_main_async<R: Runtime>(
+    app: &AppHandle<R>,
+    f: impl FnOnce(MainThreadMarker) + Send + 'static,
+) {
     if let Some(mtm) = MainThreadMarker::new() {
         f(mtm);
         return;
@@ -90,7 +96,10 @@ pub fn activate(mtm: MainThreadMarker) {
 }
 
 /// The `NSWindow` behind a Tauri window.
-fn ns_window<R: Runtime>(_mtm: MainThreadMarker, window: &WebviewWindow<R>) -> Option<Retained<NSWindow>> {
+fn ns_window<R: Runtime>(
+    _mtm: MainThreadMarker,
+    window: &WebviewWindow<R>,
+) -> Option<Retained<NSWindow>> {
     let ptr = window.ns_window().ok()?.cast::<NSWindow>();
     // SAFETY: Tauri returns the window's live NSWindow; we are on the main thread, and retaining
     // it keeps it alive for as long as we hold it.
@@ -109,12 +118,20 @@ pub fn exclude_from_windows_menu<R: Runtime>(mtm: MainThreadMarker, window: &Web
 pub const MAIN_FRAME_AUTOSAVE: &str = "main";
 
 /// Puts the window at its autosaved frame `name`; false when none is saved.
-pub fn restore_frame<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWindow<R>, name: &str) -> bool {
+pub fn restore_frame<R: Runtime>(
+    mtm: MainThreadMarker,
+    window: &WebviewWindow<R>,
+    name: &str,
+) -> bool {
     ns_window(mtm, window).is_some_and(|w| w.setFrameUsingName(&NSString::from_str(name)))
 }
 
 /// Starts (`Some`) or stops (`None`) AppKit saving the window's frame under `name` on every change.
-pub fn autosave_frame<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWindow<R>, name: Option<&str>) {
+pub fn autosave_frame<R: Runtime>(
+    mtm: MainThreadMarker,
+    window: &WebviewWindow<R>,
+    name: Option<&str>,
+) {
     if let Some(w) = ns_window(mtm, window) {
         w.setFrameAutosaveName(&NSString::from_str(name.unwrap_or("")));
     }
@@ -149,13 +166,18 @@ define_class!(
 /// windows, follows you to the active Space and shows over full-screen apps, and stays out of
 /// the Window menu and ⌘`. Also rounds its corners natively (10 pt).
 pub fn make_menubar_panel<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWindow<R>) {
-    let Some(w) = ns_window(mtm, window) else { return };
+    let Some(w) = ns_window(mtm, window) else {
+        return;
+    };
     let ptr: *const NSWindow = &*w;
     // SAFETY: MenuBarPanel is an NSPanel subclass without ivars, and NSPanel is an NSWindow
     // subclass that adds no ivars Tauri's window relies on, so swapping the class of this live
     // window only changes which methods answer (the technique tauri-nspanel uses). Main thread.
     unsafe {
-        objc2::ffi::object_setClass(ptr.cast_mut().cast::<AnyObject>(), MenuBarPanel::class() as *const AnyClass);
+        objc2::ffi::object_setClass(
+            ptr.cast_mut().cast::<AnyObject>(),
+            MenuBarPanel::class() as *const AnyClass,
+        );
     }
     w.setStyleMask(w.styleMask() | NSWindowStyleMask::NonactivatingPanel);
     w.setLevel(NSStatusWindowLevel);
@@ -213,7 +235,10 @@ pub enum PanelKey {
 
 pub fn panel_key(chars: &str, flags: NSEventModifierFlags) -> Option<PanelKey> {
     let mods = flags
-        & (NSEventModifierFlags::Command | NSEventModifierFlags::Shift | NSEventModifierFlags::Option | NSEventModifierFlags::Control);
+        & (NSEventModifierFlags::Command
+            | NSEventModifierFlags::Shift
+            | NSEventModifierFlags::Option
+            | NSEventModifierFlags::Control);
     if mods != NSEventModifierFlags::Command {
         return None;
     }
@@ -235,7 +260,10 @@ pub fn install_panel_key_monitor(
     let block = block2::RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
         // SAFETY: AppKit passes a valid event for the duration of the handler.
         let e = unsafe { event.as_ref() };
-        let chars = e.charactersIgnoringModifiers().map(|s| s.to_string().to_lowercase()).unwrap_or_default();
+        let chars = e
+            .charactersIgnoringModifiers()
+            .map(|s| s.to_string().to_lowercase())
+            .unwrap_or_default();
         if let Some(key) = panel_key(&chars, e.modifierFlags())
             && is_panel_key()
         {
@@ -246,7 +274,9 @@ pub fn install_panel_key_monitor(
     });
     // SAFETY: the handler returns the event or null (swallow), as the API requires; AppKit keeps
     // the monitor (and the block) for the life of the app since we never remove it.
-    let monitor = unsafe { NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &block) };
+    let monitor = unsafe {
+        NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::KeyDown, &block)
+    };
     std::mem::forget(monitor);
 }
 
@@ -258,7 +288,10 @@ mod tests {
     fn panel_shortcuts() {
         let cmd = NSEventModifierFlags::Command;
         assert_eq!(panel_key("n", cmd), Some(PanelKey::NewTicket));
-        assert_eq!(panel_key("o", cmd | NSEventModifierFlags::CapsLock), Some(PanelKey::OpenMain));
+        assert_eq!(
+            panel_key("o", cmd | NSEventModifierFlags::CapsLock),
+            Some(PanelKey::OpenMain)
+        );
         assert_eq!(panel_key("r", cmd), Some(PanelKey::Refresh));
         assert_eq!(panel_key("r", cmd | NSEventModifierFlags::Shift), None);
         assert_eq!(panel_key("r", NSEventModifierFlags::empty()), None);

@@ -1,7 +1,9 @@
 //! The ticket table shared by an organization and a person (`TicketTable`, `PersonChip` and
 //! `Pager`, W/OrgsView.swift:7-107 and W/ListOptions.swift:156-178): ORG-11, PPL-14.
 
-use itop_kit::{CurrentUser, Ticket, TicketGroup, TicketList, TicketListView, TicketPage, TicketSort};
+use itop_kit::{
+    CurrentUser, Ticket, TicketGroup, TicketList, TicketListView, TicketPage, TicketSort,
+};
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -56,11 +58,20 @@ pub struct TicketTable {
 #[serde(tag = "type", rename_all = "camelCase")]
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum TableState {
-    Loading { text: String },
+    Loading {
+        text: String,
+    },
     #[serde(rename_all = "camelCase")]
-    Failed { text: String, can_retry: bool },
-    Empty { text: String },
-    Loaded { table: TicketTable },
+    Failed {
+        text: String,
+        can_retry: bool,
+    },
+    Empty {
+        text: String,
+    },
+    Loaded {
+        table: TicketTable,
+    },
 }
 
 /// The shared sort and page size (ListOptions) and the table's own page (`@State page`).
@@ -76,7 +87,11 @@ pub struct TableOptions {
 impl Default for TableOptions {
     /// ListOptions' defaults: priority, 20 per page.
     fn default() -> Self {
-        Self { sort: TicketSort::Priority, page_size: Some(20), page: 1 }
+        Self {
+            sort: TicketSort::Priority,
+            page_size: Some(20),
+            page: 1,
+        }
     }
 }
 
@@ -93,10 +108,18 @@ impl TableOptions {
     }
 }
 
-
 /// `TicketTable.body`: grouped in Team order with the chosen sort, then paged.
-pub fn table(tickets: &[Ticket], me: &CurrentUser, last_column: LastColumn, opts: &TableOptions) -> TicketTable {
-    let paged = TicketPage::new(TicketList::groups(tickets, me, TicketListView::Team, opts.sort), opts.page_size, opts.page);
+pub fn table(
+    tickets: &[Ticket],
+    me: &CurrentUser,
+    last_column: LastColumn,
+    opts: &TableOptions,
+) -> TicketTable {
+    let paged = TicketPage::new(
+        TicketList::groups(tickets, me, TicketListView::Team, opts.sort),
+        opts.page_size,
+        opts.page,
+    );
     let sections = paged
         .sections
         .iter()
@@ -107,7 +130,11 @@ pub fn table(tickets: &[Ticket], me: &CurrentUser, last_column: LastColumn, opts
             rows: s.tickets.iter().map(|t| row(t, me)).collect(),
         })
         .collect();
-    TicketTable { last_column, sections, pager: pager(&paged) }
+    TicketTable {
+        last_column,
+        sections,
+        pager: pager(&paged),
+    }
 }
 
 fn row(t: &Ticket, me: &CurrentUser) -> TableRow {
@@ -115,8 +142,16 @@ fn row(t: &Ticket, me: &CurrentUser) -> TableRow {
     let assignee = if t.is_unassigned() {
         AgentChip::Unassigned
     } else {
-        let name = if mine { "You".to_owned() } else { t.agent_name.clone() };
-        let initials = if mine { me.initials() } else { chip_initials(&name) };
+        let name = if mine {
+            "You".to_owned()
+        } else {
+            t.agent_name.clone()
+        };
+        let initials = if mine {
+            me.initials()
+        } else {
+            chip_initials(&name)
+        };
         AgentChip::Person { initials, name }
     };
     TableRow {

@@ -25,14 +25,40 @@ fn handler(r: &RecordedRequest) -> StubReply {
         "UserRequest" if key.contains("org_id = 3") => objects(
             "UserRequest",
             &[
-                ("412", ticket_fields("R-000412", "VPN down", "assigned", "1", ("5", "Jane Agent"), "1")),
-                ("413", ticket_fields("R-000413", "Printer", "new", "3", ("0", ""), "1")),
-                ("414", ticket_fields("R-000414", "Mail", "assigned", "2", ("9", "bob builder"), "1")),
+                (
+                    "412",
+                    ticket_fields(
+                        "R-000412",
+                        "VPN down",
+                        "assigned",
+                        "1",
+                        ("5", "Jane Agent"),
+                        "1",
+                    ),
+                ),
+                (
+                    "413",
+                    ticket_fields("R-000413", "Printer", "new", "3", ("0", ""), "1"),
+                ),
+                (
+                    "414",
+                    ticket_fields(
+                        "R-000414",
+                        "Mail",
+                        "assigned",
+                        "2",
+                        ("9", "bob builder"),
+                        "1",
+                    ),
+                ),
             ],
         ),
         "UserRequest" | "Incident" if key.contains("org_id = ") => empty(),
         // The open-ticket counts behind the list: org 3 has two, org 2 one.
-        "UserRequest" => objects("UserRequest", &[("1", json!({"org_id": "3"})), ("2", json!({"org_id": "3"}))]),
+        "UserRequest" => objects(
+            "UserRequest",
+            &[("1", json!({"org_id": "3"})), ("2", json!({"org_id": "3"}))],
+        ),
         "Incident" => objects("Incident", &[("1", json!({"org_id": "2"}))]),
         _ => empty(),
     }
@@ -51,7 +77,10 @@ fn snap(e: &Env) -> Value {
 }
 
 fn org_list_requests(e: &Env) -> usize {
-    e.oql().iter().filter(|q| q.as_str() == "SELECT Organization WHERE status = 'active'").count()
+    e.oql()
+        .iter()
+        .filter(|q| q.as_str() == "SELECT Organization WHERE status = 'active'")
+        .count()
 }
 
 #[tokio::test(start_paused = true)]
@@ -88,12 +117,19 @@ async fn org_02_04_failure_and_retry() {
     let fail = Arc::new(AtomicBool::new(true));
     let failing = fail.clone();
     let e = env(move |r: &RecordedRequest| {
-        if failing.load(Ordering::SeqCst) { StubReply::json_status("{}", 500) } else { handler(r) }
+        if failing.load(Ordering::SeqCst) {
+            StubReply::json_status("{}", 500)
+        } else {
+            handler(r)
+        }
     });
     let m = model(&e);
     m.appear();
     settle().await;
-    assert_eq!(snap(&e)["list"], json!({"type": "failed", "text": "Couldn't load organizations. The server answered with HTTP 500."}));
+    assert_eq!(
+        snap(&e)["list"],
+        json!({"type": "failed", "text": "Couldn't load organizations. The server answered with HTTP 500."})
+    );
     fail.store(false, Ordering::SeqCst);
     send(&m, json!({"type": "retryList"})).await;
     assert_eq!(snap(&e)["list"]["type"], "loaded");
@@ -111,14 +147,26 @@ async fn org_03_04_local_search_and_empty_texts() {
     send(&m, json!({"type": "setQuery", "query": "BETA"})).await;
     assert_eq!(snap(&e)["list"]["orgs"][0]["id"], "4");
     send(&m, json!({"type": "setQuery", "query": " nope "})).await;
-    assert_eq!(snap(&e)["list"], json!({"type": "empty", "text": "No organization matches \u{201C}nope\u{201D}."}));
+    assert_eq!(
+        snap(&e)["list"],
+        json!({"type": "empty", "text": "No organization matches \u{201C}nope\u{201D}."})
+    );
     assert_eq!(e.stub.requests().len(), 3, "searching is local");
 
-    let none = env(|r: &RecordedRequest| if r.class().as_deref() == Some("Organization") { empty() } else { handler(r) });
+    let none = env(|r: &RecordedRequest| {
+        if r.class().as_deref() == Some("Organization") {
+            empty()
+        } else {
+            handler(r)
+        }
+    });
     let m = model(&none);
     m.appear();
     settle().await;
-    assert_eq!(snap(&none)["list"], json!({"type": "empty", "text": "Your iTop account can't see any organizations."}));
+    assert_eq!(
+        snap(&none)["list"],
+        json!({"type": "empty", "text": "Your iTop account can't see any organizations."})
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -132,19 +180,31 @@ async fn org_06_07_header_and_counts() {
     assert_eq!(d["headerLine"], "Organization · AC");
     assert_eq!(d["peopleLabel"], "People");
     assert_eq!(d["configItemsLabel"], "Config items");
-    assert_eq!(d["tickets"], json!({"type": "loading", "text": "Loading Acme's tickets"}));
+    assert_eq!(
+        d["tickets"],
+        json!({"type": "loading", "text": "Loading Acme's tickets"})
+    );
     settle().await;
     let d = snap(&e)["detail"].clone();
     assert_eq!(d["peopleLabel"], "People 2");
     assert_eq!(d["configItemsLabel"], "Config items 1");
     send(&m, json!({"type": "select", "id": "4"})).await;
     assert_eq!(snap(&e)["detail"]["headerLine"], "Organization");
-    assert_eq!(snap(&e)["placeholder"], "Select an organization to see its open tickets.");
+    assert_eq!(
+        snap(&e)["placeholder"],
+        "Select an organization to see its open tickets."
+    );
 }
 
 #[tokio::test(start_paused = true)]
 async fn org_07_counts_failure_keeps_plain_labels() {
-    let e = env(|r: &RecordedRequest| if r.class().as_deref() == Some("Person") { StubReply::failure(-1009) } else { handler(r) });
+    let e = env(|r: &RecordedRequest| {
+        if r.class().as_deref() == Some("Person") {
+            StubReply::failure(-1009)
+        } else {
+            handler(r)
+        }
+    });
     let m = model(&e);
     m.appear();
     settle().await;
@@ -165,14 +225,28 @@ async fn org_08_09_heading_and_reload_on_scope_change() {
     send(&m, json!({"type": "select", "id": "4"})).await;
     settle().await;
     assert_eq!(snap(&e)["detail"]["ticketsHeading"], "Open tickets");
-    assert_eq!(snap(&e)["detail"]["tickets"], json!({"type": "empty", "text": "beta labs has no open tickets."}));
+    assert_eq!(
+        snap(&e)["detail"]["tickets"],
+        json!({"type": "empty", "text": "beta labs has no open tickets."})
+    );
     e.link.set_scope(TicketScope::new(true, Some(30)));
     m.scope_changed();
     settle().await;
     assert_eq!(snap(&e)["detail"]["ticketsHeading"], "Tickets");
-    assert_eq!(snap(&e)["detail"]["tickets"], json!({"type": "empty", "text": "beta labs has no tickets in this range."}));
-    let last = e.oql().into_iter().rev().find(|q| q.starts_with("SELECT Incident") && q.contains("org_id = 4")).unwrap();
-    assert_eq!(last, "SELECT Incident WHERE start_date >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND org_id = 4");
+    assert_eq!(
+        snap(&e)["detail"]["tickets"],
+        json!({"type": "empty", "text": "beta labs has no tickets in this range."})
+    );
+    let last = e
+        .oql()
+        .into_iter()
+        .rev()
+        .find(|q| q.starts_with("SELECT Incident") && q.contains("org_id = 4"))
+        .unwrap();
+    assert_eq!(
+        last,
+        "SELECT Incident WHERE start_date >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND org_id = 4"
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -180,7 +254,11 @@ async fn org_10_ticket_failure_and_retry() {
     let fail = Arc::new(AtomicBool::new(true));
     let failing = fail.clone();
     let e = env(move |r: &RecordedRequest| {
-        if failing.load(Ordering::SeqCst) && oql(r).contains("AND org_id = 3") { StubReply::failure(-1009) } else { handler(r) }
+        if failing.load(Ordering::SeqCst) && oql(r).contains("AND org_id = 3") {
+            StubReply::failure(-1009)
+        } else {
+            handler(r)
+        }
     });
     let m = model(&e);
     m.appear();
@@ -217,16 +295,25 @@ async fn org_11_ticket_table() {
         json!({"ticketId": "UserRequest::412", "ref": "R-000412", "title": "VPN down", "needsYou": false, "p1": true,
                "callerName": "Carl Caller", "assignee": {"type": "person", "initials": "JA", "name": "You"}})
     );
-    assert_eq!(rows[1]["assignee"], json!({"type": "person", "initials": "BB", "name": "bob builder"}));
+    assert_eq!(
+        rows[1]["assignee"],
+        json!({"type": "person", "initials": "BB", "name": "bob builder"})
+    );
     assert_eq!(rows[1]["p1"], false);
-    assert_eq!(t["sections"][0]["rows"][0]["assignee"], json!({"type": "unassigned"}));
+    assert_eq!(
+        t["sections"][0]["rows"][0]["assignee"],
+        json!({"type": "unassigned"})
+    );
     assert_eq!(t["pager"], json!({"type": "count", "text": "3 tickets"}));
 
     // Paged: 2 per page, page 2, then back to 1 when the page size changes.
     m.set_table_options(TicketSort::Priority, Some(2));
     send(&m, json!({"type": "setTicketPage", "page": 2})).await;
     let t = snap(&e)["detail"]["tickets"]["table"].clone();
-    assert_eq!(t["pager"], json!({"type": "pages", "page": 2, "pageCount": 2, "label": "3–3 of 3", "canPrevious": true, "canNext": false}));
+    assert_eq!(
+        t["pager"],
+        json!({"type": "pages", "page": 2, "pageCount": 2, "label": "3–3 of 3", "canPrevious": true, "canNext": false})
+    );
     assert_eq!(t["sections"][0]["total"], 2, "the group's whole count");
     m.set_table_options(TicketSort::Oldest, Some(2));
     assert_eq!(snap(&e)["detail"]["tickets"]["table"]["pager"]["page"], 1);
@@ -244,7 +331,10 @@ async fn org_shell_10_open_org_from_elsewhere() {
     send(&m, json!({"type": "setQuery", "query": "zeta"})).await;
     m.show_org("3");
     settle().await;
-    assert!(e.stub.requests().is_empty(), "nothing loads until the section shows");
+    assert!(
+        e.stub.requests().is_empty(),
+        "nothing loads until the section shows"
+    );
     assert_eq!(snap(&e)["query"], "");
     assert_eq!(snap(&e)["selectedId"], "3");
     m.appear();
@@ -275,11 +365,29 @@ async fn orgs_snapshot_json_shape() {
         k.sort();
         k
     };
-    assert_eq!(keys(&s), ["detail", "list", "placeholder", "query", "selectedId"]);
+    assert_eq!(
+        keys(&s),
+        ["detail", "list", "placeholder", "query", "selectedId"]
+    );
     assert_eq!(
         keys(&s["detail"]),
-        ["code", "configItemsLabel", "headerLine", "id", "name", "peopleLabel", "tickets", "ticketsHeading"]
+        [
+            "code",
+            "configItemsLabel",
+            "headerLine",
+            "id",
+            "name",
+            "peopleLabel",
+            "tickets",
+            "ticketsHeading"
+        ]
     );
-    assert_eq!(keys(&s["detail"]["tickets"]["table"]), ["lastColumn", "pager", "sections"]);
-    assert_eq!(keys(&s["detail"]["tickets"]["table"]["sections"][0]), ["group", "rows", "title", "total"]);
+    assert_eq!(
+        keys(&s["detail"]["tickets"]["table"]),
+        ["lastColumn", "pager", "sections"]
+    );
+    assert_eq!(
+        keys(&s["detail"]["tickets"]["table"]["sections"][0]),
+        ["group", "rows", "title", "total"]
+    );
 }

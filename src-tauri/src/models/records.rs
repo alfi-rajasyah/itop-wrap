@@ -220,10 +220,16 @@ pub struct Notice {
 
 impl Notice {
     pub fn ok(text: impl Into<String>) -> Self {
-        Notice { text: text.into(), is_error: false }
+        Notice {
+            text: text.into(),
+            is_error: false,
+        }
     }
     pub fn error(text: impl Into<String>) -> Self {
-        Notice { text: text.into(), is_error: true }
+        Notice {
+            text: text.into(),
+            is_error: true,
+        }
     }
 }
 
@@ -265,7 +271,9 @@ pub fn status_label(status: &str) -> String {
         _ => {
             let mut chars = status.chars();
             match chars.next() {
-                Some(first) => first.to_uppercase().collect::<String>() + &chars.as_str().replace('_', " "),
+                Some(first) => {
+                    first.to_uppercase().collect::<String>() + &chars.as_str().replace('_', " ")
+                }
                 None => String::new(),
             }
         }
@@ -392,7 +400,13 @@ pub fn pager(page: &itop_kit::TicketPage) -> Pager {
             can_next: page.page < page.page_count,
         }
     } else if page.total > 0 {
-        Pager::Count { text: if page.total == 1 { "1 ticket".to_owned() } else { format!("{} tickets", page.total) } }
+        Pager::Count {
+            text: if page.total == 1 {
+                "1 ticket".to_owned()
+            } else {
+                format!("{} tickets", page.total)
+            },
+        }
     } else {
         Pager::None
     }
@@ -436,11 +450,21 @@ pub fn inline_image_src(id: &str) -> String {
 
 /// `RichTextView` (W/RichTextView.swift:15-66): parsed blocks, or the plain text when the parse
 /// yields nothing (DET-50).
-pub fn rich_content(html: Option<&str>, plain: &str, base: &str, ticket_web_url: Option<&str>) -> RichContent {
+pub fn rich_content(
+    html: Option<&str>,
+    plain: &str,
+    base: &str,
+    ticket_web_url: Option<&str>,
+) -> RichContent {
     let blocks = html.map(|h| RichText::parse(h, base)).unwrap_or_default();
     if blocks.is_empty() {
         return RichContent {
-            blocks: vec![RichBlock::Text { runs: vec![RichRun::Text { text: plain.to_owned(), link: None }] }],
+            blocks: vec![RichBlock::Text {
+                runs: vec![RichRun::Text {
+                    text: plain.to_owned(),
+                    link: None,
+                }],
+            }],
         };
     }
     RichContent {
@@ -458,7 +482,10 @@ pub fn rich_content(html: Option<&str>, plain: &str, base: &str, ticket_web_url:
                             {
                                 RichRun::OutsideImage { host: r.text, url }
                             } else {
-                                RichRun::Text { text: r.text, link: r.link }
+                                RichRun::Text {
+                                    text: r.text,
+                                    link: r.link,
+                                }
                             }
                         })
                         .collect(),
@@ -480,7 +507,10 @@ pub fn rich_content(html: Option<&str>, plain: &str, base: &str, ticket_web_url:
 fn data_url(bytes: &[u8]) -> String {
     use base64::Engine;
     let mime = itop_kit::LogImage::sniff(bytes).map_or("image/png", |(m, _)| m);
-    format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))
+    format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -610,7 +640,9 @@ pub fn placeholder<T>(state: &Loadable<Vec<T>>, loading: &str, empty: &str) -> S
 
 /// Adds a final "." when the reason doesn't end in . ! or ? (ERR-13); trims spaces first.
 pub fn with_period(reason: &str) -> String {
-    let mut reason = reason.trim_matches(|c: char| c == ' ' || c == '\t').to_owned();
+    let mut reason = reason
+        .trim_matches(|c: char| c == ' ' || c == '\t')
+        .to_owned();
     if let Some(last) = reason.chars().last()
         && !".!?".contains(last)
     {
@@ -629,7 +661,10 @@ mod tests {
         assert_eq!(status_label("escalated_tto"), "Escalated TTO");
         assert_eq!(status_label("waiting_for_approval"), "Waiting for approval");
         assert_eq!(status_label("assigned"), "Assigned");
-        assert_eq!(status_label("pending_customer_reply"), "Pending customer reply");
+        assert_eq!(
+            status_label("pending_customer_reply"),
+            "Pending customer reply"
+        );
         assert_eq!(status_label(""), "");
     }
 
@@ -638,7 +673,9 @@ mod tests {
         let c = rich_content(None, "Plain", "https://x", None);
         assert_eq!(
             serde_json::to_value(&c).ok(),
-            Some(serde_json::json!({"blocks":[{"type":"text","runs":[{"type":"text","text":"Plain","link":null}]}]}))
+            Some(
+                serde_json::json!({"blocks":[{"type":"text","runs":[{"type":"text","text":"Plain","link":null}]}]})
+            )
         );
     }
 
@@ -652,11 +689,22 @@ mod tests {
 
     #[test]
     fn pager_shapes() {
-        assert_eq!(serde_json::to_value(Pager::None).ok(), Some(serde_json::json!({"type":"none"})));
-        let p = Pager::Pages { page: 2, page_count: 3, label: "21–40 of 56".into(), can_previous: true, can_next: true };
+        assert_eq!(
+            serde_json::to_value(Pager::None).ok(),
+            Some(serde_json::json!({"type":"none"}))
+        );
+        let p = Pager::Pages {
+            page: 2,
+            page_count: 3,
+            label: "21–40 of 56".into(),
+            can_previous: true,
+            can_next: true,
+        };
         assert_eq!(
             serde_json::to_value(p).ok(),
-            Some(serde_json::json!({"type":"pages","page":2,"pageCount":3,"label":"21–40 of 56","canPrevious":true,"canNext":true}))
+            Some(
+                serde_json::json!({"type":"pages","page":2,"pageCount":3,"label":"21–40 of 56","canPrevious":true,"canNext":true})
+            )
         );
     }
 }

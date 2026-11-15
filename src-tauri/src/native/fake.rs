@@ -52,7 +52,10 @@ impl FakeNative {
         self.calls.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
     fn record(&self, call: Call) {
-        self.calls.lock().unwrap_or_else(|e| e.into_inner()).push(call);
+        self.calls
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(call);
     }
 }
 
@@ -68,10 +71,16 @@ impl Native for FakeNative {
     }
     fn save_panel(&self, suggested_name: &str) -> Option<PathBuf> {
         self.record(Call::SavePanel(suggested_name.to_owned()));
-        self.save_to.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.save_to
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
     fn convert_image(&self, _: &[u8], _: ConvertTo) -> Option<ConvertedImage> {
-        self.converted.lock().unwrap_or_else(|e| e.into_inner()).clone()
+        self.converted
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
     fn show_main_window(&self) {
         self.record(Call::ShowMainWindow);
@@ -89,7 +98,10 @@ impl Native for FakeNative {
         self.record(Call::SessionChanged(signed_in));
     }
     fn set_tray(&self, title: &str, accessibility_label: &str) {
-        self.record(Call::SetTray(title.to_owned(), accessibility_label.to_owned()));
+        self.record(Call::SetTray(
+            title.to_owned(),
+            accessibility_label.to_owned(),
+        ));
     }
     fn new_ticket_assign_to_me(&self) -> bool {
         *self.assign_to_me.lock().unwrap_or_else(|e| e.into_inner())
