@@ -37,7 +37,16 @@ export type SidebarItem = {
 
 export type SidebarSection = { id: string; title?: string; items: SidebarItem[] };
 
-export type SidebarUser = { name: string; detail?: string; initials?: string; menu: MenuEntry[] };
+export type SidebarUser = {
+  name: string;
+  detail?: string;
+  initials?: string;
+  menu: MenuEntry[];
+  /** Accessible name of the account button; defaults to "Account: <name>". */
+  ariaLabel?: string;
+  /** Tooltip of the account button. */
+  tooltip?: string;
+};
 
 export const TRAFFIC_LIGHTS_WIDTH = 78;
 
@@ -155,11 +164,12 @@ export function Sidebar({
             items={user.menu}
             placement="top-start"
             minWidth={200}
-            trigger={({ ref, ...props }) => (
+            trigger={({ ref, ...props }) => {
+              const button = (
               <button
                 ref={ref}
                 type="button"
-                aria-label={`Account: ${user.name}`}
+                aria-label={user.ariaLabel ?? `Account: ${user.name}`}
                 className="flex h-10 w-full items-center gap-2 rounded-[8px] px-2 text-left transition-[background-color,transform] duration-100 hover:bg-hover-2 active:scale-[0.99] aria-expanded:bg-hover-2"
                 {...props}
               >
@@ -170,7 +180,15 @@ export function Sidebar({
                 </span>
                 <ChevronUpDownIcon className="size-4 shrink-0 text-ink-2" />
               </button>
-            )}
+              );
+              return user.tooltip ? (
+                <Tooltip content={user.tooltip} side="top" describe={false} className="flex w-full">
+                  {button}
+                </Tooltip>
+              ) : (
+                button
+              );
+            }}
           />
         </div>
       ) : null}

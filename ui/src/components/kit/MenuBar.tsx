@@ -53,7 +53,7 @@ export function MenuBarSection({ title, count, children }: { title: string; coun
   return (
     <section aria-label={title} className="flex flex-col">
       <h3 className="flex h-[30px] items-end gap-2 px-3 pb-1.5 text-[11.5px] font-semibold text-ink-2">
-        <span>{title}</span>
+        <span className="whitespace-pre">{title}</span>
         {count != null ? <span className="tabular-nums">{count}</span> : null}
       </h3>
       <GlideMenu rowSelector="[data-mb-row]" highlightClassName="inset-x-1.5 rounded-[8px] bg-hover" className="flex flex-col px-1.5">
@@ -71,6 +71,7 @@ export function MenuBarTicketRow({
   needsYou = false,
   total,
   runningSince,
+  runningLabel,
   timer = "none",
   onToggleTimer,
   timerDisabled,
@@ -85,6 +86,8 @@ export function MenuBarTicketRow({
   total?: string;
   /** Epoch ms: this row is the running timer. */
   runningSince?: number | null;
+  /** The live HH:MM:SS made elsewhere (Rust's `timer.running.counter`); marks the row as running. Wins over runningSince. */
+  runningLabel?: string | null;
   timer?: MenuBarTimer;
   onToggleTimer?: () => void;
   timerDisabled?: boolean;
@@ -92,8 +95,9 @@ export function MenuBarTicketRow({
   timerBusy?: boolean;
   onOpen?: () => void;
 }) {
-  const elapsed = useElapsedSeconds(runningSince);
-  const running = elapsed !== undefined;
+  const elapsed = useElapsedSeconds(runningLabel != null ? null : runningSince);
+  const counter = runningLabel ?? (elapsed !== undefined ? formatCounter(elapsed) : undefined);
+  const running = counter !== undefined;
   return (
     <div
       data-mb-row
@@ -110,7 +114,7 @@ export function MenuBarTicketRow({
       </Tooltip>
       {running ? (
         <Duration running className="text-[12px]">
-          {formatCounter(elapsed)}
+          {counter}
         </Duration>
       ) : total ? (
         <Duration>{total}</Duration>
