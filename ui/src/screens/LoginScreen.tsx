@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { useModel, type LoginForm, type LoginMessage, type Send } from '@/backend'
 import { Button, Spinner, TextInput } from '@/components/kit'
 import { useWindowKeyDown } from '@/lib/keys'
-import { useSyncedText } from '@/lib/useSyncedText'
+import { useModelText } from '@/lib/useModelText'
 
 /*
  * Everything the main window shows without a session (AUTH-1…19, KEY-7):
@@ -75,8 +75,8 @@ function Unreachable({ message, send }: { message: string; send: SessionSend }) 
 type Focusable = 'server' | 'user' | 'password'
 
 function SignInForm({ form, send }: { form: LoginForm; send: SessionSend }) {
-  const [server, setServer] = useSyncedText(form.server, (server) => send({ type: 'setServer', server }))
-  const [user, setUser] = useSyncedText(form.user, (user) => send({ type: 'setUser', user }))
+  const [server, setServer] = useModelText(form.server, (server) => send({ type: 'setServer', server }))
+  const [user, setUser] = useModelText(form.user, (user) => send({ type: 'setUser', user }))
   const [password, setPassword] = useState('')
   const submitting = useRef(false)
   const refs = {

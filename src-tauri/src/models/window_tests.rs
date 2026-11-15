@@ -258,3 +258,45 @@ async fn det_34_save_failure_reads_like_foundation() {
         format!("Couldn't download vpn.log. {why}")
     );
 }
+
+/// SHELL-2: the sidebar is 180…260 pt, 200 at first, and its width is remembered.
+#[tokio::test(start_paused = true)]
+async fn shell_2_sidebar_width_is_clamped_and_remembered() {
+    use super::prefs::Prefs;
+    let h = Harness::new(FakeITop::with(vec![ticket("1", "assigned", "7")]));
+    assert_eq!(h.snap("shell")["sidebarWidth"], 200);
+    send(
+        &h,
+        "shell",
+        json!({"type": "setSidebarWidth", "width": 400}),
+    )
+    .await;
+    assert_eq!(h.snap("shell")["sidebarWidth"], 260);
+    send(
+        &h,
+        "shell",
+        json!({"type": "setSidebarWidth", "width": 222}),
+    )
+    .await;
+    assert_eq!(h.prefs.int(super::shell::SIDEBAR_WIDTH_KEY), Some(222));
+    let again = super::shell::ShellState::load(h.prefs.as_ref());
+    assert_eq!(again.sidebar_width, 222, "the next launch starts at it");
+}
+
+/// View ▸ Hide Sidebar / Show Sidebar flips the sidebar and the menu title follows.
+#[tokio::test(start_paused = true)]
+async fn sidebar_toggle_follows_the_menu() {
+    let h = Harness::new(FakeITop::with(vec![ticket("1", "assigned", "7")]));
+    assert_eq!(h.snap("shell")["sidebarVisible"], true);
+    h.ws.shell_toggle_sidebar();
+    assert_eq!(h.snap("shell")["sidebarVisible"], false);
+    assert!(h.native.calls().contains(&Call::SidebarChanged(false)));
+    send(
+        &h,
+        "shell",
+        json!({"type": "setSidebarVisible", "visible": true}),
+    )
+    .await;
+    assert_eq!(h.snap("shell")["sidebarVisible"], true);
+    assert!(h.native.calls().contains(&Call::SidebarChanged(true)));
+}

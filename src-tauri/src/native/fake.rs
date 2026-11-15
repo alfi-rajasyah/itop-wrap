@@ -20,6 +20,7 @@ pub enum Call {
     SessionChanged(bool),
     SetTray(String, String),
     ReadPasteboard,
+    SidebarChanged(bool),
 }
 
 pub struct FakeNative {
@@ -104,6 +105,9 @@ impl Native for FakeNative {
     }
     fn session_changed(&self, signed_in: bool) {
         self.record(Call::SessionChanged(signed_in));
+    }
+    fn sidebar_changed(&self, visible: bool) {
+        self.record(Call::SidebarChanged(visible));
     }
     fn set_tray(&self, title: &str, accessibility_label: &str) {
         self.record(Call::SetTray(

@@ -47,6 +47,8 @@ pub trait Native: Send + Sync {
     fn hide_menubar_panel(&self);
     /// The session state changed: resize the main window, rebuild the menus, add or remove the tray.
     fn session_changed(&self, signed_in: bool);
+    /// The sidebar was hidden or shown: View ▸ "Hide Sidebar" / "Show Sidebar" follows.
+    fn sidebar_changed(&self, visible: bool);
     /// The tray's title and accessibility label (MB-1…6).
     fn set_tray(&self, title: &str, accessibility_label: &str);
     /// New ticket's "Assign to me": UserDefaults `newTicket.assignToMe` in the standard domain,

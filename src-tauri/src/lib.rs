@@ -72,6 +72,11 @@ pub fn run() {
 
 /// Runs the app with the router `make_router` builds from the [`AppContext`].
 pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send + 'static) {
+    let env: std::collections::HashMap<String, String> = std::env::vars().collect();
+    let debug = models::debug::native_switches(&env, !cfg!(debug_assertions));
+    if let Some(path) = &debug.stderr {
+        native::mac::appkit::redirect_stderr(path);
+    }
     let mut make_router = Some(make_router);
     let app = tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol("itop", commands::itop_protocol)
@@ -116,6 +121,12 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
             });
             app.manage(shell.clone());
             let mtm = objc2::MainThreadMarker::new().ok_or("setup isn't on the main thread")?;
+            if let Some(appearance) = debug.appearance {
+                native::mac::appkit::force_appearance(
+                    mtm,
+                    appearance == models::debug::Appearance::Dark,
+                );
+            }
             shell.create_windows(mtm)?;
             shell.send(NativeEvent::Launched);
             Ok(())

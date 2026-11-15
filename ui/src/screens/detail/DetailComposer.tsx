@@ -1,6 +1,7 @@
 import { useCallback, useRef, type ClipboardEvent } from 'react'
 import { Composer } from '@/components/kit'
-import { useModel, type Composer as ComposerView, type ListScope } from '@/backend'
+import { isTauri, useModel, type Composer as ComposerView, type ListScope } from '@/backend'
+import { isModalOpen, useWindowKeyDown } from '@/lib/keys'
 import { useModelText } from '@/lib/useModelText'
 import { pickDropped, pickPasted, toIntake, type IntakePick } from './intake'
 
@@ -17,6 +18,17 @@ export function DetailComposer({ scope, ticketId, composer }: { scope: ListScope
   const commit = useCallback((text: string) => send({ type: 'setDraft', text }), [send])
   const [draft, setDraft] = useModelText(composer.draft, commit, draftKey)
 
+  const sendEntry = () => void send({ type: 'send' }).catch((error: unknown) => console.error('send failed', error))
+
+  // ⌘↩ is the send button's shortcut (LOG-5, KEY-5): it works from anywhere in the window while
+  // no sheet or dialog is up, not only with the focus in the text box (which handles it itself).
+  useWindowKeyDown((e) => {
+    if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.isComposing) return
+    if (e.defaultPrevented || isModalOpen() || !composer.canSend) return
+    e.preventDefault()
+    sendEntry()
+  })
+
   const add = (pick: IntakePick | null) => {
     if (!pick) return
     void toIntake(pick, composer.maxIntakeFileBytes)
@@ -26,6 +38,21 @@ export function DetailComposer({ scope, ticketId, composer }: { scope: ListScope
 
   const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     if (!composer.editable) return
+    if (isTauri()) {
+      // WKWebView doesn't hand over files copied in Finder, so Rust reads NSPasteboard the way
+      // ComposerTextView did (LOG-14). When it finds no images the text is pasted as usual.
+      e.preventDefault()
+      const text = e.clipboardData.getData('text/plain')
+      const field = e.currentTarget
+      void send({ type: 'pasteFromClipboard' })
+        .then((result) => {
+          if (result !== 'text' || !text) return
+          field.focus()
+          document.execCommand('insertText', false, text)
+        })
+        .catch((error: unknown) => console.error('paste failed', error))
+      return
+    }
     const pick = pickPasted(e.clipboardData)
     if (!pick) return
     e.preventDefault()
@@ -38,7 +65,7 @@ export function DetailComposer({ scope, ticketId, composer }: { scope: ListScope
         <Composer
           value={draft}
           onChange={setDraft}
-          onSend={() => void send({ type: 'send' }).catch((error: unknown) => console.error('send failed', error))}
+          onSend={sendEntry}
           label={composer.accessibilityLabel}
           placeholder={composer.placeholder}
           sendLabel={composer.sendLabel}
@@ -54,7 +81,11 @@ export function DetailComposer({ scope, ticketId, composer }: { scope: ListScope
           status={composer.status?.text}
           statusTone={composer.status?.isError ? 'error' : 'info'}
           onPaste={onPaste}
-          onDropFiles={(files) => add(pickDropped(files))}
+          onDropFiles={(files) => {
+            const pick = pickDropped(files)
+            add(pick)
+            return pick !== null
+          }}
         />
       </div>
       <input

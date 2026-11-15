@@ -9,7 +9,7 @@ import {
   MenuBarTopRow,
 } from '@/components/kit'
 import { isCommand, useWindowKeyDown } from '@/lib/keys'
-import { useSyncedText } from '@/lib/useSyncedText'
+import { useModelText } from '@/lib/useModelText'
 import { TimerNotice } from './list/TimerNotice'
 
 /*
@@ -100,6 +100,6 @@ export default function MenuBarPanelScreen() {
 }
 
 function SearchRow({ query, send }: { query: string; send: Send<'menubar'> }) {
-  const [value, setValue] = useSyncedText(query, (q) => send({ type: 'setQuery', query: q }))
+  const [value, setValue] = useModelText(query, (q) => send({ type: 'setQuery', query: q }))
   return <MenuBarTopRow query={value} onQueryChange={setValue} onNewTicket={() => void send({ type: 'newTicket' })} />
 }

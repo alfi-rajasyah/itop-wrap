@@ -156,7 +156,7 @@ impl Workspace {
         let now = ctx.native.now();
         let state = State {
             options: OptionsState::load(prefs.as_ref()),
-            shell: ShellState::default(),
+            shell: ShellState::load(prefs.as_ref()),
             lists: [
                 ListState::new(ListScope::Mine),
                 ListState::new(ListScope::Team),

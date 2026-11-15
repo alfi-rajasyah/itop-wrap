@@ -82,6 +82,40 @@ pub fn save_panel(mtm: MainThreadMarker, suggested_name: &str) -> Option<PathBuf
     panel.URL()?.path().map(|p| PathBuf::from(p.to_string()))
 }
 
+/// `ITOPWRAP_STDERR=<file>` (debug builds): `freopen(path, "a", stderr)`.
+pub fn redirect_stderr(path: &str) {
+    use std::os::fd::AsRawFd;
+    unsafe extern "C" {
+        fn dup2(fd: i32, fd2: i32) -> i32;
+    }
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        // SAFETY: both are open descriptors; dup2 makes 2 (stderr) refer to the file, which
+        // stays open through fd 2 after `file` is dropped.
+        Ok(file) => unsafe {
+            dup2(file.as_raw_fd(), 2);
+        },
+        Err(e) => eprintln!("ITOPWRAP_STDERR: can't open {path}: {e}"),
+    }
+}
+
+/// `ITOPWRAP_APPEARANCE=light|dark` (debug builds): `NSApp.appearance = .aqua / .darkAqua`.
+pub fn force_appearance(mtm: MainThreadMarker, dark: bool) {
+    // SAFETY: immutable NSString constants exported by AppKit.
+    let name = unsafe {
+        if dark {
+            objc2_app_kit::NSAppearanceNameDarkAqua
+        } else {
+            objc2_app_kit::NSAppearanceNameAqua
+        }
+    };
+    let appearance = objc2_app_kit::NSAppearance::appearanceNamed(name);
+    NSApplication::sharedApplication(mtm).setAppearance(appearance.as_deref());
+}
+
 /// System Settings ▸ Accessibility ▸ Display ▸ Reduce motion.
 pub fn reduce_motion(_mtm: MainThreadMarker) -> bool {
     NSWorkspace::sharedWorkspace().accessibilityDisplayShouldReduceMotion()

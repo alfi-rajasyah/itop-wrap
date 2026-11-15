@@ -50,6 +50,65 @@ pub fn from_process() -> DebugSwitches {
     switches(&std::env::vars().collect(), !cfg!(debug_assertions))
 }
 
+/// `ITOPWRAP_APPEARANCE=light|dark` forces the app's appearance (DBG-9, `DebugLaunch.applyAppearance`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Appearance {
+    Light,
+    Dark,
+}
+
+/// The native-only debug switches: `ITOPWRAP_STDERR=<file>` appends stderr to a file (for a
+/// debug app opened from Finder) and `ITOPWRAP_APPEARANCE` (DBG-9). Ignored in release builds.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct NativeSwitches {
+    pub stderr: Option<String>,
+    pub appearance: Option<Appearance>,
+}
+
+pub fn native_switches(env: &HashMap<String, String>, release: bool) -> NativeSwitches {
+    if release {
+        return NativeSwitches::default();
+    }
+    NativeSwitches {
+        stderr: env
+            .get("ITOPWRAP_STDERR")
+            .filter(|p| !p.is_empty())
+            .cloned(),
+        appearance: match env.get("ITOPWRAP_APPEARANCE").map(String::as_str) {
+            Some("light") => Some(Appearance::Light),
+            Some("dark") => Some(Appearance::Dark),
+            _ => None,
+        },
+    }
+}
+
+#[cfg(test)]
+mod native_switch_tests {
+    use super::*;
+
+    #[test]
+    fn dbg_9_stderr_and_appearance() {
+        let env: HashMap<String, String> = [
+            ("ITOPWRAP_STDERR", "/tmp/itopwrap.log"),
+            ("ITOPWRAP_APPEARANCE", "dark"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+        .collect();
+        assert_eq!(
+            native_switches(&env, false),
+            NativeSwitches {
+                stderr: Some("/tmp/itopwrap.log".into()),
+                appearance: Some(Appearance::Dark),
+            }
+        );
+        assert_eq!(native_switches(&env, true), NativeSwitches::default());
+        let other: HashMap<String, String> =
+            [("ITOPWRAP_APPEARANCE".to_owned(), "blue".to_owned())].into();
+        assert_eq!(native_switches(&other, false).appearance, None);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

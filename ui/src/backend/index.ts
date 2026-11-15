@@ -70,9 +70,31 @@ export class ModelStore {
     this.listeners.get(model)?.forEach((listener) => listener())
   }
 
+  /**
+   * Sends an intent. A model's `set…` intents (text fields, tabs: quick state changes) go out one
+   * after another, and any later intent to the same model waits until they have been applied, so
+   * a confirm, create or send issued right after typing can never overtake the last keystroke
+   * (Tauri runs async commands concurrently). Other intents don't wait for each other.
+   */
   dispatch<K extends ModelId, I extends IntentOf<K>>(model: K, intent: I): Promise<ResultOf<K, I['type']>> {
-    return this.backend.dispatch(model, intent)
+    const before = this.settingQueue.get(model)
+    const run = () => this.backend.dispatch(model, intent)
+    const result = before ? before.then(run) : run()
+    if (intent.type.startsWith('set')) {
+      const settled = result.then(
+        () => undefined,
+        () => undefined,
+      )
+      this.settingQueue.set(model, settled)
+      void settled.then(() => {
+        if (this.settingQueue.get(model) === settled) this.settingQueue.delete(model)
+      })
+    }
+    return result
   }
+
+  /** Per model: when its last `set…` intent has been applied. */
+  private readonly settingQueue = new Map<ModelId, Promise<void>>()
 }
 
 function selectBackend(): Backend {

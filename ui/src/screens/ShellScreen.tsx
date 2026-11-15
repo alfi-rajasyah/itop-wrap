@@ -4,9 +4,11 @@ import {
   AppShell,
   BuildingIcon,
   Dialog,
+  IconButton,
   PeopleIcon,
   ServerIcon,
   SignOutIcon,
+  SidebarIcon,
   Sidebar,
   TeamIcon,
   TrayIcon,
@@ -64,19 +66,37 @@ export default function ShellScreen() {
     } else if (isCommand(e, 'n')) {
       e.preventDefault()
       void send({ type: 'newTicket' })
+    } else if (e.key.toLowerCase() === 's' && e.ctrlKey && e.metaKey && !e.altKey && !e.shiftKey) {
+      // View ▸ Hide Sidebar / Show Sidebar (⌃⌘S) is a native menu item in the app.
+      e.preventDefault()
+      void send({ type: 'setSidebarVisible', visible: !shell.sidebarVisible })
     }
   })
 
   if (!shell) return <div className="h-screen bg-app" />
 
+  const toggle = (
+    <IconButton
+      label={shell.sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+      tooltip={shell.sidebarVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+      icon={<SidebarIcon />}
+      onClick={() => void send({ type: 'setSidebarVisible', visible: !shell.sidebarVisible })}
+    />
+  )
+
   return (
     <div className="h-screen">
       <AppShell
+        sidebarVisible={shell.sidebarVisible}
+        sidebarToggle={toggle}
         sidebar={
           <Sidebar
             sections={sidebarSections(shell)}
             selectedId={shell.selection}
             onSelect={(id) => void send({ type: 'select', item: id as SidebarItem })}
+            header={toggle}
+            width={shell.sidebarWidth}
+            onWidthChange={(width) => void send({ type: 'setSidebarWidth', width })}
             user={{
               name: shell.account.displayName,
               detail: shell.account.host,

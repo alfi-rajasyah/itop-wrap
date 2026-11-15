@@ -95,6 +95,23 @@ describe('TicketListScreen: selection and keyboard (KEY-3, KEY-9, LIST-64)', () 
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
     expect(dispatch.mock.calls.filter(([m, i]) => m === 'list:mine' && i.type === 'refresh')).toHaveLength(2)
   })
+
+  it('⌘R does nothing while a sheet, dialog or the image viewer is up (LIST-64, KEY-3)', async () => {
+    const { dispatch } = mountMock()
+    render(<App />)
+    await listbox()
+    const modal = document.createElement('div')
+    modal.setAttribute('aria-modal', 'true')
+    document.body.appendChild(modal)
+    let event!: KeyboardEvent
+    await act(async () => {
+      event = new KeyboardEvent('keydown', { key: 'r', metaKey: true, bubbles: true, cancelable: true })
+      window.dispatchEvent(event)
+    })
+    modal.remove()
+    expect(event.defaultPrevented).toBe(true)
+    expect(dispatch.mock.calls.filter(([m, i]) => m === 'list:mine' && i.type === 'refresh')).toHaveLength(0)
+  })
 })
 
 describe('TicketListScreen: rows, notices and lookups', () => {

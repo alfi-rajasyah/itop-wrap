@@ -415,6 +415,11 @@ impl Router for AppRouter {
                     ws.main_window_hidden();
                 }
             }
+            NativeEvent::ToggleSidebar => {
+                if let Some(ws) = ws {
+                    ws.shell_toggle_sidebar();
+                }
+            }
             NativeEvent::MainWindowShown => {
                 if let Some(ws) = ws {
                     ws.main_window_shown();

@@ -61,8 +61,8 @@ export type ComposerProps = {
   status?: ReactNode;
   statusTone?: "info" | "error";
   onPaste?: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
-  /** Files dropped on the box. */
-  onDropFiles?: (files: File[], event: DragEvent<HTMLDivElement>) => void;
+  /** Files dropped on the box; true when taken (otherwise the default drop happens). */
+  onDropFiles?: (files: File[], event: DragEvent<HTMLDivElement>) => boolean;
   className?: string;
 };
 
@@ -103,7 +103,14 @@ export const Composer = forwardRef<HTMLTextAreaElement, ComposerProps>(function 
     }
   };
 
-  const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  // LOG-15: only a drag that carries images highlights the box and is taken; any other drag
+  // gets the default drop. While dragging only the items' types are readable; a file whose type
+  // WebKit doesn't report counts, and the caller rejects it on drop if it isn't an image.
+  const hasFiles = (e: DragEvent) => {
+    const items = Array.from(e.dataTransfer?.items ?? []).filter((i) => i.kind === "file");
+    if (items.length > 0) return items.some((i) => i.type === "" || i.type.startsWith("image/"));
+    return Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  };
 
   return (
     <div
@@ -126,8 +133,7 @@ export const Composer = forwardRef<HTMLTextAreaElement, ComposerProps>(function 
         depth.current = 0;
         setDragging(false);
         if (readOnly || !hasFiles(e)) return;
-        e.preventDefault();
-        onDropFiles?.(Array.from(e.dataTransfer.files), e);
+        if (onDropFiles?.(Array.from(e.dataTransfer.files), e)) e.preventDefault();
       }}
       className={cn(
         "relative flex flex-col gap-1.5 rounded-[14px] border bg-surface p-1.5 shadow-card transition-[border-color,background-color,border-width] duration-150",
@@ -151,11 +157,11 @@ export const Composer = forwardRef<HTMLTextAreaElement, ComposerProps>(function 
       />
 
       {images.length > 0 ? (
-        <div role="list" aria-label={images.length === 1 ? "1 image to add" : `${images.length} images to add`} className="flex flex-wrap gap-1.5 px-1">
+        <div role="list" aria-label={images.length === 1 ? "1 image to add" : `${images.length} images to add`} className="flex gap-1.5 overflow-x-auto pb-0.5 pl-1 pr-2 pt-1.5">
           {images.map((img) => {
             const desc = img.sizeLabel ? `${img.name}, ${img.sizeLabel}` : img.name;
             return (
-              <div role="listitem" key={img.id} className="relative" style={{ animation: "pop-in 160ms cubic-bezier(0.23,1,0.32,1) both" }}>
+              <div role="listitem" key={img.id} className="relative shrink-0" style={{ animation: "pop-in 160ms cubic-bezier(0.23,1,0.32,1) both" }}>
                 <Tooltip content={desc} describe={false}>
                   <img src={img.src} alt={desc} className="size-14 rounded-[8px] object-cover shadow-hairline" draggable={false} />
                 </Tooltip>

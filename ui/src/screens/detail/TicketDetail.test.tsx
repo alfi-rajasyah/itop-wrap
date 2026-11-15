@@ -333,6 +333,66 @@ describe('TicketDetail: composer', () => {
     expect(spy).not.toHaveBeenCalledWith('detail:mine', expect.objectContaining({ type: 'addImages' }))
   })
 
+  it('⌘↩ sends from anywhere in the window, but not while a dialog is up (LOG-5, KEY-5)', async () => {
+    const mock = startMock()
+    renderDetail()
+    await selectTicket(mock, 'mine', 'R-000412')
+    const box = await screen.findByRole('textbox', { name: 'Public entry' })
+    await userEvent.type(box, 'From anywhere')
+    await until(mock, 'detail:mine', (s) => s.type === 'ticket' && s.composer?.canSend === true)
+    const spy = vi.spyOn(mock, 'dispatch')
+    const modal = document.createElement('div')
+    modal.setAttribute('aria-modal', 'true')
+    document.body.appendChild(modal)
+    fireEvent.keyDown(document.body, { key: 'Enter', metaKey: true })
+    expect(spy).not.toHaveBeenCalledWith('detail:mine', { type: 'send' })
+    modal.remove()
+    box.blur()
+    fireEvent.keyDown(document.body, { key: 'Enter', metaKey: true })
+    expect(spy).toHaveBeenCalledWith('detail:mine', { type: 'send' })
+    expect(await screen.findByText('From anywhere', { selector: 'p' })).toBeInTheDocument()
+  })
+
+  it('in the app, paste asks Rust to read the pasteboard and pastes text when it finds no images (LOG-14)', async () => {
+    const mock = startMock()
+    renderDetail()
+    await selectTicket(mock, 'mine', 'R-000412')
+    const spy = vi.spyOn(mock, 'dispatch')
+    const exec = vi.fn(() => true)
+    Object.defineProperty(document, 'execCommand', { value: exec, configurable: true })
+    ;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {}
+    try {
+      const box = await screen.findByRole('textbox', { name: 'Public entry' })
+      fireEvent.paste(box, { clipboardData: { files: [], types: ['text/plain'], getData: () => 'vpn-gw-01.png' } })
+      await waitFor(() => expect(spy).toHaveBeenCalledWith('detail:mine', { type: 'pasteFromClipboard' }))
+      await waitFor(() => expect(exec).toHaveBeenCalledWith('insertText', false, 'vpn-gw-01.png'))
+    } finally {
+      delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
+    }
+  })
+
+  it('a drag without images neither highlights the box nor is taken (LOG-15)', async () => {
+    const mock = startMock()
+    renderDetail()
+    await selectTicket(mock, 'mine', 'R-000412')
+    const spy = vi.spyOn(mock, 'dispatch')
+    const box = await screen.findByRole('textbox', { name: 'Public entry' })
+    const card = box.parentElement!
+    const text = new File(['x'], 'notes.txt', { type: 'text/plain' })
+    const dataTransfer = { types: ['Files'], items: [{ kind: 'file', type: 'text/plain' }], files: [text] }
+    fireEvent.dragEnter(card, { dataTransfer })
+    expect(card.className).not.toContain('border-2')
+    const dropped = fireEvent.drop(card, { dataTransfer })
+    expect(dropped).toBe(true)
+    expect(spy).not.toHaveBeenCalledWith('detail:mine', expect.objectContaining({ type: 'addImages' }))
+    const png = new File([PNG], 'shot.png', { type: 'image/png' })
+    const images = { types: ['Files'], items: [{ kind: 'file', type: 'image/png' }], files: [png] }
+    fireEvent.dragEnter(card, { dataTransfer: images })
+    expect(card.className).toContain('border-2')
+    expect(fireEvent.drop(card, { dataTransfer: images })).toBe(false)
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('detail:mine', expect.objectContaining({ type: 'addImages' })))
+  })
+
   it('takes picked files and shows Rust’s intake message (LOG-12, LOG-19)', async () => {
     const mock = startMock()
     const { container } = renderDetail()

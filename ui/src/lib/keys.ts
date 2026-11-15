@@ -24,6 +24,11 @@ export function useWindowKeyDown(handler: (e: KeyboardEvent) => void, enabled = 
  * ⌘R must never reload the web view (contract §6). Screens that refresh something handle it
  * themselves; this only stops the reload everywhere else in the window.
  */
+/** A sheet, dialog or the image viewer is up (they all mark themselves `aria-modal`). */
+export function isModalOpen(): boolean {
+  return document.querySelector('[aria-modal="true"]') !== null
+}
+
 export function usePreventReload() {
   useWindowKeyDown((e) => {
     if (isCommand(e, 'r')) e.preventDefault()
