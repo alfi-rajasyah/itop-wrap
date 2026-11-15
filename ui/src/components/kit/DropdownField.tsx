@@ -206,6 +206,10 @@ export function DropdownField({
     "aria-activedescendant": activeId,
     "aria-invalid": invalid || undefined,
     "aria-busy": loading || undefined,
+    // KEY-17: the hint VoiceOver reads after the value
+    "aria-description": searchable
+      ? "Type to filter, then use the up and down arrow keys and Return to pick"
+      : "Use the up and down arrow keys to choose, Return to pick",
     ...aria,
   };
 
