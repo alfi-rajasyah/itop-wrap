@@ -15,6 +15,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         menubar: fileURLToPath(new URL('./menubar.html', import.meta.url)),
+        kit: fileURLToPath(new URL('./kit.html', import.meta.url)),
       },
     },
   },

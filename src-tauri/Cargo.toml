@@ -15,7 +15,6 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 itop-kit = { path = "../crates/itop-kit" }
 tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-png"] }
-tauri-plugin-notification = "2"
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

@@ -1,8 +1,12 @@
 //! iTop Wrap: the Tauri app. Models, commands, tray and native pieces.
 
+pub mod error;
+pub mod hub;
+pub mod models;
+pub mod native;
+
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_notification::init())
         .run(tauri::generate_context!())
         .expect("iTop Wrap failed to start");
 }
