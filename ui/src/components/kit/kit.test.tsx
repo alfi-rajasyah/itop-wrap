@@ -179,6 +179,8 @@ describe("Dialog", () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<Sheet onCancel={onCancel} />);
+    // let the sheet's initial focus (next frame) land first, or it steals focus from the open list
+    await waitFor(() => expect(screen.getByLabelText("Reason")).toHaveFocus());
     const combo = screen.getByRole("combobox", { name: "Field" });
     combo.focus();
     await user.keyboard("{ArrowDown}");
