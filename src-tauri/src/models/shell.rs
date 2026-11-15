@@ -15,6 +15,9 @@ use itop_kit::ConfigItem;
 #[derive(Clone, Debug)]
 pub struct ShellState {
     pub selection: SidebarItem,
+    /// Whether the main window is on screen. Closing it while signed in only hides it
+    /// (SHELL-16); its views disappear like SwiftUI's do when the window closes.
+    pub window_shown: bool,
 }
 
 impl Default for ShellState {
@@ -22,6 +25,7 @@ impl Default for ShellState {
     fn default() -> Self {
         ShellState {
             selection: SidebarItem::MyTickets,
+            window_shown: true,
         }
     }
 }
@@ -224,27 +228,84 @@ impl Workspace {
     /// Sidebar selection (and View ▸ ⌘1…5). The section that leaves disappears and the one that
     /// comes runs its views' on-appear work; Team tickets stops polling when it leaves.
     pub(crate) async fn shell_select(&self, item: SidebarItem) {
-        let old = {
+        let (old, shown) = {
             let mut st = self.lock();
             let old = st.shell.selection;
             st.shell.selection = item;
-            old
+            (old, st.shell.window_shown)
         };
         if old == item {
             self.publish();
             return;
         }
         self.trace(|| format!("sidebar selection applied: {}", item.raw()));
-        if old == SidebarItem::TeamTickets
-            && let Some(h) = self.tasks().team_poll.take()
-        {
-            h.abort();
+        // With the window closed no section's views are on screen: the new one appears when the
+        // window comes back (`main_window_shown`).
+        if shown {
+            self.section_disappeared(old);
+            self.section_shown(item);
+        }
+        self.publish();
+    }
+
+    /// The section's views went away: Team tickets stops polling, the list's search task is
+    /// cancelled, and CMDB/Organizations/People cancel theirs.
+    fn section_disappeared(&self, item: SidebarItem) {
+        if let Some(scope) = item.list() {
+            let mut tasks = self.tasks();
+            if scope == ListScope::Team
+                && let Some(h) = tasks.team_poll.take()
+            {
+                h.abort();
+            }
+            if let Some(h) = tasks.lookup[scope.index()].take() {
+                h.abort();
+            }
         }
         if let Some(s) = self.standalone() {
-            s.section(old, false);
+            s.section(item, false);
+        }
+    }
+
+    /// The section's views appeared: their `.task` modifiers run.
+    fn section_shown(&self, item: SidebarItem) {
+        if let Some(s) = self.standalone() {
             s.section(item, true);
         }
         self.section_appeared(item);
+    }
+
+    /// The main window was closed while signed in (it only hides, SHELL-16). Its views disappear
+    /// as SwiftUI's do: Team polling, searches and detail loads stop, the detail and its sheets
+    /// go away. My tickets' 120 s refresh, the timer and the menu bar keep running.
+    pub(crate) fn main_window_hidden(&self) {
+        let selection = {
+            let mut st = self.lock();
+            if !st.shell.window_shown {
+                return;
+            }
+            st.shell.window_shown = false;
+            st.shell.selection
+        };
+        self.trace(|| "main window hidden".to_owned());
+        self.section_disappeared(selection);
+        self.publish();
+    }
+
+    /// The main window is back: the shown section appears again (its list loads if needed, its
+    /// search re-runs, Team tickets polls again), and the selected ticket's detail is made anew,
+    /// loads and re-checks the web stopwatch (POLL-2/3/5, LIST-22, TMR-15).
+    pub(crate) fn main_window_shown(&self) {
+        let selection = {
+            let mut st = self.lock();
+            if st.shell.window_shown {
+                return;
+            }
+            st.shell.window_shown = true;
+            st.shell.selection
+        };
+        self.trace(|| "main window shown".to_owned());
+        self.section_shown(selection);
         self.publish();
     }
 

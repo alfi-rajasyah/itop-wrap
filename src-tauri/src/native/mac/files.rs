@@ -131,3 +131,29 @@ pub fn write_file(path: &Path, data: &[u8]) -> Result<(), String> {
         .writeToURL_options_error(&url, NSDataWritingOptions::empty())
         .map_err(|e| e.localizedDescription().to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn det_34_write_errors_are_foundations_text() {
+        let err = write_file(Path::new("/nonexistent-dir/x/vpn.log"), b"hello")
+            .expect_err("no such folder");
+        assert!(err.contains("vpn.log"), "{err}");
+        assert!(!err.contains("os error"), "{err}");
+        let dir = std::env::temp_dir().join(format!("itopwrap-files-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("ok.txt");
+        assert_eq!(write_file(&path, b"hi"), Ok(()));
+        assert_eq!(std::fs::read(&path).ok(), Some(b"hi".to_vec()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn image_extensions_follow_uttype() {
+        assert!(is_image_extension("png"));
+        assert!(is_image_extension("HEIC"));
+        assert!(!is_image_extension("txt"));
+    }
+}

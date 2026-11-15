@@ -170,9 +170,19 @@ pub fn make_menubar_panel<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWin
         return;
     };
     let ptr: *const NSWindow = &*w;
-    // SAFETY: MenuBarPanel is an NSPanel subclass without ivars, and NSPanel is an NSWindow
-    // subclass that adds no ivars Tauri's window relies on, so swapping the class of this live
-    // window only changes which methods answer (the technique tauri-nspanel uses). Main thread.
+    if !panel_swap_is_sound(w.class()) {
+        eprintln!("menu bar panel: the window's class can't be swapped safely; left as it is");
+        return;
+    }
+    // SAFETY: checked by `panel_swap_is_sound`: the live object is tao's `TaoWindow`, an NSWindow
+    // subclass whose only ivar (`WindowState { focusable: AtomicBool }`, no Drop side effects)
+    // sits after NSWindow's ivars, and NSPanel adds no ivars of its own, so NSPanel's methods never
+    // touch tao's ivar and tao still reads it at its fixed offset in the allocation (which keeps
+    // TaoWindow's size). TaoWindow's overrides that the swap drops are `canBecomeKeyWindow` /
+    // `canBecomeMainWindow` (MenuBarPanel answers those) and `sendEvent:` (only for
+    // `movableByWindowBackground` drags, which the panel doesn't use). MenuBarPanel has no ivars.
+    // The panel must be an NSPanel for the non-activating style, so it can't subclass TaoWindow.
+    // Main thread.
     unsafe {
         objc2::ffi::object_setClass(
             ptr.cast_mut().cast::<AnyObject>(),
@@ -197,6 +207,21 @@ pub fn make_menubar_panel<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWin
             layer.setMasksToBounds(true);
         }
     }
+}
+
+/// Whether swapping `original` (the window's runtime class) for `MenuBarPanel` keeps the object
+/// valid: `original` is tao's `TaoWindow` directly under NSWindow, NSPanel and MenuBarPanel add no
+/// ivars to NSWindow's, and the allocation (TaoWindow's size) is at least as big as the new class.
+fn panel_swap_is_sound(original: &AnyClass) -> bool {
+    let window = NSWindow::class();
+    let is_tao = original.name().to_str() == Ok("TaoWindow")
+        && original
+            .superclass()
+            .is_some_and(|s| std::ptr::eq(s, window));
+    is_tao
+        && NSPanel::class().instance_size() == window.instance_size()
+        && MenuBarPanel::class().instance_size() == window.instance_size()
+        && original.instance_size() >= MenuBarPanel::class().instance_size()
 }
 
 /// Shows the panel and gives it keyboard focus without activating the app.
@@ -283,6 +308,16 @@ pub fn install_panel_key_monitor(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Review finding V: NSPanel (and our panel class) add no ivars to NSWindow on this macOS,
+    /// so the runtime class swap can't overlap tao's ivar.
+    #[test]
+    fn panel_class_adds_no_ivars() {
+        let window = NSWindow::class().instance_size();
+        assert_eq!(NSPanel::class().instance_size(), window);
+        assert_eq!(MenuBarPanel::class().instance_size(), window);
+        assert!(!panel_swap_is_sound(NSWindow::class()), "only tao's window");
+    }
 
     #[test]
     fn panel_shortcuts() {

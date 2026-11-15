@@ -100,7 +100,9 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
                 native: native.clone(),
                 prefs: Prefs::session(),
                 standard_prefs: Prefs::standard(),
-                secrets: Arc::new(keychain::KeychainStore::new(prefs::keychain_service())),
+                secrets: Arc::new(keychain::BlockingSecrets(Arc::new(
+                    keychain::KeychainStore::new(prefs::keychain_service()),
+                ))),
             };
             let router = match make_router.take() {
                 Some(make) => make(ctx),

@@ -146,7 +146,7 @@ impl AppRouter {
                 }
                 let ctx = ModelContext {
                     session,
-                    hub: self.0.hub.clone(),
+                    hub: self.0.hub.gated(),
                     native: self.0.native.clone(),
                 };
                 let ws = Workspace::new(ctx, self.0.fmt, self.0.prefs.clone(), self.0.trace);
@@ -399,11 +399,25 @@ impl Router for AppRouter {
                         .await;
                 }
             }
+            // ⌘R is the footer's Refresh button, which is disabled while My tickets reloads
+            // (MB-16): nothing is queued then.
             NativeEvent::PanelRefresh => {
-                if let Some(ws) = ws {
+                if let Some(ws) = ws
+                    && !ws.lock().lists[0].refreshing
+                {
                     let _ = ws
                         .dispatch_menubar(super::menubar::MenuBarIntent::Refresh)
                         .await;
+                }
+            }
+            NativeEvent::MainWindowHidden => {
+                if let Some(ws) = ws {
+                    ws.main_window_hidden();
+                }
+            }
+            NativeEvent::MainWindowShown => {
+                if let Some(ws) = ws {
+                    ws.main_window_shown();
                 }
             }
             NativeEvent::PanelShown => {

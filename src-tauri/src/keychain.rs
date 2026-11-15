@@ -126,9 +126,60 @@ impl SecretStore for KeychainStore {
     }
 }
 
+/// A `SecretStore` whose calls tell the async runtime they block: Keychain calls can wait on a
+/// macOS access prompt, so on Tauri's multi-threaded runtime they run in `block_in_place` and
+/// the worker's other tasks move on. Elsewhere (no runtime, or a current-thread one) they run
+/// as they are. `SessionService` behaves exactly as with the store itself.
+pub struct BlockingSecrets(pub std::sync::Arc<dyn SecretStore>);
+
+impl BlockingSecrets {
+    fn run<T>(&self, f: impl FnOnce(&dyn SecretStore) -> T) -> T {
+        let multi = tokio::runtime::Handle::try_current()
+            .is_ok_and(|h| h.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread);
+        if multi {
+            tokio::task::block_in_place(|| f(self.0.as_ref()))
+        } else {
+            f(self.0.as_ref())
+        }
+    }
+}
+
+impl SecretStore for BlockingSecrets {
+    fn password(&self, account: &str) -> Result<Option<String>, KeychainError> {
+        self.run(|s| s.password(account))
+    }
+
+    fn set_password(&self, password: &str, account: &str) -> Result<(), KeychainError> {
+        self.run(|s| s.set_password(password, account))
+    }
+
+    fn delete_password(&self, account: &str) -> Result<(), KeychainError> {
+        self.run(|s| s.delete_password(account))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn blocking_secrets_pass_through() {
+        let inner = std::sync::Arc::new(itop_kit::MemorySecretStore::new());
+        let store = BlockingSecrets(inner.clone());
+        store.set_password("pw", "a@b").expect("set");
+        assert_eq!(store.password("a@b"), Ok(Some("pw".to_owned())));
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .build()
+            .expect("runtime");
+        let read = rt.block_on(async move {
+            tokio::spawn(async move { store.password("a@b") })
+                .await
+                .expect("task")
+        });
+        assert_eq!(read, Ok(Some("pw".to_owned())));
+        assert_eq!(inner.count(), 1);
+    }
 
     #[test]
     fn swift_defaults() {

@@ -367,7 +367,7 @@ impl Harness {
         });
         let ctx = ModelContext {
             session,
-            hub: hub.clone(),
+            hub: hub.gated(),
             native: native.clone(),
         };
         let ws = Workspace::new(ctx, Fmt::utc(), prefs.clone(), false);

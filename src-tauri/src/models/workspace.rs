@@ -108,6 +108,9 @@ pub(crate) struct Inner {
     pub timer_store: TimerStore,
     pub state: Mutex<State>,
     pub tasks: Mutex<Tasks>,
+    /// Held across building and publishing snapshots, so two tasks can't publish out of order
+    /// (an older build overwriting a newer one). Taken before `state`, never the other way.
+    pub publishing: Mutex<()>,
     pub standalone: OnceLock<Standalone>,
 }
 
@@ -182,6 +185,7 @@ impl Workspace {
             timer_store,
             state: Mutex::new(state),
             tasks: Mutex::default(),
+            publishing: Mutex::new(()),
             standalone: OnceLock::new(),
             ctx,
         }));
@@ -244,11 +248,25 @@ impl Workspace {
         }
     }
 
+    /// Runs `f` as a task of this workspace; nothing runs once the workspace stopped.
     pub(crate) fn spawn<F>(&self, f: F) -> AbortHandle
     where
         F: Future<Output = ()> + Send + 'static,
     {
+        if self.stopped() {
+            return tokio::spawn(async {}).abort_handle();
+        }
         tokio::spawn(f).abort_handle()
+    }
+
+    /// Whether [`Workspace::stop`] ran (sign-out or another user): tasks still in flight must
+    /// not publish, set the tray or start loads.
+    pub(crate) fn stopped(&self) -> bool {
+        self.0.ctx.hub.is_closed()
+    }
+
+    fn publishing(&self) -> MutexGuard<'_, ()> {
+        self.0.publishing.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     // MARK: Error text (Swift `ErrorText.describe`)
@@ -315,6 +333,8 @@ impl Workspace {
 
     /// Swift `Workspace.stop()`, plus every task the views owned.
     pub fn stop(&self) {
+        // First, so nothing still running for this workspace publishes again.
+        self.0.ctx.hub.close();
         let mut tasks = self.tasks();
         let handles = [
             tasks.refresh_loop.take(),
@@ -385,6 +405,10 @@ impl Workspace {
     /// Rebuilds every snapshot and publishes it (the hub drops unchanged ones). Also starts what
     /// SwiftUI's `.task(id:)` modifiers on the detail would start for the current selection.
     pub(crate) fn publish(&self) {
+        if self.stopped() {
+            return;
+        }
+        let _publishing = self.publishing();
         let now = self.now();
         let snaps = {
             let mut st = self.lock();
@@ -414,11 +438,15 @@ impl Workspace {
         }
         hub.publish("timer", &snaps.timer);
         hub.publish("menubar", &snaps.menubar);
-        self.update_tray();
+        self.update_tray_locked();
     }
 
     /// The once-a-second part: the timer's counters and the menu bar.
     pub(crate) fn publish_live(&self) {
+        if self.stopped() {
+            return;
+        }
+        let _publishing = self.publishing();
         let now = self.now();
         let (timer, menubar) = {
             let st = self.lock();
@@ -429,7 +457,7 @@ impl Workspace {
         };
         self.0.ctx.hub.publish("timer", &timer);
         self.0.ctx.hub.publish("menubar", &menubar);
-        self.update_tray();
+        self.update_tray_locked();
     }
 
     /// The tray title and label, from `Workspace.clock` like Swift's `MenuBarLabel`.
@@ -440,6 +468,18 @@ impl Workspace {
     }
 
     fn update_tray(&self) {
+        if self.stopped() {
+            return;
+        }
+        let _publishing = self.publishing();
+        self.update_tray_locked();
+    }
+
+    /// `update_tray` with the publishing lock already held.
+    fn update_tray_locked(&self) {
+        if self.stopped() {
+            return;
+        }
         let changed = {
             let mut st = self.lock();
             let tray = self.tray_status(&st);

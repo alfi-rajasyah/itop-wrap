@@ -27,3 +27,5 @@ pub use workspace::{Standalone, Workspace};
 mod testkit;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod window_tests;

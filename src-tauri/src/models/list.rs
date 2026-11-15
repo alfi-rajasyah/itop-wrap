@@ -762,7 +762,7 @@ impl Workspace {
 
     /// `searchChanged()` (LIST-20…28): a full ref that isn't in the list is asked of iTop after
     /// 250 ms; anything else clears the lookup.
-    async fn search_changed(&self, scope: ListScope) {
+    pub(crate) async fn search_changed(&self, scope: ListScope) {
         let i = scope.index();
         let wanted = {
             let mut st = self.lock();
@@ -793,11 +793,13 @@ impl Workspace {
         {
             let mut st = self.lock();
             let l = &mut st.lists[i];
+            // Swift cancels a superseded lookup (`.task(id: query)`), so neither its answer nor
+            // its failure is shown once the query changed.
+            if trim_spaces(&l.query).to_uppercase() != r {
+                return;
+            }
             match result {
                 Ok(found) => {
-                    if trim_spaces(&l.query).to_uppercase() != r {
-                        return;
-                    }
                     l.set_lookup(found.map_or(Lookup::Missing(r), Lookup::Found));
                 }
                 Err(e) => {

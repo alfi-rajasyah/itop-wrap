@@ -61,6 +61,11 @@ pub enum NativeEvent {
     PanelNewTicket,
     PanelOpenMain,
     PanelRefresh,
+    /// The main window was closed while signed in (it only hides, SHELL-16) / came back (Dock,
+    /// ⌘O, the panel, a ticket opened from the panel). The workspace's main-window views
+    /// disappear and reappear like SwiftUI's.
+    MainWindowHidden,
+    MainWindowShown,
     /// The menu bar panel was shown (MB: it refreshes/reads state on open if the Swift app does).
     PanelShown,
     /// The New Ticket window's close button (contract: dispatches dismiss without a draft).

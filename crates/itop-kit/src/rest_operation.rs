@@ -3,7 +3,7 @@
 use crate::json::{JsonObject, JsonValue};
 
 /// One iTop REST operation, encoded as the `json_data` form field.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum RestOperation {
     ListOperations,
     CheckCredentials {
@@ -45,6 +45,84 @@ pub enum RestOperation {
         fields: JsonObject,
         comment: String,
     },
+}
+
+/// Written by hand so the password in `CheckCredentials` can never be printed.
+impl std::fmt::Debug for RestOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RestOperation::ListOperations => f.write_str("ListOperations"),
+            RestOperation::CheckCredentials { user, .. } => f
+                .debug_struct("CheckCredentials")
+                .field("user", user)
+                .field("password", &"<redacted>")
+                .finish(),
+            RestOperation::Get {
+                class_name,
+                key,
+                output_fields,
+                limit,
+            } => f
+                .debug_struct("Get")
+                .field("class_name", class_name)
+                .field("key", key)
+                .field("output_fields", output_fields)
+                .field("limit", limit)
+                .finish(),
+            RestOperation::GetRelated {
+                class_name,
+                key,
+                relation,
+                depth,
+                direction,
+            } => f
+                .debug_struct("GetRelated")
+                .field("class_name", class_name)
+                .field("key", key)
+                .field("relation", relation)
+                .field("depth", depth)
+                .field("direction", direction)
+                .finish(),
+            RestOperation::Create {
+                class_name,
+                fields,
+                comment,
+                output_fields,
+            } => f
+                .debug_struct("Create")
+                .field("class_name", class_name)
+                .field("fields", fields)
+                .field("comment", comment)
+                .field("output_fields", output_fields)
+                .finish(),
+            RestOperation::Update {
+                class_name,
+                key,
+                fields,
+                comment,
+            } => f
+                .debug_struct("Update")
+                .field("class_name", class_name)
+                .field("key", key)
+                .field("fields", fields)
+                .field("comment", comment)
+                .finish(),
+            RestOperation::ApplyStimulus {
+                class_name,
+                key,
+                stimulus,
+                fields,
+                comment,
+            } => f
+                .debug_struct("ApplyStimulus")
+                .field("class_name", class_name)
+                .field("key", key)
+                .field("stimulus", stimulus)
+                .field("fields", fields)
+                .field("comment", comment)
+                .finish(),
+        }
+    }
 }
 
 impl RestOperation {
@@ -178,5 +256,30 @@ impl RestOperation {
             }
         }
         JsonValue::Object(o)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_credentials_debug_hides_the_password() {
+        let op = RestOperation::CheckCredentials {
+            user: "agent".into(),
+            password: "hunter2".into(),
+        };
+        let text = format!("{op:?}");
+        assert!(text.contains("agent"), "{text}");
+        assert!(!text.contains("hunter2"), "{text}");
+    }
+
+    #[test]
+    fn keychain_errors_read_like_the_swift_app() {
+        let e = crate::KeychainError { status: -25293 };
+        assert_eq!(
+            e.to_string(),
+            "The operation couldn\u{2019}t be completed. (ITopKit.KeychainError error 1.)"
+        );
     }
 }

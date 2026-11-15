@@ -4,12 +4,12 @@
 //! from [`Native`]'s `format_*` operations (Foundation's formatters in the app, en_US in tests);
 //! this module only adds the rules around them that the Swift call sites apply:
 //!
-//! - [`Fmt::log_date`]: `LogDate.short` (K/CaseLog.swift, DET-39)
-//! - [`Fmt::date_time`]: `date.formatted(date: .abbreviated, time: .shortened)` (LIST-54)
-//! - [`Fmt::since`]: `TimerModel.time(_:)`: today the time only, otherwise date and time (TMR-16)
-//! - [`Fmt::relative_named`]: `formatted(.relative(presentation: .named))` (MB-16)
-//! - [`Fmt::byte_count`]: `ByteCountFormatter` `.file` (LOG-20, DET-33)
-//! - [`Fmt::list`]: `ListFormatter.localizedString(byJoining:)` (CMDB-14)
+//! - [`Fmt::log_date`] is `LogDate.short` (K/CaseLog.swift, DET-39)
+//! - [`Fmt::date_time`] is `date.formatted(date: .abbreviated, time: .shortened)` (LIST-54)
+//! - [`Fmt::since`] is `TimerModel.time(_:)`: today the time only, otherwise date and time (TMR-16)
+//! - [`Fmt::relative_named`] is `formatted(.relative(presentation: .named))` (MB-16)
+//! - [`Fmt::byte_count`] is `ByteCountFormatter` `.file` (LOG-20, DET-33)
+//! - [`Fmt::list`] is `ListFormatter.localizedString(byJoining:)` (CMDB-14)
 
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime, Offset, Utc};
 use itop_kit::LogDate;

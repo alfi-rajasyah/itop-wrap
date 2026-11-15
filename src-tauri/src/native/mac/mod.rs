@@ -106,6 +106,8 @@ struct State {
     panel_hidden_at: Option<Instant>,
     /// The panel's top-left (logical), kept while the UI resizes it.
     panel_origin: Option<(f64, f64)>,
+    /// The main window was closed (hidden) while signed in and hasn't been shown since.
+    main_hidden: bool,
 }
 
 /// The native shell: windows, menus, tray, panel.
@@ -212,6 +214,8 @@ impl Shell {
             if let Some(w) = self.window(MAIN) {
                 let _ = w.hide();
             }
+            self.state().main_hidden = true;
+            self.send(NativeEvent::MainWindowHidden);
         } else {
             // Signed out, restoring or unreachable: closing the window quits.
             self.app.exit(0);
@@ -300,6 +304,9 @@ impl Shell {
             let _ = w.set_focus();
         }
         appkit::activate(mtm);
+        if std::mem::take(&mut self.state().main_hidden) {
+            self.send(NativeEvent::MainWindowShown);
+        }
     }
 
     fn show_new_ticket(self: &Arc<Self>, mtm: MainThreadMarker) {
