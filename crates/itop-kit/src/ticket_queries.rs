@@ -555,7 +555,7 @@ pub struct TicketPage {
     #[ts(type = "number")]
     pub total: i64,
     /// Private in Swift (read through `group_total`); serialised so the UI can show headers.
-    #[ts(type = "Partial<Record<TicketGroup, number>>")]
+    #[ts(type = "Partial<Record<import(\"./TicketGroup\").TicketGroup, number>>")]
     totals: BTreeMap<TicketGroup, i64>,
     #[ts(type = "number")]
     first: i64,
