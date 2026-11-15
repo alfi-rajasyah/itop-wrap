@@ -246,8 +246,11 @@ impl AppRouter {
         }
         Ok(Value::Null)
     }
+}
 
-    async fn dispatch_workspace(&self, ws: &Workspace, model: &str, intent: Value) -> Result<Value, AppError> {
+/// Routes an intent to a workspace model (every id but `session`).
+pub(crate) async fn route_workspace(ws: &Workspace, model: &str, intent: Value) -> Result<Value, AppError> {
+    {
         let scope_of = |id: &str| -> Result<ListScope, AppError> {
             ListScope::from_raw(id.split_once(':').map_or("", |(_, s)| s)).ok_or_else(|| AppError::unknown_model(model))
         };
@@ -290,7 +293,7 @@ impl Router for AppRouter {
             return self.dispatch_session(decode(intent)?).await;
         }
         let Some(ws) = self.workspace() else { return Err(AppError::not_signed_in()) };
-        self.dispatch_workspace(&ws, model, intent).await
+        route_workspace(&ws, model, intent).await
     }
 
     async fn asset(&self, kind: &str, id: &str) -> Option<(Vec<u8>, String)> {
