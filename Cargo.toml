@@ -17,4 +17,3 @@ ts-rs = { version = "12", features = ["chrono-impl", "serde-json-impl"] }
 
 [profile.release]
 lto = "thin"
-strip = true

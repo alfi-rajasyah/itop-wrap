@@ -1,15 +1,15 @@
 {
   "name": "itop-wrap-ui",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc -b",
+    "typecheck": "npm run bindings && tsc -b",
     "tauri": "tauri",
     "bindings": "cd .. && rm -rf ui/src/bindings && cargo test --workspace export_bindings"
   },

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Builds build/iTop Wrap.app: a release build, Resources/Info.plist and Resources/AppIcon.icns,
-# signed (PLAN.md Task 10). Debug-only switches (ITOPWRAP_*) are compiled out of release.
+# Builds build/iTop Wrap.app: the web UI, a release build of the Rust app, bundled by Tauri and
+# signed. Debug-only switches (ITOPWRAP_*) are compiled out of release.
 # Usage: scripts/bundle-app.sh            signs with your Apple Development certificate if you
 #                                         have one (rebuilds keep Keychain access), else ad hoc
 #        SIGN=adhoc scripts/bundle-app.sh always ad hoc (release DMGs: a development signature
@@ -11,18 +11,18 @@ APP="build/iTop Wrap.app"
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
-echo "Building release…" >&2
-swift build -c release --product ITopWrap >&2
-BIN="$(swift build -c release --show-bin-path)/ITopWrap"
+[ -d ui/node_modules ] || { echo "Installing the UI's packages…" >&2; npm --prefix ui ci >&2; }
 
-[ -f Resources/AppIcon.icns ] || scripts/make-app-icon.sh
+echo "Building release…" >&2
+# Tauri runs the UI build itself (tauri.conf.json: beforeBuildCommand), then cargo.
+ui/node_modules/.bin/tauri build --bundles app >&2
+BUILT="target/release/bundle/macos/iTop Wrap.app"
+[ -d "$BUILT" ] || { echo "Tauri didn't produce $BUILT" >&2; exit 1; }
 
 echo "Assembling the app…" >&2
-mkdir -p "$STAGE/iTop Wrap.app/Contents/MacOS" "$STAGE/iTop Wrap.app/Contents/Resources"
-cp "$BIN" "$STAGE/iTop Wrap.app/Contents/MacOS/ITopWrap"
-cp Resources/AppIcon.icns "$STAGE/iTop Wrap.app/Contents/Resources/AppIcon.icns"
+cp -R "$BUILT" "$STAGE/iTop Wrap.app"
 BUILD=$(git rev-list --count HEAD 2>/dev/null || echo 1)
-sed "s/BUILD_NUMBER/$BUILD/" Resources/Info.plist > "$STAGE/iTop Wrap.app/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$STAGE/iTop Wrap.app/Contents/Info.plist"
 plutil -lint "$STAGE/iTop Wrap.app/Contents/Info.plist" >&2
 
 # With an Apple Development certificate, every build has the same signing identity, so a
@@ -39,7 +39,7 @@ if [ "$IDENTITY" = "-" ]; then
 else
     echo "Signing with your Apple Development certificate…" >&2
 fi
-codesign --force --sign "$IDENTITY" --timestamp=none "$STAGE/iTop Wrap.app" >&2
+codesign --force --deep --sign "$IDENTITY" --timestamp=none "$STAGE/iTop Wrap.app" >&2
 codesign --verify --strict "$STAGE/iTop Wrap.app" >&2
 
 mkdir -p build
