@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 
 READ_ONLY_OPS = {"core/get", "core/check_credentials"}
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "ITopKitTests", "Fixtures", "images-probe.json")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "crates", "itop-kit", "tests", "fixtures", "images-probe.json")
 IMG_SRC = re.compile(r'<img\b[^>]*?\bsrc="([^"]+)"', re.I)
 DATA_ID = re.compile(r'\bdata-img-id="(\d+)"', re.I)
 

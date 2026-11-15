@@ -6,7 +6,7 @@ What it does:
     at a hidden prompt and never written anywhere).
   - Sends only read operations: list_operations, core/check_credentials,
     core/get. Anything else is refused before a request is made.
-  - Writes redacted copies to Tests/ITopKitTests/Fixtures/: every free-text
+  - Writes redacted copies to crates/itop-kit/tests/fixtures/: every free-text
     value is replaced, ids are renumbered, and HTML keeps its tags only.
   - Writes schema.json: attribute codes and value types per class, so the
     app can be built against your real data model.
@@ -28,7 +28,7 @@ import urllib.request
 
 READ_ONLY_OPS = {"list_operations", "core/check_credentials", "core/get"}
 REST_VERSION = "1.4"
-OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "ITopKitTests", "Fixtures")
+OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "crates", "itop-kit", "tests", "fixtures")
 
 # Values kept as-is: short enums and codes that are not personal data.
 KEEP_KEYS = {

@@ -1,15 +1,18 @@
 # iTop Wrap
 
-A native macOS app for working iTop tickets without the web UI: your queue, ticket detail with logs and
+A macOS app for working iTop tickets without the web UI: your queue, ticket detail with logs and
 images, the CMDB, organizations and people, plus log entries, assigning, pending and resolving, a time
 tracker and a menu bar item. It talks to iTop through its REST API.
 
-Not affiliated with Combodo. The spec, plan and design live in [SPEC.md](SPEC.md), [PLAN.md](PLAN.md),
+Not affiliated with Combodo. The app is written in Rust (Tauri) with a React UI built from the
+[Beautiful UI](https://www.beautifului.dev/) components. It was first written in Swift; the rewrite's
+design, the list of every behaviour it had to keep, and the contract between Rust and the UI are in
+[docs/](docs/). The original spec, plan and design are [SPEC.md](SPEC.md), [PLAN.md](PLAN.md),
 [DESIGN.md](DESIGN.md) and [UX-FLOWS.md](UX-FLOWS.md).
 
 ## Requirements
 
-- macOS 26 or newer, Apple silicon, with Xcode 26 (Swift 6.2+) to build.
+- macOS 13 or newer, Apple silicon. To build: Rust 1.96+, Node 24+ and the Xcode command line tools.
 - iTop 3.2 or newer with REST 1.4.
 - Your iTop account needs the **REST Services User** profile, and your usual agent profiles for the
   tickets you work. Time tracking needs Combodo's **Time Tracking** extension and the **Time Tracker**
@@ -32,7 +35,7 @@ choose **Open**, or open it once, then go to System Settings > Privacy & Securit
 scripts/bundle-app.sh
 ```
 
-This builds a release, adds the icon and `Info.plist`, signs it and puts it at
+This builds the UI and a release of the app, bundles and signs it, and puts it at
 `build/iTop Wrap.app`. `scripts/make-dmg.sh` wraps that into `build/iTop-Wrap-<version>.dmg`.
 
 If you have an Apple Development certificate (free: add your Apple ID in Xcode > Settings >
@@ -74,7 +77,7 @@ sidebar) removes the password from the Keychain.
 - **CMDB, Organizations, People:** search CIs and see their relationships and open tickets; an
   organization's tickets from every agent; a person's assigned and reported tickets.
 
-Release builds can change anything your iTop account may change. Debug builds (`swift run`) are
+Release builds can change anything your iTop account may change. Debug builds (`tauri dev`) are
 read-only unless you switch writes on for named test tickets (see Development).
 
 ## Troubleshooting
@@ -98,24 +101,41 @@ read-only unless you switch writes on for named test tickets (see Development).
 ## Development
 
 ```bash
-swift build
-swift test
+cargo test --workspace
 ```
 
-`ITopKit` holds the logic and is covered by tests (Swift Testing, REST stubbed); `ITopWrap` is the
-SwiftUI app. Debug builds read these switches (release builds ignore them):
+```bash
+npm --prefix ui run typecheck && npm --prefix ui test
+```
+
+```bash
+ui/node_modules/.bin/tauri dev
+```
+
+- `crates/itop-kit` holds the REST client and every ticket rule, covered by tests with REST stubbed.
+- `src-tauri` is the app: the models the UI shows, the menu bar item, menus, windows and the Keychain.
+- `ui` is the React UI. It only renders what Rust sends and sends back what you do
+  ([docs/rewrite/contract.md](docs/rewrite/contract.md)). Opened in a plain browser
+  (`npm --prefix ui run dev`) it runs on made-up tickets, and nothing is sent to any server.
+
+Debug builds read these switches (release builds ignore them):
 
 | Switch | Effect |
 |---|---|
-| `ITOPWRAP_DEMO=1` | Made-up user and tickets; nothing is sent to any server |
 | `ITOPWRAP_SETTINGS=<name>` | Keep the address, username and Keychain item apart from your real ones |
 | `ITOPWRAP_WRITE_TICKETS=R-…,R-…` | Writes on for these tickets only; the client refuses any other write before sending |
 | `ITOPWRAP_WRITE_NEW=1` | Also allow creating tickets, and writes on the ones created |
 | `ITOPWRAP_TRACE=1` | Log REST calls and UI steps to stderr, never passwords or field values |
-| `ITOPWRAP_APPEARANCE=light\|dark` | Force an appearance |
+
+Two tests run against a real iTop and are off by default, because they create and close tickets. Point
+them only at a test server:
+
+```bash
+ITOP_URL=… ITOP_USER=… ITOP_PASSWORD=… cargo test --workspace -- --ignored the_whole_round the_app_against
+```
 
 `scripts/probe-itop.py`, `scripts/probe-images.py` and `scripts/probe-stopwatch.py` are read-only
-probes that save redacted summaries to `Tests/ITopKitTests/Fixtures/`. Never commit credentials,
+probes that save redacted summaries to `crates/itop-kit/tests/fixtures/`. Never commit credentials,
 server addresses or real ticket data.
 
 ## License
