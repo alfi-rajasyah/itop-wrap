@@ -16,3 +16,10 @@ __pycache__/
 *.env
 .env*
 raw-responses/
+
+# Rust and the web UI
+target/
+node_modules/
+ui/dist/
+src-tauri/gen/
+*.tsbuildinfo

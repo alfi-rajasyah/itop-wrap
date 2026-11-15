@@ -1,0 +1,23 @@
+[package]
+name = "itop-kit"
+description = "iTop REST client and ticket rules for iTop Wrap. No UI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+ts-rs.workspace = true
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "form", "json"] }
+async-trait = "0.1"
+url = "2"
+rand = "0.9"
+base64 = "0.22"
+
+[dev-dependencies]
+wiremock = "0.6"
+tokio = { workspace = true, features = ["test-util"] }

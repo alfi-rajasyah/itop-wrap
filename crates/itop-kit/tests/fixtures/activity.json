@@ -1,0 +1,20 @@
+{
+  "code": 0,
+  "message": "[text]",
+  "objects": {
+    "Activity::1025": {
+      "class": "Activity",
+      "code": 0,
+      "fields": {
+        "background_color": "[text]",
+        "friendlyname": "[text]",
+        "label": "[text]",
+        "obj_class": "UserRequest",
+        "obj_id": "1026",
+        "text_color": "[text]"
+      },
+      "key": "1025",
+      "message": ""
+    }
+  }
+}
