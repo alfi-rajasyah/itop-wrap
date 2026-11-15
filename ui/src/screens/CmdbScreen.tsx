@@ -90,7 +90,7 @@ function CIView({ ci }: { ci: CIDetailView }) {
   return (
     <div className="kit-scroll min-h-0 flex-1 overflow-y-auto">
       <article aria-label={ci.name} className="flex max-w-[860px] flex-col gap-5 px-6 pb-8 pt-5">
-        <header className="flex items-start gap-3">
+        <header data-tauri-drag-region className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[12px] text-ink-2">{ci.headerLine}</p>

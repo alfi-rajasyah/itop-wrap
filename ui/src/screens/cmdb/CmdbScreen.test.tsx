@@ -70,6 +70,21 @@ describe('CmdbScreen (section 11)', () => {
     expect(await screen.findByText('Copied vpn-gw-01')).toBeInTheDocument()
   })
 
+  it('a ticket row opens that ticket in My tickets, detail included (SHELL-9)', async () => {
+    const mock = startMock()
+    await until(mock, 'list:mine', (s) => s.content.type === 'list')
+    const first = await until(mock, 'list:mine', (s) => s.content.type === 'list')
+    if (first.content.type !== 'list') throw new Error()
+    const other = first.content.body.sections[0]!.rows[0]!.ticket
+    await act(() => mock.dispatch('list:mine', { type: 'select', ticketId: other.id }))
+    render(<CmdbScreen />)
+    await userEvent.type(await screen.findByRole('searchbox', { name: 'Search config items' }), 'vpn')
+    await userEvent.click(within(await screen.findByRole('listbox', { name: 'Config items' })).getByText('vpn-gw-01'))
+    await userEvent.click(await screen.findByRole('button', { name: /R-000412/ }))
+    const detail = await until(mock, 'detail:mine', (s) => s.type === 'ticket' && s.ticket.ref === 'R-000412')
+    expect(detail.type).toBe('ticket')
+  })
+
   it('opens a relationship chip and the web page (CMDB-11, CMDB-14)', async () => {
     const mock = await searchAndOpen('vpn', 'vpn-gw-01')
     const open = vi.spyOn(mock.native, 'openUrl').mockResolvedValue()

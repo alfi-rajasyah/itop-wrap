@@ -105,7 +105,7 @@ function OrgView({ org }: { org: OrgDetailView }) {
   return (
     <div className="kit-scroll min-h-0 flex-1 overflow-y-auto">
       <article aria-label={org.name} className="flex max-w-[960px] flex-col gap-4 px-6 pb-8 pt-5">
-        <header>
+        <header data-tauri-drag-region>
           <p className="text-[12px] text-ink-2">{org.headerLine}</p>
           <h2 className="mt-1 select-text text-[22px] font-semibold leading-[1.25] tracking-[-0.01em] text-ink">{org.name}</h2>
         </header>

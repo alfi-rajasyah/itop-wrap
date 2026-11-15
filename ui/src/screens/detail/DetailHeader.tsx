@@ -81,8 +81,9 @@ export function DetailHeader({ scope, view }: { scope: ListScope; view: TicketDe
   ]
 
   return (
-    <div ref={headerRef} className={cn('flex gap-3', stacked ? 'flex-col items-start gap-2.5' : 'items-start')}>
-      <div className="min-w-0 flex-1">
+    // Empty parts of the header move the window (the overlay title bar has no chrome of its own).
+    <div ref={headerRef} data-tauri-drag-region className={cn('flex gap-3', stacked ? 'flex-col items-start gap-2.5' : 'items-start')}>
+      <div data-tauri-drag-region className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-2">
           <Tooltip content={`Copy ${ticket.ref}`} describe={false}>
             <button

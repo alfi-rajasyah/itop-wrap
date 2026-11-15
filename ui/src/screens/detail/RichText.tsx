@@ -119,12 +119,12 @@ export function RichImage({ src, ticketWebUrl }: { src: string; ticketWebUrl: st
           Loading image
         </div>
       ) : null}
-      <Tooltip content="Open full size" describe={false}>
+      <Tooltip content="Open full size" describe={false} className="flex max-w-full">
         <button
           type="button"
           aria-label="Image, open full size"
           onClick={() => setViewing(true)}
-          className={cn('block rounded-[6px]', state !== 'loaded' && 'hidden')}
+          className={cn('block max-w-full rounded-[6px]', state !== 'loaded' && 'hidden')}
         >
           <img
             src={src}
@@ -136,7 +136,7 @@ export function RichImage({ src, ticketWebUrl }: { src: string; ticketWebUrl: st
             }}
             onError={() => setState('failed')}
             className="block h-auto w-auto rounded-[6px] object-contain shadow-hairline"
-            style={{ maxWidth: Math.min(size?.w || 640, 640), maxHeight: 480 }}
+            style={{ maxWidth: `min(${Math.min(size?.w || 640, 640)}px, 100%)`, maxHeight: 480 }}
           />
         </button>
       </Tooltip>

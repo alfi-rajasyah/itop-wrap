@@ -114,7 +114,7 @@ function PersonView({ person }: { person: PersonDetailView }) {
   return (
     <div className="kit-scroll min-h-0 flex-1 overflow-y-auto">
       <article aria-label={person.displayName} className="flex max-w-[960px] flex-col gap-4 px-6 pb-8 pt-5">
-        <header className="flex items-center gap-3">
+        <header data-tauri-drag-region className="flex items-center gap-3">
           <InitialsAvatar name={person.displayName} initials={person.initials} size={44} />
           <div className="min-w-0">
             <h2 className="select-text text-[22px] font-semibold leading-[1.25] tracking-[-0.01em] text-ink">{person.displayName}</h2>
