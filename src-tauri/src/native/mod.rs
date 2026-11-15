@@ -9,6 +9,75 @@ pub mod fake;
 #[cfg(target_os = "macos")]
 pub mod mac;
 
+#[cfg(all(test, target_os = "macos"))]
+mod quarantine_tests {
+    #[test]
+    fn saved_files_are_marked_as_downloaded() {
+        let dir = std::env::temp_dir().join(format!("itopwrap-q-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("vpn.log");
+        std::fs::write(&file, b"x").unwrap();
+        super::quarantine_download(&file);
+        let out = std::process::Command::new("/usr/bin/xattr")
+            .args(["-p", "com.apple.quarantine"])
+            .arg(&file)
+            .output()
+            .unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            text.starts_with("0081;") && text.contains(";iTop Wrap;"),
+            "{text}"
+        );
+    }
+}
+
+/// Marks a file saved from iTop as downloaded (`com.apple.quarantine`), as a browser does, so
+/// Gatekeeper asks before an app or script from a ticket first runs. Best effort; no-op elsewhere.
+pub fn quarantine_download(path: &std::path::Path) {
+    #[cfg(target_os = "macos")]
+    {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        unsafe extern "C" {
+            fn setxattr(
+                path: *const std::ffi::c_char,
+                name: *const std::ffi::c_char,
+                value: *const std::ffi::c_void,
+                size: usize,
+                position: u32,
+                options: i32,
+            ) -> i32;
+        }
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        let value = format!("0081;{secs:08x};iTop Wrap;");
+        let (Ok(p), Ok(name)) = (
+            CString::new(path.as_os_str().as_bytes()),
+            CString::new("com.apple.quarantine"),
+        ) else {
+            return;
+        };
+        // SAFETY: valid NUL-terminated strings and a buffer of `value.len()` bytes for the call.
+        let rc = unsafe {
+            setxattr(
+                p.as_ptr(),
+                name.as_ptr(),
+                value.as_ptr().cast(),
+                value.len(),
+                0,
+                0,
+            )
+        };
+        if rc != 0 {
+            eprintln!("couldn't mark the saved file as downloaded");
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = path;
+}
+
 /// An image after intake conversion (LOG-18): what `sips`/ImageIO produced.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConvertedImage {

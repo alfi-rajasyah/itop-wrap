@@ -48,6 +48,95 @@ async fn posts_the_form_and_reads_the_answer() {
 }
 
 #[tokio::test]
+async fn a_redirect_on_the_same_server_is_followed() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/itop/webservices/rest.php"))
+        .respond_with(
+            ResponseTemplate::new(307)
+                .insert_header("location", "/itop2/webservices/rest.php?version=1.4"),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/itop2/webservices/rest.php"))
+        .and(body_string_contains("auth_pwd="))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(r#"{"code":0,"message":"","authorized":true}"#),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let c = client(&format!("{}/itop", server.uri()));
+    assert_eq!(c.check_credentials().await, Ok(true));
+}
+
+/// The password is in the form body, which a 307/308 re-sends: never to another server.
+#[tokio::test]
+async fn a_redirect_to_another_server_is_refused_and_the_password_stays_home() {
+    let elsewhere = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(r#"{"code":0}"#))
+        .expect(0)
+        .mount(&elsewhere)
+        .await;
+    let server = MockServer::start().await;
+    for status in [307, 308] {
+        server.reset().await;
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(status).insert_header(
+                "location",
+                format!("{}/webservices/rest.php", elsewhere.uri()).as_str(),
+            ))
+            .mount(&server)
+            .await;
+        assert_eq!(
+            client(&server.uri())
+                .send(RestOperation::ListOperations)
+                .await,
+            Err(ITopError::UnexpectedResponse),
+            "HTTP {status}"
+        );
+    }
+    elsewhere.verify().await;
+}
+
+#[test]
+fn same_server_redirects() {
+    use itop_kit::transport::is_same_server_redirect as same;
+    let u = |s: &str| url::Url::parse(s).unwrap();
+    assert!(same(
+        &u("https://itop.example.com/a"),
+        &u("https://itop.example.com/b")
+    ));
+    assert!(same(
+        &u("http://itop.example.com/a"),
+        &u("https://itop.example.com/a")
+    ));
+    assert!(same(
+        &u("http://itop.example.com:8080/a"),
+        &u("https://itop.example.com:8080/a")
+    ));
+    assert!(!same(
+        &u("https://itop.example.com/a"),
+        &u("http://itop.example.com/a")
+    ));
+    assert!(!same(
+        &u("https://itop.example.com/a"),
+        &u("https://evil.example/a")
+    ));
+    assert!(!same(
+        &u("https://itop.example.com/a"),
+        &u("https://itop.example.com:8443/a")
+    ));
+    assert!(!same(
+        &u("http://itop.example.com/a"),
+        &u("https://itop.example.com:8443/a")
+    ));
+}
+
+#[tokio::test]
 async fn http_errors_keep_their_status() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))

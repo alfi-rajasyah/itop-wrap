@@ -149,6 +149,11 @@ const MID: char = '\u{E001}';
 const END: char = '\u{E002}';
 const ICON_MARK: char = '\u{E003}';
 
+/// One of the private-use characters above.
+fn is_mark(c: char) -> bool {
+    ('\u{E000}'..='\u{E003}').contains(&c)
+}
+
 struct Icon {
     url: String,
     small: bool,
@@ -186,7 +191,9 @@ impl RichText {
         for token in tokens.find_iter(&source) {
             let piece = token.as_str();
             if !piece.starts_with('<') {
-                buffer.push_str(&HtmlText::decode_entities(piece));
+                // The marks are the parser's own: text (or `&#xE000;`) can't forge a link or icon.
+                let text = HtmlText::decode_entities(piece);
+                buffer.extend(text.chars().filter(|c| !is_mark(*c)));
                 continue;
             }
             let tag = piece.to_lowercase();

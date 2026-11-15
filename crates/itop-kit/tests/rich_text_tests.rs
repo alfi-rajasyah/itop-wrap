@@ -53,6 +53,23 @@ mod rich_text_tests {
         }
     }
 
+    /// Not a Swift test: the parser's private-use link and icon marks (U+E000…E003) can't be
+    /// written by the HTML, as characters or as entities, to put text under another link.
+    #[test]
+    fn text_cannot_forge_the_link_marks() {
+        let html = concat!(
+            r#"<a href="https://evil.example/">x</a> "#,
+            "&#xE000;0&#xE001;https://bank.example&#xE002; \u{E000}0\u{E001}pay\u{E002}"
+        );
+        assert_eq!(
+            RichText::parse(html, BASE),
+            [RichBlock::Text(vec![
+                RichRun::link("x", "https://evil.example/"),
+                RichRun::text(" 0https://bank.example 0pay"),
+            ])]
+        );
+    }
+
     /// Email links are kept
     #[test]
     fn mailto() {

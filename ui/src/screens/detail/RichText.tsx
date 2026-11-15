@@ -47,6 +47,7 @@ function Run({ run }: { run: RichRun }) {
       return run.link ? (
         <a
           href={run.link}
+          title={run.link}
           onClick={(e) => {
             e.preventDefault()
             open(run.link!)
@@ -64,6 +65,7 @@ function Run({ run }: { run: RichRun }) {
       return (
         <a
           href={run.url}
+          title={run.url}
           onClick={(e) => {
             e.preventDefault()
             open(run.url)

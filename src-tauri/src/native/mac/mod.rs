@@ -18,6 +18,7 @@ use objc2::MainThreadMarker;
 use serde_json::Value;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+use tauri::webview::NewWindowResponse;
 use tauri::{
     AppHandle, LogicalPosition, LogicalSize, Manager, Rect, TitleBarStyle, WebviewUrl,
     WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry,
@@ -27,6 +28,15 @@ use crate::native::{ConvertTo, ConvertedImage, Native};
 use crate::router::{NativeEvent, Router};
 use appkit::{PanelKey, on_main, on_main_async};
 use tray_draw::Slide;
+
+/// Navigation guard for every app web view (see [`crate::commands::is_app_url`]).
+fn app_page(url: &tauri::Url) -> bool {
+    let ok = crate::commands::is_app_url(url);
+    if !ok {
+        eprintln!("navigation refused: {}", url.scheme());
+    }
+    ok
+}
 
 pub const MAIN: &str = "main";
 pub const MENUBAR: &str = "menubar";
@@ -148,6 +158,8 @@ impl Shell {
     /// and the panel's key monitor. Call on the main thread from `setup`.
     pub fn create_windows(self: &Arc<Self>, mtm: MainThreadMarker) -> tauri::Result<()> {
         let main = WebviewWindowBuilder::new(&self.app, MAIN, WebviewUrl::App("index.html".into()))
+            .on_navigation(app_page)
+            .on_new_window(|_, _| NewWindowResponse::Deny)
             .title("iTop Wrap")
             .inner_size(480.0, 320.0)
             .resizable(false)
@@ -164,6 +176,8 @@ impl Shell {
 
         let panel =
             WebviewWindowBuilder::new(&self.app, MENUBAR, WebviewUrl::App("menubar.html".into()))
+                .on_navigation(app_page)
+                .on_new_window(|_, _| NewWindowResponse::Deny)
                 .title("iTop Wrap")
                 .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
                 .decorations(false)
@@ -313,6 +327,8 @@ impl Shell {
             NEW_TICKET,
             WebviewUrl::App("index.html?window=new-ticket".into()),
         )
+        .on_navigation(app_page)
+        .on_new_window(|_, _| NewWindowResponse::Deny)
         .title("New Ticket")
         .inner_size(NEW_TICKET_SIZE.0, NEW_TICKET_SIZE.1)
         .resizable(false)

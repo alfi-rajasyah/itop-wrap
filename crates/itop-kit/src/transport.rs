@@ -8,7 +8,11 @@
 //! URLSession behaviours mirrored:
 //! - 60 s request timeout (URLSession's `timeoutIntervalForRequest`, an idle timeout): reqwest
 //!   `connect_timeout` and `read_timeout` of 60 s, reported as `timedOut` (-1001).
-//! - Redirects are followed (up to 10 here, 16 in CFNetwork), then `tooManyRedirects` (-1007).
+//! - Redirects are followed (up to 10 here, 16 in CFNetwork), then `tooManyRedirects` (-1007),
+//!   but only on the same server: same host, and the same scheme and port or an upgrade from
+//!   http to https. The form body (with `auth_pwd`) is re-sent on 307/308, so a redirect to
+//!   another host or down to http is refused and reported as `badServerResponse` (-1011), which
+//!   the client shows as [`crate::ITopError::UnexpectedResponse`]. URLSession followed those.
 //! - Certificates are checked against the macOS trust settings (rustls-platform-verifier), so a
 //!   certificate trusted in Keychain Access works, and one the Mac doesn't trust fails with a
 //!   `serverCertificate*` code, which the client maps to `ITopError::UntrustedCertificate`.
@@ -112,6 +116,7 @@ impl ReqwestTransport {
 
     pub fn new() -> Result<Self, TransportError> {
         let client = reqwest::Client::builder()
+            .redirect(redirect_policy())
             .connect_timeout(Self::TIMEOUT)
             .read_timeout(Self::TIMEOUT)
             .user_agent(concat!("iTop Wrap/", env!("CARGO_PKG_VERSION")))
@@ -167,6 +172,47 @@ impl Transport for ReqwestTransport {
     }
 }
 
+/// Why a redirect wasn't followed: it leaves the server the password was meant for.
+#[derive(Debug, thiserror::Error)]
+#[error("refused a redirect to another server: {0}")]
+pub struct RedirectRefused(String);
+
+/// Whether a redirect from `from` to `to` stays on the same server: same host, and the same
+/// scheme and port, or http upgraded to https (port unchanged or the scheme's default).
+pub fn is_same_server_redirect(from: &url::Url, to: &url::Url) -> bool {
+    if from.host_str() != to.host_str() {
+        return false;
+    }
+    match (from.scheme(), to.scheme()) {
+        (a, b) if a == b => from.port_or_known_default() == to.port_or_known_default(),
+        ("http", "https") => to.port().is_none() || to.port() == from.port(),
+        _ => false,
+    }
+}
+
+/// Up to 10 redirects, each on the same server (see the module note).
+fn redirect_policy() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() >= 10 {
+            return attempt.error("too many redirects");
+        }
+        let same = attempt
+            .previous()
+            .last()
+            .is_none_or(|from| is_same_server_redirect(from, attempt.url()));
+        if same {
+            attempt.follow()
+        } else {
+            let to = format!(
+                "{}://{}",
+                attempt.url().scheme(),
+                attempt.url().host_str().unwrap_or("")
+            );
+            attempt.error(RedirectRefused(to))
+        }
+    })
+}
+
 /// The `URLError.Code` URLSession would have given for this failure (see the module note).
 pub fn map_reqwest_error(error: &reqwest::Error) -> TransportError {
     let message = error_chain_text(error);
@@ -174,6 +220,11 @@ pub fn map_reqwest_error(error: &reqwest::Error) -> TransportError {
         code
     } else if error.is_timeout() {
         url_error::TIMED_OUT
+    } else if chain(error)
+        .iter()
+        .any(|e| e.downcast_ref::<RedirectRefused>().is_some())
+    {
+        url_error::BAD_SERVER_RESPONSE
     } else if error.is_redirect() {
         url_error::HTTP_TOO_MANY_REDIRECTS
     } else if error.is_builder() {

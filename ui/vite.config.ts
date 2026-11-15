@@ -11,11 +11,13 @@ export default defineConfig({
   server: { port: 1420, strictPort: true },
   build: {
     target: 'safari17',
+    // Every asset is a file, never a data: URL, so the CSP's font-src stays 'self' (tauri.conf.json).
+    assetsInlineLimit: 0,
+    // kit.html (the component gallery) isn't shipped: the dev server still serves it at /kit.html.
     rollupOptions: {
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         menubar: fileURLToPath(new URL('./menubar.html', import.meta.url)),
-        kit: fileURLToPath(new URL('./kit.html', import.meta.url)),
       },
     },
   },

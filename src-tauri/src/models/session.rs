@@ -55,7 +55,7 @@ pub enum SessionSnapshot {
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[ts(export, export_to = "../../ui/src/bindings/app/")]
 pub enum SessionIntent {
@@ -65,6 +65,38 @@ pub enum SessionIntent {
     RetryRestore,
     SignInWithAnotherAccount,
     SignOut,
+}
+
+/// The password never prints (like `itop_kit::Credentials`).
+impl std::fmt::Debug for SessionIntent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SetServer { server } => {
+                f.debug_struct("SetServer").field("server", server).finish()
+            }
+            Self::SetUser { user } => f.debug_struct("SetUser").field("user", user).finish(),
+            Self::SignIn { .. } => f.debug_struct("SignIn").field("password", &"***").finish(),
+            Self::RetryRestore => f.write_str("RetryRestore"),
+            Self::SignInWithAnotherAccount => f.write_str("SignInWithAnotherAccount"),
+            Self::SignOut => f.write_str("SignOut"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod intent_debug_tests {
+    use super::SessionIntent;
+
+    #[test]
+    fn the_password_never_prints() {
+        let text = format!(
+            "{:?}",
+            SessionIntent::SignIn {
+                password: "hunter2".into()
+            }
+        );
+        assert_eq!(text, r#"SignIn { password: "***" }"#);
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]

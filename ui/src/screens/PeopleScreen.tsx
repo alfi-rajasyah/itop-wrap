@@ -89,7 +89,10 @@ function PersonView({ person }: { person: PersonDetailView }) {
       ),
     })
   }
-  if (person.email) {
+  if (person.email && !isMailAddress(person.email)) {
+    // Not a plain address (it would carry ?bcc=…, &body=… into the mail app): shown, not linked.
+    rows.push({ label: 'Email', value: <span className="select-text">{person.email}</span> })
+  } else if (person.email) {
     const email = person.email
     rows.push({
       label: 'Email',
@@ -163,4 +166,9 @@ function PersonView({ person }: { person: PersonDetailView }) {
       </article>
     </div>
   )
+}
+
+/** One plain e-mail address: no spaces, no `?`/`&`/`#` that a mailto: URL would read as fields. */
+function isMailAddress(text: string): boolean {
+  return /^[^\s@?&#/:]+@[^\s@?&#/:]+$/.test(text)
 }

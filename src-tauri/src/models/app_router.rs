@@ -327,7 +327,10 @@ impl Router for AppRouter {
             return Err(AppError::unknown_model(model));
         }
         if model == "session" {
-            return self.dispatch_session(decode(intent)?).await;
+            // serde's message can quote the value it refused, which may be the password.
+            let intent = serde_json::from_value(intent)
+                .map_err(|_| AppError::invalid_intent("That isn't a session intent."))?;
+            return self.dispatch_session(intent).await;
         }
         let Some(ws) = self.workspace() else {
             return Err(AppError::not_signed_in());

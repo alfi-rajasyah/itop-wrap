@@ -1137,11 +1137,14 @@ impl Workspace {
             Ok(file) => match self.save_panel(&file.filename).await {
                 None => Ok(None),
                 Some(path) => match std::fs::write(&path, &file.data) {
-                    Ok(()) => Ok(Some(format!(
-                        "Saved {} ({}).",
-                        file.filename,
-                        byte_count(file.data.len() as u64)
-                    ))),
+                    Ok(()) => Ok(Some({
+                        crate::native::quarantine_download(&path);
+                        format!(
+                            "Saved {} ({}).",
+                            file.filename,
+                            byte_count(file.data.len() as u64)
+                        )
+                    })),
                     Err(e) => Err(e.to_string()),
                 },
             },
@@ -1167,12 +1170,19 @@ impl Workspace {
 /// An `ImageIntakeItem` from the UI as `ImageIntake.Item`: raw clipboard data ("") is named
 /// "Pasted image.png" or ".tiff" (LOG-14), files that weren't read are oversize (LOG-16).
 pub fn intake_item(item: ImageIntakeItem) -> IntakeItem {
+    // The web view checks the size before reading; a file sent anyway over the limit is
+    // oversize here too, and isn't decoded.
+    let too_long = |b: &str| b.len() as i64 > (MAX_INTAKE_FILE_BYTES / 3 + 1) * 4;
     let data = item
         .data_base64
         .as_deref()
+        .filter(|b| !too_long(b))
         .and_then(|b| base64::engine::general_purpose::STANDARD.decode(b).ok())
         .unwrap_or_default();
-    let oversize = item.data_base64.is_none() && item.size > MAX_INTAKE_FILE_BYTES;
+    let oversize = match item.data_base64.as_deref() {
+        None => item.size > MAX_INTAKE_FILE_BYTES,
+        Some(b) => too_long(b),
+    };
     let filename = if item.filename.is_empty() {
         if is_tiff(&data) {
             "Pasted image.tiff"
@@ -1187,5 +1197,30 @@ pub fn intake_item(item: ImageIntakeItem) -> IntakeItem {
         data,
         filename,
         oversize,
+    }
+}
+
+#[cfg(test)]
+mod intake_bound_tests {
+    use super::*;
+
+    /// Not a Swift test: a file the web view sends anyway over 40 MB is oversize (LOG-16's
+    /// message) and isn't decoded; one at the limit still is.
+    #[test]
+    fn data_over_the_limit_sent_anyway_is_oversize() {
+        let item = |len: usize| {
+            intake_item(ImageIntakeItem {
+                filename: "a.png".into(),
+                data_base64: Some("A".repeat(len)),
+                size: 0,
+            })
+        };
+        let limit = ((MAX_INTAKE_FILE_BYTES / 3 + 1) * 4) as usize;
+        let over = item(limit + 4);
+        assert!(over.oversize);
+        assert!(over.data.is_empty());
+        let at = item(limit);
+        assert!(!at.oversize);
+        assert!(!at.data.is_empty());
     }
 }

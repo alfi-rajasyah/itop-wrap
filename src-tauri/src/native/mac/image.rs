@@ -6,8 +6,8 @@
 use std::ffi::c_void;
 
 use objc2_core_foundation::{
-    CFData, CFDictionary, CFMutableData, CFNumber, CFRetained, CFString, CFType, CGPoint, CGRect,
-    CGSize,
+    CFBoolean, CFData, CFDictionary, CFMutableData, CFNumber, CFRetained, CFString, CFType,
+    CGPoint, CGRect, CGSize,
 };
 use objc2_core_graphics::{
     CGBitmapContextCreate, CGBitmapContextCreateImage, CGColorSpace, CGContext, CGImage,
@@ -15,7 +15,9 @@ use objc2_core_graphics::{
 };
 use objc2_image_io::{
     CGImageDestination, CGImageSource, kCGImageDestinationLossyCompressionQuality,
-    kCGImagePropertyOrientation,
+    kCGImagePropertyOrientation, kCGImagePropertyPixelHeight, kCGImagePropertyPixelWidth,
+    kCGImageSourceCreateThumbnailFromImageAlways, kCGImageSourceCreateThumbnailWithTransform,
+    kCGImageSourceThumbnailMaxPixelSize,
 };
 
 use crate::native::{ConvertTo, ConvertedImage};
@@ -45,18 +47,42 @@ pub fn convert(data: &[u8], to: ConvertTo) -> Option<ConvertedImage> {
     if unsafe { source.count() } == 0 {
         return None;
     }
-    // SAFETY: index 0 exists (count > 0); no options.
-    let image = unsafe { source.image_at_index(0, None) }?;
-    let (w, h) = (CGImage::width(Some(&image)), CGImage::height(Some(&image)));
-    if w == 0 || h == 0 {
-        return None;
-    }
     let orientation = orientation(&source);
-    let (tw, th) = target_size(w, h);
-    let image = if (tw, th) == (w, h) {
-        image
-    } else {
-        scaled(&image, tw, th)?
+    // The stored size from the header, so a huge image is never decoded at full size.
+    let image = match header_size(&source) {
+        Some((w, h)) => {
+            if w == 0 || h == 0 || w.saturating_mul(h) > MAX_SOURCE_PIXELS {
+                return None;
+            }
+            let (tw, th) = target_size(w, h);
+            if (tw, th) == (w, h) {
+                // SAFETY: index 0 exists (count > 0); no options.
+                unsafe { source.image_at_index(0, None) }?
+            } else {
+                let thumb = thumbnail(&source, tw.max(th))?;
+                let size = (CGImage::width(Some(&thumb)), CGImage::height(Some(&thumb)));
+                // ImageIO may round the short side differently from Swift: then scale exactly.
+                if size == (tw, th) {
+                    thumb
+                } else {
+                    scaled(&thumb, tw, th)?
+                }
+            }
+        }
+        None => {
+            // SAFETY: index 0 exists (count > 0); no options.
+            let image = unsafe { source.image_at_index(0, None) }?;
+            let (w, h) = (CGImage::width(Some(&image)), CGImage::height(Some(&image)));
+            if w == 0 || h == 0 || w.saturating_mul(h) > MAX_SOURCE_PIXELS {
+                return None;
+            }
+            let (tw, th) = target_size(w, h);
+            if (tw, th) == (w, h) {
+                image
+            } else {
+                scaled(&image, tw, th)?
+            }
+        }
     };
     let (uti, ext) = match to {
         ConvertTo::Png => ("public.png", "png"),
@@ -90,6 +116,51 @@ pub fn convert(data: &[u8], to: ConvertTo) -> Option<ConvertedImage> {
     }
     let bytes = out.to_vec();
     (!bytes.is_empty()).then_some(ConvertedImage { data: bytes, ext })
+}
+
+/// Images above this many pixels (stored size) aren't converted: a few bytes of PNG can declare a
+/// picture that would take gigabytes to decode. 300 MP is well past any camera or screenshot.
+pub const MAX_SOURCE_PIXELS: usize = 300_000_000;
+
+/// The first image's stored pixel size from its header, without decoding it.
+fn header_size(source: &CGImageSource) -> Option<(usize, usize)> {
+    // SAFETY: index 0 exists (checked by the caller); no options.
+    let props = unsafe { source.properties_at_index(0, None) }?;
+    let read = |key: &CFString| -> Option<usize> {
+        // SAFETY: `props` has CFString keys; the value, if any, is owned by `props`.
+        let raw = unsafe { props.value((key as *const CFString).cast::<c_void>()) };
+        if raw.is_null() {
+            return None;
+        }
+        // SAFETY: non-null CF object owned by `props`, which outlives this borrow.
+        let value: &CFType = unsafe { &*raw.cast::<CFType>() };
+        usize::try_from(value.downcast_ref::<CFNumber>()?.as_i64()?).ok()
+    };
+    // SAFETY: immutable CFString constants exported by ImageIO.
+    let (wk, hk) = unsafe { (kCGImagePropertyPixelWidth, kCGImagePropertyPixelHeight) };
+    Some((read(wk)?, read(hk)?))
+}
+
+/// The first image decoded straight at `max_side` on its long side (ImageIO subsamples), stored
+/// orientation kept (the orientation property is written back by the caller, as before).
+fn thumbnail(source: &CGImageSource, max_side: usize) -> Option<CFRetained<CGImage>> {
+    // SAFETY: immutable CFString constants exported by ImageIO.
+    let keys: [&CFString; 3] = unsafe {
+        [
+            kCGImageSourceCreateThumbnailFromImageAlways,
+            kCGImageSourceThumbnailMaxPixelSize,
+            kCGImageSourceCreateThumbnailWithTransform,
+        ]
+    };
+    let side = CFNumber::new_i64(i64::try_from(max_side).ok()?);
+    let values: [&CFType; 3] = [
+        CFBoolean::new(true).as_ref(),
+        side.as_ref(),
+        CFBoolean::new(false).as_ref(),
+    ];
+    let options = CFDictionary::<CFString, CFType>::from_slices(&keys, &values);
+    // SAFETY: index 0 exists; a CFString → CFType dictionary of thumbnail options.
+    unsafe { source.thumbnail_at_index(0, Some(options.as_opaque())) }
 }
 
 /// The EXIF/TIFF orientation (1…8) of the first image, kept so a portrait photo still shows upright.
@@ -214,6 +285,17 @@ mod tests {
         let heic = make(64, 48, "public.heic");
         let jpg = convert(&heic, ConvertTo::Jpeg).expect("jpg from heic");
         assert_eq!(size_of(&jpg.data), (64, 48));
+    }
+
+    #[test]
+    fn an_image_too_big_to_decode_is_refused_from_its_header() {
+        // A 20000×20000 PNG header (400 MP) with no pixel data: refused before any decoding.
+        let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        png.extend(20_000u32.to_be_bytes());
+        png.extend(20_000u32.to_be_bytes());
+        png.extend([8, 6, 0, 0, 0]);
+        png.extend([0, 0, 0, 0]); // CRC, not checked by the header read
+        assert!(convert(&png, ConvertTo::Png).is_none());
     }
 
     #[test]

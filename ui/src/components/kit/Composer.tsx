@@ -107,6 +107,7 @@ export const Composer = forwardRef<HTMLTextAreaElement, ComposerProps>(function 
 
   return (
     <div
+      data-dropzone
       onDragEnter={(e) => {
         if (!hasFiles(e) || readOnly) return;
         depth.current += 1;

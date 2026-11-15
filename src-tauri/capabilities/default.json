@@ -1,19 +1,18 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the app's own windows may do",
+  "description": "The main and New Ticket windows: the three app commands, the snapshot event, title-bar dragging",
   "windows": [
     "main",
-    "menubar",
     "new-ticket"
   ],
   "permissions": [
-    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:window:allow-start-dragging",
-    "core:window:allow-hide",
-    "core:window:allow-show",
-    "core:window:allow-set-focus",
-    "core:window:allow-close",
-    "core:window:allow-set-size"
+    "core:window:allow-internal-toggle-maximize",
+    "allow-get-snapshot",
+    "allow-dispatch",
+    "allow-open-url"
   ]
 }

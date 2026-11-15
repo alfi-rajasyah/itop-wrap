@@ -363,6 +363,8 @@ impl ITopClient {
             | url_error::SERVER_CERTIFICATE_HAS_BAD_DATE
             | url_error::SERVER_CERTIFICATE_HAS_UNKNOWN_ROOT
             | url_error::SERVER_CERTIFICATE_NOT_YET_VALID => ITopError::UntrustedCertificate,
+            // A redirect to another server, refused by the transport (transport.rs).
+            url_error::BAD_SERVER_RESPONSE => ITopError::UnexpectedResponse,
             code => ITopError::Transport(code),
         }
     }
