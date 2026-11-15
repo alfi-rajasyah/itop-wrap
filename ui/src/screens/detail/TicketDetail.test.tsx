@@ -26,16 +26,18 @@ describe('TicketDetail: states', () => {
     expect(await screen.findByText('Select a ticket to see its details.')).toBeInTheDocument()
   })
 
-  it('shows the header at once and the body once loaded (DET-4, DET-6)', async () => {
-    const mock = startMock({ delayMs: 200 })
-    renderDetail()
-    const list = await until(mock, 'list:mine', (s) => s.content.type === 'list')
-    if (list.content.type !== 'list') throw new Error()
-    const row = list.content.body.sections.flatMap((s) => s.rows).find((r) => r.ticket.ref === 'R-000412')!
-    await act(() => mock.dispatch('list:mine', { type: 'select', ticketId: row.ticket.id }))
+  it('shows the header and strip at once, the body and composer once loaded (DET-4, DET-6, LOG-1)', async () => {
+    const base = await loadedView()
+    staticBackend({ 'detail:mine': { ...base, body: { type: 'loading' }, composer: null, strip: { ...base.strip, linkedCIs: [] } } })
+    const first = renderDetail()
     expect(await screen.findByRole('heading', { name: 'VPN drops every hour' })).toBeInTheDocument()
     expect(screen.getByText('Loading the ticket from iTop')).toBeInTheDocument()
+    expect(screen.getByLabelText('Caller: Caller 1')).toBeInTheDocument()
+    expect(screen.queryByText('Description')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Public entry' })).not.toBeInTheDocument()
+    first.unmount()
+    staticBackend({ 'detail:mine': base })
+    renderDetail()
     expect(await screen.findByText('Network access › VPN')).toBeInTheDocument()
     expect(screen.queryByText('Loading the ticket from iTop')).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Public entry' })).toBeInTheDocument()

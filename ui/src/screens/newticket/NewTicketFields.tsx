@@ -24,12 +24,22 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
   const orgChosen = form.organization.selectedId !== null
   useEffect(() => {
     if (focused.current || !orgReady) return
-    focused.current = true
-    const active = document.activeElement
-    const untouched = !active || active === document.body || active.getAttribute('role') === 'dialog' || active.getAttribute('role') === 'radio'
-    if (!untouched) return
-    if (orgChosen) titleRef.current?.focus()
-    else orgRef.current?.querySelector<HTMLInputElement>('input')?.focus()
+    // After the sheet's own initial focus (one frame), unless the user has moved on.
+    let inner = 0
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => {
+        focused.current = true
+        const active = document.activeElement
+        const untouched = !active || active === document.body || active.getAttribute('role') === 'dialog' || active.getAttribute('role') === 'radio'
+        if (!untouched) return
+        if (orgChosen) titleRef.current?.focus()
+        else orgRef.current?.querySelector<HTMLInputElement>('input')?.focus()
+      })
+    })
+    return () => {
+      cancelAnimationFrame(outer)
+      cancelAnimationFrame(inner)
+    }
   }, [orgReady, orgChosen])
 
   const r = form.required
