@@ -50,6 +50,7 @@ function NewTicketSheet({ form, send }: Props) {
       confirmBusy={form.creating}
       error={<NewTicketMessages form={form} />}
       footerStart={<ClearForm form={form} send={send} />}
+      focusFirstField={false}
     >
       <NewTicketFields form={form} send={send} />
     </Dialog>
@@ -68,14 +69,14 @@ function NewTicketWindow({ form, send }: Props) {
     }
   }
   return (
-    <div onKeyDown={onKeyDown} className="flex h-full min-h-0 flex-col bg-surface text-ink">
-      <header data-tauri-drag-region className="shrink-0 px-5 pb-1 pt-4">
-        <h1 data-tauri-drag-region className="text-[15px] font-semibold leading-snug">
+    <div onKeyDown={onKeyDown} className="flex flex-col bg-surface text-ink">
+      <header className="shrink-0 px-5 pb-1 pt-4">
+        <h1 className="text-[15px] font-semibold leading-snug">
           New ticket
         </h1>
         {form.subtitle ? <p className="mt-0.5 text-[13px] text-ink-2">{form.subtitle}</p> : null}
       </header>
-      <div className="kit-scroll min-h-0 flex-1 overflow-y-auto px-5 pb-2 pt-3">
+      <div className="px-5 pb-2 pt-3">
         <NewTicketFields form={form} send={send} />
       </div>
       <div className="min-h-[18px] shrink-0 px-5 text-[12px] leading-snug text-danger" aria-live="polite">

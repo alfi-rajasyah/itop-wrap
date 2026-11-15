@@ -6,7 +6,9 @@
 //! after the app state is managed, so the web views never call a command before it exists.
 
 pub mod appkit;
+pub mod files;
 pub mod image;
+pub mod locale;
 pub mod tray_draw;
 
 use std::path::PathBuf;
@@ -24,7 +26,7 @@ use tauri::{
     WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry,
 };
 
-use crate::native::{ConvertTo, ConvertedImage, Native};
+use crate::native::{ConvertTo, ConvertedImage, Native, PastedImage};
 use crate::router::{NativeEvent, Router};
 use appkit::{PanelKey, on_main, on_main_async};
 use tray_draw::Slide;
@@ -46,9 +48,10 @@ const TRAY_ID: &str = "itop-wrap";
 /// The panel's width (MB-6) and its height until the UI sizes it to its content.
 pub const PANEL_WIDTH: f64 = 360.0;
 const PANEL_HEIGHT: f64 = 420.0;
-/// The shell's minimum (SHELL-2: columns 180 + 300 + 380, height 520) and first size.
+/// The shell's minimum (SHELL-2: columns 180 + 300 + 380, height 520) and its first size when no
+/// frame is saved: the ideal column widths 200 + 360 + 380 at the minimum height (SHELL-1).
 const SHELL_MIN: (f64, f64) = (860.0, 520.0);
-const SHELL_DEFAULT: (f64, f64) = (1180.0, 760.0);
+const SHELL_DEFAULT: (f64, f64) = (940.0, 520.0);
 /// New Ticket is 480 pt wide (W/NewTicketView.swift:141); the UI may fit the height to its content.
 const NEW_TICKET_SIZE: (f64, f64) = (480.0, 640.0);
 /// The sidebar items in order, for View ▸ ⌘1…⌘5 (W/SessionModel.swift:5-31).
@@ -114,6 +117,10 @@ struct State {
     panel_hidden_at: Option<Instant>,
     /// The panel's top-left (logical), kept while the UI resizes it.
     panel_origin: Option<(f64, f64)>,
+    /// The main window was closed (hidden) while signed in and hasn't been shown since.
+    main_hidden: bool,
+    /// The shell's sidebar is collapsed: View shows "Show Sidebar".
+    sidebar_hidden: bool,
 }
 
 /// The native shell: windows, menus, tray, panel.
@@ -224,6 +231,8 @@ impl Shell {
             if let Some(w) = self.window(MAIN) {
                 let _ = w.hide();
             }
+            self.state().main_hidden = true;
+            self.send(NativeEvent::MainWindowHidden);
         } else {
             // Signed out, restoring or unreachable: closing the window quits.
             self.app.exit(0);
@@ -312,6 +321,9 @@ impl Shell {
             let _ = w.set_focus();
         }
         appkit::activate(mtm);
+        if std::mem::take(&mut self.state().main_hidden) {
+            self.send(NativeEvent::MainWindowShown);
+        }
     }
 
     fn show_new_ticket(self: &Arc<Self>, mtm: MainThreadMarker) {
@@ -421,8 +433,11 @@ impl Shell {
     // MARK: menus (contract.md §6, KEY-1, KEY-2)
 
     fn rebuild_menu(&self) {
-        let signed_in = self.state().signed_in;
-        match build_menu(&self.app, signed_in) {
+        let (signed_in, sidebar_hidden) = {
+            let s = self.state();
+            (s.signed_in, s.sidebar_hidden)
+        };
+        match build_menu(&self.app, signed_in, sidebar_hidden) {
             Ok(menu) => {
                 if let Err(e) = self.app.set_menu(menu) {
                     eprintln!("menu wasn't installed: {e}");
@@ -449,6 +464,7 @@ impl Shell {
                 self.show_main(mtm);
                 self.send(NativeEvent::MenuOpenMain);
             }
+            "toggle-sidebar" => self.send(NativeEvent::ToggleSidebar),
             other => {
                 if let Some(n) = other
                     .strip_prefix("view-")
@@ -473,7 +489,14 @@ impl Shell {
     // MARK: tray (MB-1…6)
 
     fn set_signed_in(self: &Arc<Self>, signed_in: bool) {
-        let was = std::mem::replace(&mut self.state().signed_in, signed_in);
+        let was = {
+            let mut s = self.state();
+            if signed_in && !s.signed_in {
+                // A new workspace starts with the sidebar showing.
+                s.sidebar_hidden = false;
+            }
+            std::mem::replace(&mut s.signed_in, signed_in)
+        };
         if was != signed_in {
             self.rebuild_menu();
         }
@@ -624,7 +647,11 @@ impl Shell {
     }
 }
 
-fn build_menu(app: &AppHandle<Wry>, signed_in: bool) -> tauri::Result<Menu<Wry>> {
+fn build_menu(
+    app: &AppHandle<Wry>,
+    signed_in: bool,
+    sidebar_hidden: bool,
+) -> tauri::Result<Menu<Wry>> {
     let sep = || PredefinedMenuItem::separator(app);
     let app_menu = Submenu::with_items(
         app,
@@ -678,8 +705,22 @@ fn build_menu(app: &AppHandle<Wry>, signed_in: bool) -> tauri::Result<Menu<Wry>>
         ],
     )?;
 
+    // SwiftUI's View menu for the NavigationSplitView: the sidebar toggle first, then the
+    // `CommandGroup(after: .sidebar)` items (a divider and ⌘1…⌘5), then Enter Full Screen (KEY-2).
     let view = Submenu::new(app, "View", true)?;
     if signed_in {
+        view.append(&MenuItem::with_id(
+            app,
+            "toggle-sidebar",
+            if sidebar_hidden {
+                "Show Sidebar"
+            } else {
+                "Hide Sidebar"
+            },
+            true,
+            Some("Ctrl+Cmd+S"),
+        )?)?;
+        view.append(&sep()?)?;
         for (i, title) in SECTIONS.iter().enumerate() {
             view.append(&MenuItem::with_id(
                 app,
@@ -784,6 +825,14 @@ impl Native for MacNative {
         on_main_async(self.app(), move |_| shell.set_signed_in(signed_in));
     }
 
+    fn sidebar_changed(&self, visible: bool) {
+        let shell = self.shell.clone();
+        on_main_async(self.app(), move |_| {
+            shell.state().sidebar_hidden = !visible;
+            shell.rebuild_menu();
+        });
+    }
+
     fn set_tray(&self, title: &str, accessibility_label: &str) {
         let shell = self.shell.clone();
         let (title, label) = (title.to_owned(), accessibility_label.to_owned());
@@ -799,6 +848,38 @@ impl Native for MacNative {
     fn set_new_ticket_assign_to_me(&self, on: bool) {
         self.standard
             .set_bool(crate::prefs::keys::NEW_TICKET_ASSIGN_TO_ME, on);
+    }
+
+    fn format_date_template(&self, date: DateTime<Utc>, template: &str) -> String {
+        locale::date_template(date, template)
+    }
+
+    fn format_date_time(&self, date: DateTime<Utc>, with_date: bool) -> String {
+        locale::date_time(date, with_date)
+    }
+
+    fn format_relative_named(&self, date: DateTime<Utc>, now: DateTime<Utc>) -> String {
+        locale::relative_named(date, now)
+    }
+
+    fn format_byte_count(&self, bytes: i64) -> String {
+        locale::byte_count(bytes)
+    }
+
+    fn format_list(&self, items: &[String]) -> String {
+        locale::list(items)
+    }
+
+    /// Hops to the main thread and waits; call it from a blocking-friendly context.
+    fn pasteboard_images(&self, max_file_bytes: u64) -> Option<Vec<PastedImage>> {
+        on_main(self.app(), move |_| {
+            files::pasteboard_images(max_file_bytes)
+        })
+        .flatten()
+    }
+
+    fn write_file(&self, path: &std::path::Path, data: &[u8]) -> Result<(), String> {
+        files::write_file(path, data)
     }
 }
 

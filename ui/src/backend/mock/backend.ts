@@ -753,8 +753,13 @@ export class MockBackend implements Backend {
       needCount,
       account: { initials: ME.initials, displayName: ME.displayName, host: HOST },
       signOutConfirm: { title: `Sign out of ${HOST}?`, message: 'Your password is removed from the Keychain. Your username stays filled in.' },
+      sidebarWidth: this.sidebarWidth,
+      sidebarVisible: this.sidebarVisible,
     }
   }
+
+  private sidebarWidth = 200
+  private sidebarVisible = true
 
   private needCount() {
     return this.lists.mine.tickets.filter((t) => this.needsYou(t)).length
@@ -824,6 +829,14 @@ export class MockBackend implements Backend {
         return null
       case 'newTicketForCI':
         await this.openNewTicket('sheet', { orgId: null, orgName: intent.orgName, ciId: intent.key, ciName: intent.name })
+        return null
+      case 'setSidebarWidth':
+        this.sidebarWidth = Math.min(260, Math.max(180, Math.round(intent.width)))
+        this.changed()
+        return null
+      case 'setSidebarVisible':
+        this.sidebarVisible = intent.visible
+        this.changed()
         return null
     }
   }
@@ -1589,6 +1602,9 @@ export class MockBackend implements Backend {
         if (accepted.length > 0) list.draftImages[key] = [...existing, ...accepted]
         return null
       }
+      // A browser has no NSPasteboard: the UI takes images from the paste event itself.
+      case 'pasteFromClipboard':
+        return 'text'
       case 'removeImage': {
         const rest = (list.draftImages[key] ?? []).filter((i) => i.id !== intent.imageId)
         if (rest.length === 0) delete list.draftImages[key]
@@ -2653,7 +2669,7 @@ export class MockBackend implements Backend {
       const spent = this.timer.totals[id] ?? 0
       return {
         ticketId: id, ref: t.ref, title: t.title, needsYou: this.needsYou(t), isRunning,
-        right: isRunning ? { type: 'running' } : spent > 0 ? { type: 'spent', text: total(spent) } : { type: 'none' },
+        right: isRunning ? { type: 'running', counter: counter(elapsed) } : spent > 0 ? { type: 'spent', text: total(spent) } : { type: 'none' },
         button: isRunning
           ? { type: 'stop' }
           : this.canStart(t) && !this.timer.web[id]

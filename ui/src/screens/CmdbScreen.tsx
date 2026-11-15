@@ -94,9 +94,10 @@ function CIView({ ci }: { ci: CIDetailView }) {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-[12px] text-ink-2">{ci.headerLine}</p>
-              {ci.copied ? <CopiedChip className="h-6">Copied {ci.name}</CopiedChip> : null}
             </div>
             <h2 className="mono-figures mt-1 select-text text-[22px] font-semibold leading-[1.25] text-ink [overflow-wrap:anywhere]">{ci.name}</h2>
+            {/* CMDB-11: under the name for 2 s, moving what follows down like the Swift stack. */}
+            {ci.copied ? <CopiedChip className="mt-1">Copied {ci.name}</CopiedChip> : null}
           </div>
           <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
             <Button

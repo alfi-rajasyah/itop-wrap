@@ -42,6 +42,8 @@ export type DialogProps = {
   width?: number;
   role?: "dialog" | "alertdialog";
   initialFocusRef?: RefObject<HTMLElement | null>;
+  /** False: the sheet itself takes the focus, no field does (a SwiftUI sheet with no focus set). */
+  focusFirstField?: boolean;
   className?: string;
 };
 
@@ -64,6 +66,7 @@ export function Dialog({
   width = 420,
   role = "dialog",
   initialFocusRef,
+  focusFirstField = true,
   className,
 }: DialogProps) {
   const titleId = useId();
@@ -79,8 +82,8 @@ export function Dialog({
       if (!panel) return;
       const target =
         initialFocusRef?.current ??
-        panel.querySelector<HTMLElement>("[data-autofocus]") ??
-        panel.querySelector<HTMLElement>(`[data-dialog-body] :is(${FOCUSABLE})`) ??
+        (focusFirstField ? panel.querySelector<HTMLElement>("[data-autofocus]") : null) ??
+        (focusFirstField ? panel.querySelector<HTMLElement>(`[data-dialog-body] :is(${FOCUSABLE})`) : null) ??
         panel;
       target.focus();
     });
@@ -88,7 +91,7 @@ export function Dialog({
       cancelAnimationFrame(raf);
       restoreRef.current?.focus?.();
     };
-  }, [open, initialFocusRef]);
+  }, [open, initialFocusRef, focusFirstField]);
 
   if (!open || typeof document === "undefined") return null;
 

@@ -343,6 +343,10 @@ export interface ShellSnapshot {
     host: string
   }
   signOutConfirm: { title: string; message: string }
+  /** The sidebar column's width in pt, 180…260, remembered across launches (SHELL-2). */
+  sidebarWidth: number
+  /** View ▸ Hide Sidebar / Show Sidebar (⌃⌘S). */
+  sidebarVisible: boolean
 }
 
 export type ShellIntent =
@@ -359,6 +363,10 @@ export type ShellIntent =
   | { type: 'newTicket' }
   | { type: 'newTicketForOrg'; orgId: string; orgName: string }
   | { type: 'newTicketForCI'; key: string; name: string; orgName: string }
+  /** The sidebar divider was dragged (Rust clamps to 180…260 and remembers it). */
+  | { type: 'setSidebarWidth'; width: number }
+  /** The sidebar toggle button (the View menu item is native). */
+  | { type: 'setSidebarVisible'; visible: boolean }
 
 export interface ShellResults {
   select: null
@@ -370,6 +378,8 @@ export interface ShellResults {
   newTicket: null
   newTicketForOrg: null
   newTicketForCI: null
+  setSidebarWidth: null
+  setSidebarVisible: null
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -649,10 +659,14 @@ export type DetailIntent =
   | { type: 'toggleTimer' }
   | { type: 'setDraft'; text: string }
   | { type: 'addImages'; items: ImageIntakeItem[] }
+  /** ⌘V / Edit ▸ Paste in the composer: Rust reads the pasteboard like ComposerTextView (LOG-14). */
+  | { type: 'pasteFromClipboard' }
   | { type: 'removeImage'; imageId: string }
   | { type: 'send' }
   /** Downloads through REST, then Rust shows the Save panel and writes the file. */
   | { type: 'downloadAttachment'; attachmentId: string }
+
+export type PasteResult = 'images' | 'text'
 
 export interface DetailResults {
   retry: null
@@ -664,6 +678,8 @@ export interface DetailResults {
   toggleTimer: null
   setDraft: null
   addImages: null
+  /** "images": the pasteboard's images went to the intake; "text": none, paste text normally. */
+  pasteFromClipboard: PasteResult
   removeImage: null
   /** true when the entry was added (draft cleared). */
   send: boolean
@@ -1126,7 +1142,9 @@ export interface PeopleResultsMap {
 // menubar (tray title and the panel)
 // ---------------------------------------------------------------------------------------------
 
-export type MenuRowRight = { type: 'none' } | { type: 'running' } | { type: 'spent'; text: string }
+/** `running.counter`: the live HH:MM:SS as of this snapshot (re-sent every second), so the row
+ *  shows it before the `timer` snapshot arrives (MB-13). */
+export type MenuRowRight = { type: 'none' } | { type: 'running'; counter: string } | { type: 'spent'; text: string }
 
 export type MenuRowButton =
   | { type: 'stop' }

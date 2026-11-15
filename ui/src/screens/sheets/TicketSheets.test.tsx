@@ -91,6 +91,8 @@ describe('Pending sheet (LC-9…12)', () => {
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}')
     expect(await within(dialog).findByText('Enter why the ticket is waiting.')).toBeInTheDocument()
     expect(within(dialog).getByText('Required')).toHaveClass('text-danger')
+    // LC-8: only the text turns red, not the field.
+    expect(reason).not.toHaveAttribute('aria-invalid')
     await userEvent.type(reason, 'Waiting for the caller')
     await until(mock, 'pending:mine', (s) => s.type === 'open' && s.reason === 'Waiting for the caller')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Set to pending' }))

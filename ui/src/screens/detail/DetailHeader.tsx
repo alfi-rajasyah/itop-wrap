@@ -98,11 +98,13 @@ export function DetailHeader({ scope, view }: { scope: ListScope; view: TicketDe
           <ClassIcon kind={ticket.ticketClass} />
           <StatusPill>{ticket.statusLabel}</StatusPill>
           {ticket.needsYou ? <NeedsYouPill /> : null}
-          {view.copied ? <CopiedChip className="h-6">Copied {ticket.ref}</CopiedChip> : null}
         </div>
         <h2 className="mt-1 select-text text-[22px] font-semibold leading-[1.25] tracking-[-0.01em] text-ink [overflow-wrap:anywhere]">
           {ticket.title}
         </h2>
+        {/* DET-10: under the title for 2 s. Swift inserts it in the header's stack, so the
+            content below moves down while it shows; this does the same. */}
+        {view.copied ? <CopiedChip className="mt-1">Copied {ticket.ref}</CopiedChip> : null}
       </div>
 
       <div ref={actionsRef} className="flex w-max shrink-0 items-center gap-2 pt-0.5">

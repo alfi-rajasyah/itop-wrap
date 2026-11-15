@@ -1,11 +1,12 @@
 //! `Native` for tests: a clock you set, and a record of everything the models asked the Mac to do.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 
-use super::{ConvertTo, ConvertedImage, Native};
+use super::{ConvertTo, ConvertedImage, Native, PastedImage};
+use crate::models::format::en_us;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Call {
@@ -18,6 +19,8 @@ pub enum Call {
     HideMenubarPanel,
     SessionChanged(bool),
     SetTray(String, String),
+    ReadPasteboard,
+    SidebarChanged(bool),
 }
 
 pub struct FakeNative {
@@ -29,6 +32,10 @@ pub struct FakeNative {
     pub converted: Mutex<Option<ConvertedImage>>,
     /// The remembered `newTicket.assignToMe` (default true).
     pub assign_to_me: Mutex<bool>,
+    /// What `pasteboard_images` answers (`None`: no images, paste text normally).
+    pub pasteboard: Mutex<Option<Vec<PastedImage>>>,
+    /// When set, `write_file` fails with this text.
+    pub write_failure: Mutex<Option<String>>,
 }
 
 impl FakeNative {
@@ -39,6 +46,8 @@ impl FakeNative {
             save_to: Mutex::default(),
             converted: Mutex::default(),
             assign_to_me: Mutex::new(true),
+            pasteboard: Mutex::default(),
+            write_failure: Mutex::default(),
         }
     }
     pub fn set_now(&self, now: DateTime<Utc>) {
@@ -97,6 +106,9 @@ impl Native for FakeNative {
     fn session_changed(&self, signed_in: bool) {
         self.record(Call::SessionChanged(signed_in));
     }
+    fn sidebar_changed(&self, visible: bool) {
+        self.record(Call::SidebarChanged(visible));
+    }
     fn set_tray(&self, title: &str, accessibility_label: &str) {
         self.record(Call::SetTray(
             title.to_owned(),
@@ -108,5 +120,38 @@ impl Native for FakeNative {
     }
     fn set_new_ticket_assign_to_me(&self, on: bool) {
         *self.assign_to_me.lock().unwrap_or_else(|e| e.into_inner()) = on;
+    }
+    fn format_date_template(&self, date: DateTime<Utc>, template: &str) -> String {
+        en_us::date_template(date, template)
+    }
+    fn format_date_time(&self, date: DateTime<Utc>, with_date: bool) -> String {
+        en_us::date_time(date, with_date)
+    }
+    fn format_relative_named(&self, date: DateTime<Utc>, now: DateTime<Utc>) -> String {
+        en_us::relative_named(date, now)
+    }
+    fn format_byte_count(&self, bytes: i64) -> String {
+        en_us::byte_count(bytes)
+    }
+    fn format_list(&self, items: &[String]) -> String {
+        en_us::list(items)
+    }
+    fn pasteboard_images(&self, _max_file_bytes: u64) -> Option<Vec<PastedImage>> {
+        self.record(Call::ReadPasteboard);
+        self.pasteboard
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+    }
+    fn write_file(&self, path: &Path, data: &[u8]) -> Result<(), String> {
+        let failure = self
+            .write_failure
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        match failure {
+            Some(text) => Err(text),
+            None => std::fs::write(path, data).map_err(|e| e.to_string()),
+        }
     }
 }

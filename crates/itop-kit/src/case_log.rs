@@ -278,25 +278,42 @@ impl LogDate {
         locale: DateLocale,
     ) -> String {
         let d = date.with_timezone(zone).naive_local();
-        let n = now.with_timezone(zone).naive_local();
-        // Days between the two local midnights, counted in calendar days like `Calendar` does.
-        let days = (n.date() - d.date()).num_days();
-        let time = d.format("%H:%M").to_string();
-        match days {
-            0 => format!("Today {time}"),
-            1 => format!("Yesterday {time}"),
-            2..=6 => format!("{} {time}", d.format("%a")),
+        Self::short_with(date, now, zone, |template| match template {
+            "HH:mm" => d.format("%H:%M").to_string(),
+            "EEE" => d.format("%a").to_string(),
             _ => {
                 let month = month_abbreviation(d.month(), locale);
                 let day = d.day();
-                let same_year = d.year() == n.year();
-                match (same_year, locale) {
-                    (true, DateLocale::EnUs) => format!("{month} {day} {time}"),
-                    (true, DateLocale::EnGb) => format!("{day} {month} {time}"),
-                    (false, DateLocale::EnUs) => format!("{month} {day}, {:04}", d.year()),
-                    (false, DateLocale::EnGb) => format!("{day} {month} {:04}", d.year()),
+                match (template, locale) {
+                    ("d MMM", DateLocale::EnUs) => format!("{month} {day}"),
+                    ("d MMM", DateLocale::EnGb) => format!("{day} {month}"),
+                    (_, DateLocale::EnUs) => format!("{month} {day}, {:04}", d.year()),
+                    (_, DateLocale::EnGb) => format!("{day} {month} {:04}", d.year()),
                 }
             }
+        })
+    }
+
+    /// `LogDate.short` with the formatting itself done by `format(template)`, which must format
+    /// `date` like Swift's `LogDate.format` (the app passes Foundation's `DateFormatter` with the
+    /// Mac's locale). Templates: "HH:mm" (a fixed format), "EEE", "d MMM", "d MMM yyyy".
+    pub fn short_with<Tz: TimeZone>(
+        date: DateTime<Utc>,
+        now: DateTime<Utc>,
+        zone: &Tz,
+        format: impl Fn(&str) -> String,
+    ) -> String {
+        let d = date.with_timezone(zone).naive_local();
+        let n = now.with_timezone(zone).naive_local();
+        // Days between the two local midnights, counted in calendar days like `Calendar` does.
+        let days = (n.date() - d.date()).num_days();
+        let time = format("HH:mm");
+        match days {
+            0 => format!("Today {time}"),
+            1 => format!("Yesterday {time}"),
+            2..=6 => format!("{} {time}", format("EEE")),
+            _ if d.year() == n.year() => format!("{} {time}", format("d MMM")),
+            _ => format("d MMM yyyy"),
         }
     }
 }

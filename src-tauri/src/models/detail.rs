@@ -16,7 +16,6 @@ use itop_kit::{
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::format::byte_count;
 use super::list::ListState;
 use super::records::{
     AgentChip, ConfirmText, DraftImage, ImageIntakeItem, LinkedCI, ListScope, LogEntryView, LogTab,
@@ -24,7 +23,7 @@ use super::records::{
 };
 use super::workspace::{State, Workspace};
 use crate::error::AppError;
-use crate::native::ConvertTo;
+use crate::native::{ConvertTo, Native};
 
 /// Files bigger than this aren't read at all (`ImageIntake.maxFileBytes`, LOG-16).
 pub const MAX_INTAKE_FILE_BYTES: i64 = 40 * 1_048_576;
@@ -295,6 +294,8 @@ pub enum DetailIntent {
     AddImages {
         items: Vec<ImageIntakeItem>,
     },
+    /// ⌘V / Edit ▸ Paste in the composer: Rust reads the pasteboard (LOG-14).
+    PasteFromClipboard,
     RemoveImage {
         #[serde(rename = "imageId")]
         #[ts(rename = "imageId")]
@@ -327,6 +328,49 @@ fn is_tiff(data: &[u8]) -> bool {
     data.starts_with(&[0x49, 0x49, 0x2A, 0x00]) || data.starts_with(&[0x4D, 0x4D, 0x00, 0x2A])
 }
 
+/// `ImageIntake.logImage(_:)`: PNG, JPEG and GIF as they are; other images macOS can read are
+/// converted, TIFF to PNG and the rest to JPEG (LOG-17, LOG-18). Blocking (ImageIO).
+fn log_image(native: &dyn Native, item: &IntakeItem) -> Result<LogImage, ImageFailure> {
+    if item.oversize {
+        return Err(ImageFailure::TooLarge {
+            filename: item.filename.clone(),
+            max_mb: (Img::MAX_BYTES / 1_048_576) as i64,
+        });
+    }
+    match LogImage::new(item.data.clone(), &item.filename) {
+        Err(ImageFailure::UnsupportedType { .. }) => {
+            let to = if is_tiff(&item.data) {
+                ConvertTo::Png
+            } else {
+                ConvertTo::Jpeg
+            };
+            let converted = native.convert_image(&item.data, to).ok_or_else(|| {
+                ImageFailure::UnsupportedType {
+                    filename: item.filename.clone(),
+                }
+            })?;
+            let base = deleting_extension(&item.filename);
+            let name = if base.is_empty() {
+                "Pasted image"
+            } else {
+                base
+            };
+            LogImage::new(converted.data, &format!("{name}.{}", converted.ext))
+        }
+        other => other,
+    }
+}
+
+/// What `detail.pasteFromClipboard` did (LOG-14): took the pasteboard's images, or found none,
+/// so the UI pastes text the normal way.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../ui/src/bindings/app/")]
+pub enum PasteResult {
+    Images,
+    Text,
+}
+
 impl Workspace {
     /// What SwiftUI's view identity and `.task(id:)` modifiers did for the detail column: a new
     /// model when the shown ticket changes (or its list comes back on screen), a load when it
@@ -335,7 +379,7 @@ impl Workspace {
     pub(crate) fn sync_details(&self, st: &mut State) {
         for scope in ListScope::ALL {
             let i = scope.index();
-            let active = st.shell.selection == scope.section();
+            let active = st.shell.window_shown && st.shell.selection == scope.section();
             let selected = if active {
                 let l = &st.lists[i];
                 l.ticket(l.selection.as_deref()).cloned()
@@ -466,7 +510,9 @@ impl Workspace {
             TimerButton::WebStopwatch {
                 label: format!(
                     "Web stopwatch since {}",
-                    self.0.fmt.since(*since, self.now())
+                    self.0
+                        .fmt
+                        .since(self.0.ctx.native.as_ref(), *since, self.now())
                 ),
             }
         } else if timer.can_start(t, me) {
@@ -644,7 +690,9 @@ impl Workspace {
                             id: e.id,
                             header: [
                                 Some(e.author.clone()),
-                                e.date.map(|dt| self.0.fmt.log_date(dt, now)),
+                                e.date.map(|dt| {
+                                    self.0.fmt.log_date(self.0.ctx.native.as_ref(), dt, now)
+                                }),
                             ]
                             .into_iter()
                             .flatten()
@@ -747,7 +795,10 @@ impl Workspace {
                 .map(|im| DraftImage {
                     id: im.id.clone(),
                     filename: im.filename.clone(),
-                    size_text: byte_count(im.data.len() as u64),
+                    size_text: self
+                        .0
+                        .fmt
+                        .byte_count(self.0.ctx.native.as_ref(), im.data.len()),
                     thumbnail_src: format!("itop://localhost/draft-image/{}", im.id),
                 })
                 .collect(),
@@ -864,7 +915,34 @@ impl Workspace {
             }
             DetailIntent::AddImages { items } => {
                 let items = items.into_iter().map(intake_item).collect();
-                self.detail_add_images(scope, items);
+                self.detail_add_images(scope, items).await;
+            }
+            // `ImageTextView.paste(_:)` (LOG-14): images on the pasteboard go to the intake;
+            // otherwise the UI pastes text normally.
+            DetailIntent::PasteFromClipboard => {
+                // The composer's `editable` (only then does the text view take images).
+                if !self.can_write(&ticket) {
+                    return Ok(serde_json::to_value(PasteResult::Text).unwrap_or_default());
+                }
+                let native = self.0.ctx.native.clone();
+                let max = MAX_INTAKE_FILE_BYTES as u64;
+                let pasted = tokio::task::spawn_blocking(move || native.pasteboard_images(max))
+                    .await
+                    .ok()
+                    .flatten();
+                let Some(pasted) = pasted else {
+                    return Ok(serde_json::to_value(PasteResult::Text).unwrap_or_default());
+                };
+                let items = pasted
+                    .into_iter()
+                    .map(|p| IntakeItem {
+                        oversize: p.data.is_none() && p.size > max,
+                        data: p.data.unwrap_or_default(),
+                        filename: p.filename,
+                    })
+                    .collect();
+                self.detail_add_images(scope, items).await;
+                return Ok(serde_json::to_value(PasteResult::Images).unwrap_or_default());
             }
             DetailIntent::RemoveImage { image_id } => {
                 let found = {
@@ -939,8 +1017,21 @@ impl Workspace {
     }
 
     /// `LogComposer.add` + `intake(_:existing:)` (LOG-16…19).
-    pub(crate) fn detail_add_images(&self, scope: ListScope, items: Vec<IntakeItem>) {
+    pub(crate) async fn detail_add_images(&self, scope: ListScope, items: Vec<IntakeItem>) {
         let i = scope.index();
+        // Decoding and converting (ImageIO) is blocking work: off the async workers.
+        let native = self.0.ctx.native.clone();
+        let converted = tokio::task::spawn_blocking(move || {
+            items
+                .into_iter()
+                .map(|item| {
+                    let image = log_image(native.as_ref(), &item);
+                    (item.filename, image)
+                })
+                .collect::<Vec<_>>()
+        })
+        .await
+        .unwrap_or_default();
         let existing = {
             let st = self.lock();
             let key = st.details[i].key().unwrap_or_default();
@@ -948,18 +1039,18 @@ impl Workspace {
         };
         let mut accepted: Vec<LogImage> = Vec::new();
         let mut problems: Vec<String> = Vec::new();
-        for item in items {
-            match self.log_image(&item) {
+        for (filename, image) in converted {
+            match image {
                 Ok(image) => accepted.push(image),
                 Err(ImageFailure::TooLarge { filename, max_mb }) => {
                     problems.push(format!("{filename} is larger than {max_mb} MB."))
                 }
                 Err(ImageFailure::UnsupportedType { .. }) => problems.push(format!(
                     "{} isn't an image iTop Wrap can add. Use PNG, JPEG or GIF.",
-                    if item.filename.is_empty() {
+                    if filename.is_empty() {
                         "That file"
                     } else {
-                        item.filename.as_str()
+                        filename.as_str()
                     }
                 )),
             }
@@ -991,45 +1082,6 @@ impl Workspace {
             }
         }
         self.publish();
-    }
-
-    /// `ImageIntake.logImage(_:)`: PNG, JPEG and GIF as they are; other images macOS can read are
-    /// converted, TIFF to PNG and the rest to JPEG (LOG-17, LOG-18).
-    fn log_image(&self, item: &IntakeItem) -> Result<LogImage, ImageFailure> {
-        if item.oversize {
-            return Err(ImageFailure::TooLarge {
-                filename: item.filename.clone(),
-                max_mb: (Img::MAX_BYTES / 1_048_576) as i64,
-            });
-        }
-        match LogImage::new(item.data.clone(), &item.filename) {
-            Err(ImageFailure::UnsupportedType { .. }) => {
-                let tiff = is_tiff(&item.data);
-                let converted = self
-                    .0
-                    .ctx
-                    .native
-                    .convert_image(
-                        &item.data,
-                        if tiff {
-                            ConvertTo::Png
-                        } else {
-                            ConvertTo::Jpeg
-                        },
-                    )
-                    .ok_or_else(|| ImageFailure::UnsupportedType {
-                        filename: item.filename.clone(),
-                    })?;
-                let base = deleting_extension(&item.filename);
-                let name = if base.is_empty() {
-                    "Pasted image"
-                } else {
-                    base
-                };
-                LogImage::new(converted.data, &format!("{name}.{}", converted.ext))
-            }
-            other => other,
-        }
     }
 
     /// `send(_:images:)` + clearing the sent key (LOG-5…9, LOG-22).
@@ -1122,6 +1174,15 @@ impl Workspace {
             .flatten()
     }
 
+    /// `file.data.write(to: url)` off the async workers; the error reads like Foundation's
+    /// `localizedDescription` (DET-34).
+    async fn write_file(&self, path: std::path::PathBuf, data: Vec<u8>) -> Result<(), String> {
+        let native = self.0.ctx.native.clone();
+        tokio::task::spawn_blocking(move || native.write_file(&path, &data))
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()))
+    }
+
     /// `AttachmentsView.save` (DET-33, DET-34).
     async fn detail_download(&self, scope: ListScope, instance: u64, a: AttachmentRef) {
         let i = scope.index();
@@ -1136,16 +1197,18 @@ impl Workspace {
         let outcome: Result<Option<String>, String> = match self.0.images.download(&a).await {
             Ok(file) => match self.save_panel(&file.filename).await {
                 None => Ok(None),
-                Some(path) => match std::fs::write(&path, &file.data) {
+                Some(path) => match self.write_file(path.clone(), file.data.clone()).await {
                     Ok(()) => Ok(Some({
                         crate::native::quarantine_download(&path);
                         format!(
                             "Saved {} ({}).",
                             file.filename,
-                            byte_count(file.data.len() as u64)
+                            self.0
+                                .fmt
+                                .byte_count(self.0.ctx.native.as_ref(), file.data.len())
                         )
                     })),
-                    Err(e) => Err(e.to_string()),
+                    Err(why) => Err(why),
                 },
             },
             Err(e) => Err(self.describe_image(&e)),

@@ -40,8 +40,10 @@ describe('NewTicketForm: sheet', () => {
     expect(within(dialog).getByRole('textbox', { name: 'Title' })).toHaveAttribute('placeholder', "What's wrong, in a few words")
     expect(within(dialog).getByRole('checkbox', { name: 'Assign to me' })).toBeChecked()
     expect(within(dialog).getAllByText('Required')).toHaveLength(6)
-    // initial focus on the first field to fill
-    await waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Organization' })).toHaveFocus())
+    // No field takes the focus by itself (W/NewTicketView.swift sets none).
+    await new Promise((r) => setTimeout(r, 50))
+    expect(within(dialog).getByRole('combobox', { name: 'Organization' })).not.toHaveFocus()
+    expect(within(dialog).getByRole('textbox', { name: 'Title' })).not.toHaveFocus()
   })
 
   it('names the first missing field and marks the empty ones (NEW-14)', async () => {
@@ -51,6 +53,8 @@ describe('NewTicketForm: sheet', () => {
     expect(spy).toHaveBeenCalledWith('newTicket:sheet', { type: 'create' })
     expect(await within(dialog).findByText('Fill in the organization first.')).toBeInTheDocument()
     expect(within(dialog).getAllByText('Required').filter((el) => el.classList.contains('text-danger'))).toHaveLength(6)
+    // Only the "Required" text is red: no field or dropdown border.
+    expect(dialog.querySelectorAll('[aria-invalid]')).toHaveLength(0)
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 

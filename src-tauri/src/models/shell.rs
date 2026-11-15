@@ -15,6 +15,13 @@ use itop_kit::ConfigItem;
 #[derive(Clone, Debug)]
 pub struct ShellState {
     pub selection: SidebarItem,
+    /// Whether the main window is on screen. Closing it while signed in only hides it
+    /// (SHELL-16); its views disappear like SwiftUI's do when the window closes.
+    pub window_shown: bool,
+    /// The sidebar column's width, 180…260 pt, remembered across launches (SHELL-2).
+    pub sidebar_width: i64,
+    /// View ▸ Hide Sidebar / Show Sidebar (NavigationSplitView's sidebar toggle, ⌃⌘S).
+    pub sidebar_visible: bool,
 }
 
 impl Default for ShellState {
@@ -22,6 +29,29 @@ impl Default for ShellState {
     fn default() -> Self {
         ShellState {
             selection: SidebarItem::MyTickets,
+            window_shown: true,
+            sidebar_width: SIDEBAR_DEFAULT,
+            sidebar_visible: true,
+        }
+    }
+}
+
+/// `navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)` (W/ShellView.swift:32).
+pub const SIDEBAR_MIN: i64 = 180;
+pub const SIDEBAR_DEFAULT: i64 = 200;
+pub const SIDEBAR_MAX: i64 = 260;
+/// Where the sidebar width is kept. SwiftUI kept it in its own split-view autosave, which this
+/// app can't read, so this is a new key in the session settings domain.
+pub const SIDEBAR_WIDTH_KEY: &str = "shell.sidebarWidth";
+
+impl ShellState {
+    /// The defaults with the remembered sidebar width.
+    pub fn load(prefs: &dyn super::prefs::Prefs) -> Self {
+        ShellState {
+            sidebar_width: prefs
+                .int(SIDEBAR_WIDTH_KEY)
+                .map_or(SIDEBAR_DEFAULT, |w| w.clamp(SIDEBAR_MIN, SIDEBAR_MAX)),
+            ..ShellState::default()
         }
     }
 }
@@ -54,6 +84,10 @@ pub struct ShellSnapshot {
     pub need_count: i64,
     pub account: ShellAccount,
     pub sign_out_confirm: ConfirmText,
+    /// The sidebar column's width in pt (180…260, SHELL-2).
+    pub sidebar_width: i64,
+    /// Whether the sidebar shows (View ▸ Hide Sidebar / Show Sidebar).
+    pub sidebar_visible: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -113,6 +147,14 @@ pub enum ShellIntent {
         #[ts(rename = "orgName")]
         org_name: String,
     },
+    /// The sidebar divider was dragged to this width (pt).
+    SetSidebarWidth {
+        width: i64,
+    },
+    /// The sidebar toggle button (or ⌃⌘S in the browser mock).
+    SetSidebarVisible {
+        visible: bool,
+    },
 }
 
 /// The server's host, or "iTop" (W/ShellView.swift:143).
@@ -152,7 +194,36 @@ impl Workspace {
                     "Your password is removed from the Keychain. Your username stays filled in."
                         .to_owned(),
             },
+            sidebar_width: st.shell.sidebar_width,
+            sidebar_visible: st.shell.sidebar_visible,
         }
+    }
+
+    /// The sidebar divider was dragged (the UI clamps while dragging; Rust keeps 180…260).
+    pub(crate) fn shell_set_sidebar_width(&self, width: i64) {
+        let width = width.clamp(SIDEBAR_MIN, SIDEBAR_MAX);
+        self.lock().shell.sidebar_width = width;
+        self.0.prefs.set_int(SIDEBAR_WIDTH_KEY, width);
+        self.publish();
+    }
+
+    /// Hide Sidebar / Show Sidebar: the sidebar column collapses or comes back; the View menu
+    /// item's title follows.
+    pub(crate) fn shell_set_sidebar_visible(&self, visible: bool) {
+        let changed = {
+            let mut st = self.lock();
+            std::mem::replace(&mut st.shell.sidebar_visible, visible) != visible
+        };
+        if changed {
+            self.0.ctx.native.sidebar_changed(visible);
+        }
+        self.publish();
+    }
+
+    /// View ▸ Hide Sidebar / Show Sidebar (⌃⌘S).
+    pub(crate) fn shell_toggle_sidebar(&self) {
+        let visible = self.lock().shell.sidebar_visible;
+        self.shell_set_sidebar_visible(!visible);
     }
 
     pub(crate) async fn dispatch_shell(
@@ -210,6 +281,8 @@ impl Workspace {
                 self.request_new_ticket(NewTicketStart::for_ci(&key, &name, &org_name))
                     .await
             }
+            ShellIntent::SetSidebarWidth { width } => self.shell_set_sidebar_width(width),
+            ShellIntent::SetSidebarVisible { visible } => self.shell_set_sidebar_visible(visible),
         }
         Ok(serde_json::Value::Null)
     }
@@ -224,27 +297,84 @@ impl Workspace {
     /// Sidebar selection (and View ▸ ⌘1…5). The section that leaves disappears and the one that
     /// comes runs its views' on-appear work; Team tickets stops polling when it leaves.
     pub(crate) async fn shell_select(&self, item: SidebarItem) {
-        let old = {
+        let (old, shown) = {
             let mut st = self.lock();
             let old = st.shell.selection;
             st.shell.selection = item;
-            old
+            (old, st.shell.window_shown)
         };
         if old == item {
             self.publish();
             return;
         }
         self.trace(|| format!("sidebar selection applied: {}", item.raw()));
-        if old == SidebarItem::TeamTickets
-            && let Some(h) = self.tasks().team_poll.take()
-        {
-            h.abort();
+        // With the window closed no section's views are on screen: the new one appears when the
+        // window comes back (`main_window_shown`).
+        if shown {
+            self.section_disappeared(old);
+            self.section_shown(item);
+        }
+        self.publish();
+    }
+
+    /// The section's views went away: Team tickets stops polling, the list's search task is
+    /// cancelled, and CMDB/Organizations/People cancel theirs.
+    fn section_disappeared(&self, item: SidebarItem) {
+        if let Some(scope) = item.list() {
+            let mut tasks = self.tasks();
+            if scope == ListScope::Team
+                && let Some(h) = tasks.team_poll.take()
+            {
+                h.abort();
+            }
+            if let Some(h) = tasks.lookup[scope.index()].take() {
+                h.abort();
+            }
         }
         if let Some(s) = self.standalone() {
-            s.section(old, false);
+            s.section(item, false);
+        }
+    }
+
+    /// The section's views appeared: their `.task` modifiers run.
+    fn section_shown(&self, item: SidebarItem) {
+        if let Some(s) = self.standalone() {
             s.section(item, true);
         }
         self.section_appeared(item);
+    }
+
+    /// The main window was closed while signed in (it only hides, SHELL-16). Its views disappear
+    /// as SwiftUI's do: Team polling, searches and detail loads stop, the detail and its sheets
+    /// go away. My tickets' 120 s refresh, the timer and the menu bar keep running.
+    pub(crate) fn main_window_hidden(&self) {
+        let selection = {
+            let mut st = self.lock();
+            if !st.shell.window_shown {
+                return;
+            }
+            st.shell.window_shown = false;
+            st.shell.selection
+        };
+        self.trace(|| "main window hidden".to_owned());
+        self.section_disappeared(selection);
+        self.publish();
+    }
+
+    /// The main window is back: the shown section appears again (its list loads if needed, its
+    /// search re-runs, Team tickets polls again), and the selected ticket's detail is made anew,
+    /// loads and re-checks the web stopwatch (POLL-2/3/5, LIST-22, TMR-15).
+    pub(crate) fn main_window_shown(&self) {
+        let selection = {
+            let mut st = self.lock();
+            if st.shell.window_shown {
+                return;
+            }
+            st.shell.window_shown = true;
+            st.shell.selection
+        };
+        self.trace(|| "main window shown".to_owned());
+        self.section_shown(selection);
         self.publish();
     }
 

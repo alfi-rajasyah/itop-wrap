@@ -1,9 +1,8 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import GlideMenu from "@/components/primitives/GlideMenu";
 import { cn } from "@/lib/utils";
-import { InitialsAvatar } from "./Avatar";
+import { initialsOf } from "./Avatar";
 import { CountBadge } from "./Badges";
-import { ChevronUpDownIcon } from "./icons";
 import { Menu, type MenuEntry } from "./Menu";
 import { Tooltip } from "./Tooltip";
 
@@ -103,7 +102,10 @@ export function Sidebar({
   onSelect,
   user,
   header,
-  width = 216,
+  width = 200,
+  minWidth = 180,
+  maxWidth = 260,
+  onWidthChange,
   label = "Sections",
   className,
 }: {
@@ -114,24 +116,76 @@ export function Sidebar({
   /** Right of the traffic lights, in the drag region (e.g. a refresh state). */
   header?: ReactNode;
   width?: number;
+  minWidth?: number;
+  maxWidth?: number;
+  /** With it, the right edge is a divider; called with the new width when a drag ends. */
+  onWidthChange?: (width: number) => void;
   label?: string;
   className?: string;
 }) {
+  const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const drag = useRef<{ x: number; w: number } | null>(null);
+  const clamp = (w: number) => Math.round(Math.min(maxWidth, Math.max(minWidth, w)));
+  const shown = dragWidth ?? width;
+
+  // KEY-9, SHELL-3: like the native sidebar list, ↑/↓ move the selection itself (no wrap).
   const onKey = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("[data-nav-item]"));
     const i = items.indexOf(document.activeElement as HTMLButtonElement);
     if (i < 0) return;
     e.preventDefault();
-    items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+    const next = items[Math.min(items.length - 1, Math.max(0, i + (e.key === "ArrowDown" ? 1 : -1)))];
+    if (!next || next === items[i]) return;
+    next.focus();
+    next.click();
+  };
+
+  const onDividerDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { x: e.clientX, w: shown };
+  };
+  const onDividerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (drag.current) setDragWidth(clamp(drag.current.w + e.clientX - drag.current.x));
+  };
+  const onDividerUp = () => {
+    if (!drag.current) return;
+    drag.current = null;
+    if (dragWidth !== null && dragWidth !== width) onWidthChange?.(dragWidth);
+    setDragWidth(null);
+  };
+  const onDividerKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? 40 : 16;
+    const to =
+      e.key === "ArrowLeft" ? width - step : e.key === "ArrowRight" ? width + step : e.key === "Home" ? minWidth : e.key === "End" ? maxWidth : null;
+    if (to === null) return;
+    e.preventDefault();
+    if (clamp(to) !== width) onWidthChange?.(clamp(to));
   };
 
   return (
     <aside
       aria-label={label}
-      className={cn("flex h-full min-h-0 shrink-0 flex-col border-r border-line bg-sidebar", className)}
-      style={{ width }}
+      className={cn("relative flex h-full min-h-0 shrink-0 flex-col border-r border-line bg-sidebar", className)}
+      style={{ width: shown }}
     >
+      {onWidthChange ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the sidebar"
+          aria-valuenow={shown}
+          aria-valuemin={minWidth}
+          aria-valuemax={maxWidth}
+          tabIndex={0}
+          onPointerDown={onDividerDown}
+          onPointerMove={onDividerMove}
+          onPointerUp={onDividerUp}
+          onPointerCancel={onDividerUp}
+          onKeyDown={onDividerKey}
+          className="absolute inset-y-0 -right-[4px] z-20 w-[7px] cursor-col-resize touch-none outline-none focus-visible:bg-[var(--focus)]/40"
+        />
+      ) : null}
       <div data-tauri-drag-region className="flex h-[52px] shrink-0 items-center pr-2" style={{ paddingLeft: TRAFFIC_LIGHTS_WIDTH }}>
         <div data-tauri-drag-region className="flex min-w-0 flex-1 items-center justify-end gap-1">
           {header}
@@ -158,7 +212,8 @@ export function Sidebar({
       </nav>
 
       {user ? (
-        <div className="mx-2 border-t border-line py-2">
+        // AUTH-27: just the 28 pt initials circle (11 pt semibold), left-aligned above a divider.
+        <div className="flex border-t border-line px-3 py-2.5">
           <Menu
             label="Account"
             items={user.menu}
@@ -166,23 +221,18 @@ export function Sidebar({
             minWidth={200}
             trigger={({ ref, ...props }) => {
               const button = (
-              <button
-                ref={ref}
-                type="button"
-                aria-label={user.ariaLabel ?? `Account: ${user.name}`}
-                className="flex h-10 w-full items-center gap-2 rounded-[8px] px-2 text-left transition-[background-color,transform] duration-100 hover:bg-hover-2 active:scale-[0.99] aria-expanded:bg-hover-2"
-                {...props}
-              >
-                <InitialsAvatar name={user.name} initials={user.initials} size={24} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-ink">{user.name}</span>
-                  {user.detail ? <span className="block truncate text-[11.5px] text-ink-2">{user.detail}</span> : null}
-                </span>
-                <ChevronUpDownIcon className="size-4 shrink-0 text-ink-2" />
-              </button>
+                <button
+                  ref={ref}
+                  type="button"
+                  aria-label={user.ariaLabel ?? `Account: ${user.name}`}
+                  className="flex size-7 items-center justify-center rounded-full bg-hover-2 text-[11px] font-semibold leading-none text-ink-2 transition-[background-color,transform] duration-100 hover:bg-hover active:scale-95 aria-expanded:bg-hover"
+                  {...props}
+                >
+                  {user.initials ?? initialsOf(user.name)}
+                </button>
               );
               return user.tooltip ? (
-                <Tooltip content={user.tooltip} side="top" describe={false} className="flex w-full">
+                <Tooltip content={user.tooltip} side="top" describe={false}>
                   {button}
                 </Tooltip>
               ) : (
@@ -197,10 +247,32 @@ export function Sidebar({
 }
 
 /** The window: sidebar on the left, the rest on the right. Fills its parent (h-screen). */
-export function AppShell({ sidebar, children, className }: { sidebar: ReactNode; children: ReactNode; className?: string }) {
+export function AppShell({
+  sidebar,
+  children,
+  className,
+  sidebarVisible = true,
+  sidebarToggle,
+}: {
+  sidebar: ReactNode;
+  children: ReactNode;
+  className?: string;
+  /** False: the sidebar is collapsed (View ▸ Hide Sidebar). */
+  sidebarVisible?: boolean;
+  /** The sidebar toggle button; with the sidebar collapsed it sits right of the traffic lights. */
+  sidebarToggle?: ReactNode;
+}) {
+  // With the sidebar collapsed the first pane's title row starts after the traffic lights and
+  // the toggle (PaneHeader reads --titlebar-inset).
+  const inset = { "--titlebar-inset": `${TRAFFIC_LIGHTS_WIDTH + 36}px` } as CSSProperties;
   return (
-    <div className={cn("flex h-full min-h-0 w-full overflow-hidden bg-app text-ink", className)}>
-      {sidebar}
+    <div className={cn("relative flex h-full min-h-0 w-full overflow-hidden bg-app text-ink", className)} style={sidebarVisible ? undefined : inset}>
+      {sidebarVisible ? sidebar : null}
+      {!sidebarVisible && sidebarToggle ? (
+        <div className="absolute top-[12px] z-30" style={{ left: TRAFFIC_LIGHTS_WIDTH }}>
+          {sidebarToggle}
+        </div>
+      ) : null}
       <main className="flex min-h-0 min-w-0 flex-1">{children}</main>
     </div>
   );

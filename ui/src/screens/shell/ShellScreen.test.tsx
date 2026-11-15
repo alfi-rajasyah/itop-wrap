@@ -51,6 +51,41 @@ describe('ShellScreen: sidebar (SHELL-3…5, AUTH-27)', () => {
     expect(await screen.findByTestId('cmdb')).toBeInTheDocument()
   })
 
+  it('↑/↓ change the selected section at once (KEY-9, SHELL-3)', async () => {
+    const { sent } = mountMock()
+    render(<App />)
+    const sidebar = await nav()
+    const mine = within(sidebar).getByRole('button', { name: /My tickets/ })
+    mine.focus()
+    fireEvent.keyDown(mine, { key: 'ArrowDown' })
+    expect(sent('shell', { type: 'select', item: 'teamTickets' })).toBe(true)
+    expect(await screen.findByRole('heading', { name: 'Team tickets' })).toBeInTheDocument()
+  })
+
+  it('the account button is the initials circle alone (AUTH-27)', async () => {
+    mountMock()
+    render(<App />)
+    const account = await screen.findByRole('button', { name: /^Account: signed in as / })
+    expect(account.textContent).toMatch(/^[A-Z]{1,2}$/)
+  })
+
+  it('the sidebar resizes within 180…260 and remembers it in Rust; the toggle hides it (SHELL-2)', async () => {
+    const user = userEvent.setup()
+    const { sent } = mountMock()
+    render(<App />)
+    await nav()
+    const divider = screen.getByRole('separator', { name: 'Resize the sidebar' })
+    expect(divider).toHaveAttribute('aria-valuenow', '200')
+    fireEvent.keyDown(divider, { key: 'End' })
+    expect(sent('shell', { type: 'setSidebarWidth', width: 260 })).toBe(true)
+    await waitFor(() => expect(divider).toHaveAttribute('aria-valuenow', '260'))
+    await user.click(screen.getByRole('button', { name: 'Hide Sidebar' }))
+    expect(sent('shell', { type: 'setSidebarVisible', visible: false })).toBe(true)
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Sections' })).not.toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Show Sidebar' }))
+    expect(await nav()).toBeInTheDocument()
+  })
+
   it('follows a selection made elsewhere (View menu ⌘1…5 in Rust)', async () => {
     const { mock } = mountMock()
     render(<App />)

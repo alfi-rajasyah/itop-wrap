@@ -9,7 +9,7 @@ import {
   MenuBarTopRow,
 } from '@/components/kit'
 import { isCommand, useWindowKeyDown } from '@/lib/keys'
-import { useSyncedText } from '@/lib/useSyncedText'
+import { useModelText } from '@/lib/useModelText'
 import { TimerNotice } from './list/TimerNotice'
 
 /*
@@ -48,7 +48,7 @@ export default function MenuBarPanelScreen() {
       ticketRef={r.ref}
       title={r.title}
       needsYou={r.needsYou}
-      runningLabel={r.right.type === 'running' ? counter : null}
+      runningLabel={r.right.type === 'running' ? (counter ?? r.right.counter) : null}
       total={r.right.type === 'spent' ? r.right.text : undefined}
       timer={r.button.type === 'slot' ? 'none' : r.button.type}
       timerDisabled={r.button.type === 'start' ? !r.button.enabled : false}
@@ -72,7 +72,7 @@ export default function MenuBarPanelScreen() {
             <p role="alert" className="text-[12.5px] leading-snug text-danger">
               {content.text}
             </p>
-            <Button size="sm" onClick={() => void send({ type: 'refresh' })} disabled={menu.refreshing}>
+            <Button size="sm" onClick={() => void send({ type: 'refresh' })}>
               Retry
             </Button>
           </div>
@@ -100,6 +100,6 @@ export default function MenuBarPanelScreen() {
 }
 
 function SearchRow({ query, send }: { query: string; send: Send<'menubar'> }) {
-  const [value, setValue] = useSyncedText(query, (q) => send({ type: 'setQuery', query: q }))
+  const [value, setValue] = useModelText(query, (q) => send({ type: 'setQuery', query: q }))
   return <MenuBarTopRow query={value} onQueryChange={setValue} onNewTicket={() => void send({ type: 'newTicket' })} />
 }

@@ -108,13 +108,12 @@ function PendingSheet({ scope, sheet }: { scope: ListScope; sheet: PendingSheetO
       error={sheet.error}
     >
       <Field label="Reason" required requiredError={sheet.reasonRequired.missing} error={sheet.reasonError}>
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy }) => (
           <TextArea
             id={id}
             data-autofocus
             aria-required
             aria-describedby={describedBy}
-            invalid={invalid}
             minHeight={90}
             placeholder="What are you waiting for? For example the caller's reply or a part."
             value={reason}
@@ -152,7 +151,6 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
             id={id}
             aria-labelledby={`${id}-label`}
             aria-required
-            invalid={sheet.serviceRequired.missing}
             dropdown={sheet.service}
             onPick={(serviceId) => void send({ type: 'setService', serviceId })}
           />
@@ -164,7 +162,6 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
             id={id}
             aria-labelledby={`${id}-label`}
             aria-required
-            invalid={sheet.subcategoryRequired.missing}
             dropdown={sheet.subcategory}
             onPick={(subcategoryId) => void send({ type: 'setSubcategory', subcategoryId })}
           />
@@ -176,13 +173,12 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
         )}
       </Field>
       <Field label="Solution" required requiredError={sheet.solutionRequired.missing} error={sheet.solutionError} className="mt-2">
-        {({ id, describedBy, invalid }) => (
+        {({ id, describedBy }) => (
           <TextArea
             id={id}
             data-autofocus
             aria-required
             aria-describedby={describedBy}
-            invalid={invalid}
             minHeight={110}
             placeholder="What fixed it, in words the caller understands."
             value={solution}

@@ -24,6 +24,8 @@ pub use app_router::{AppConfig, AppRouter, session_service};
 pub use workspace::{Standalone, Workspace};
 
 #[cfg(test)]
+mod parity_fix_tests;
+#[cfg(test)]
 mod testkit;
 #[cfg(test)]
 mod tests;

@@ -105,6 +105,35 @@ describe("DropdownField", () => {
     expect(screen.getByText("No organization matches")).toBeInTheDocument();
   });
 
+  it("searchable: shows its search prompt while closed when usable, the placeholder when not (KEY-13)", () => {
+    render(<Controlled items={ORGS} searchable />);
+    expect(screen.getByRole("combobox", { name: "Field" })).toHaveAttribute("placeholder", "Search organizations");
+    render(<DropdownField aria-label="Off" items={[]} value={null} onChange={() => {}} searchable searchPrompt="Search people" placeholder="Choose…" />);
+    expect(screen.getByRole("combobox", { name: "Off" })).toHaveAttribute("placeholder", "Choose…");
+  });
+
+  it("searchable: Return with no match closes; the default no-match text keeps the query as typed (KEY-13/14)", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<DropdownField aria-label="Orgs" items={ORGS} value={null} onChange={onChange} searchable searchPrompt="Search organizations" />);
+    const combo = screen.getByRole("combobox", { name: "Orgs" });
+    await user.click(combo);
+    await user.keyboard("zz ");
+    expect(screen.getByText("Nothing matches “zz ”.")).toBeInTheDocument();
+    await user.keyboard("{Enter}");
+    expect(combo).toHaveAttribute("aria-expanded", "false");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("short list: digits don't jump, letters do", async () => {
+    const user = userEvent.setup();
+    render(<Controlled items={[{ value: "1", label: "1 - High" }, ...CODES]} />);
+    const combo = screen.getByRole("combobox", { name: "Field" });
+    combo.focus();
+    await user.keyboard("1");
+    expect(combo).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("can't open when disabled or empty", async () => {
     const user = userEvent.setup();
     render(<DropdownField aria-label="Empty" items={[]} value={null} onChange={() => {}} placeholder="Choose a team first" />);

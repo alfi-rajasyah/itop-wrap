@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 import { Checkbox, Field, SegmentedControl, TextArea, TextInput } from '@/components/kit'
 import type { NewTicketIntent, NewTicketOpen, TicketClass } from '@/backend'
 import { SnapshotDropdown } from '@/lib/SnapshotDropdown'
@@ -16,32 +16,7 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
   const [title, setTitle] = useModelText(form.title, commitTitle)
   const [description, setDescription] = useModelText(form.description, commitDescription)
 
-  // Initial focus: the first field to fill once the organizations have loaded.
-  const orgRef = useRef<HTMLDivElement>(null)
-  const titleRef = useRef<HTMLInputElement>(null)
-  const focused = useRef(false)
-  const orgReady = form.organization.enabled
-  const orgChosen = form.organization.selectedId !== null
-  useEffect(() => {
-    if (focused.current || !orgReady) return
-    // After the sheet's own initial focus (one frame), unless the user has moved on.
-    let inner = 0
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => {
-        focused.current = true
-        const active = document.activeElement
-        const untouched = !active || active === document.body || active.getAttribute('role') === 'dialog' || active.getAttribute('role') === 'radio'
-        if (!untouched) return
-        if (orgChosen) titleRef.current?.focus()
-        else orgRef.current?.querySelector<HTMLInputElement>('input')?.focus()
-      })
-    })
-    return () => {
-      cancelAnimationFrame(outer)
-      cancelAnimationFrame(inner)
-    }
-  }, [orgReady, orgChosen])
-
+  // No programmatic initial focus: W/NewTicketView.swift sets none (no @FocusState).
   const r = form.required
   return (
     <div className="flex flex-col gap-1">
@@ -56,14 +31,13 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
         className="mb-2.5"
       />
 
-      <div ref={orgRef}>
+      <div>
         <Field label="Organization" required requiredError={r.organization.missing} reserveErrorSpace={false}>
           {({ id }) => (
             <SnapshotDropdown
               id={id}
               aria-labelledby={`${id}-label`}
               aria-required
-              invalid={r.organization.missing}
               dropdown={form.organization}
               onPick={(orgId) => run({ type: 'setOrganization', id: orgId })}
             />
@@ -77,7 +51,6 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
             id={id}
             aria-labelledby={`${id}-label`}
             aria-required
-            invalid={r.caller.missing}
             dropdown={form.caller}
             onPick={(callerId) => run({ type: 'setCaller', id: callerId })}
           />
@@ -91,7 +64,6 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
               id={id}
               aria-labelledby={`${id}-label`}
               aria-required
-              invalid={r.service.missing}
               dropdown={form.service}
               onPick={(serviceId) => run({ type: 'setService', id: serviceId })}
             />
@@ -103,7 +75,6 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
               id={id}
               aria-label="Service subcategory"
               aria-required
-              invalid={r.subcategory.missing}
               dropdown={form.subcategory}
               onPick={(subcategoryId) => run({ type: 'setSubcategory', id: subcategoryId })}
             />
@@ -127,10 +98,8 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
       <Field label="Title" required requiredError={r.title.missing} reserveErrorSpace={false} className="mt-2.5">
         {({ id }) => (
           <TextInput
-            ref={titleRef}
             id={id}
             aria-required
-            invalid={r.title.missing}
             placeholder="What's wrong, in a few words"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -143,7 +112,6 @@ export function NewTicketFields({ form, send }: { form: NewTicketOpen; send: (in
           <TextArea
             id={id}
             aria-required
-            invalid={r.description.missing}
             minHeight={100}
             placeholder="What the caller reports, and anything you've already checked."
             value={description}

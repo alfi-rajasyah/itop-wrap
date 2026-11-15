@@ -86,7 +86,7 @@ export function MasterDetail({
       >
         <span className="absolute inset-y-0 left-[3px] w-px bg-line transition-colors duration-150 group-hover/sep:bg-line-strong group-focus-visible/sep:w-[2px] group-focus-visible/sep:bg-[var(--focus)] group-active/sep:bg-ink-3" />
       </div>
-      <section className="flex min-h-0 min-w-[380px] flex-1 flex-col bg-surface">{detail}</section>
+      <section className="flex min-h-0 min-w-[380px] flex-1 flex-col bg-surface [--titlebar-inset:12px]">{detail}</section>
     </div>
   );
 }
@@ -109,7 +109,7 @@ export function PaneHeader({
 }) {
   return (
     <header className={cn("shrink-0", className)}>
-      <div data-tauri-drag-region className="flex h-[52px] items-center gap-2 px-3">
+      <div data-tauri-drag-region className="flex h-[52px] items-center gap-2 pr-3" style={{ paddingLeft: "var(--titlebar-inset, 12px)" }}>
         {leading}
         <div data-tauri-drag-region className="min-w-0 flex-1">
           {title ? (

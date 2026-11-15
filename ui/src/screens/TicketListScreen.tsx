@@ -15,8 +15,8 @@ import {
   SearchField,
   SearchIcon,
 } from '@/components/kit'
-import { isCommand, useWindowKeyDown } from '@/lib/keys'
-import { useSyncedText } from '@/lib/useSyncedText'
+import { isCommand, isModalOpen, useWindowKeyDown } from '@/lib/keys'
+import { useModelText } from '@/lib/useModelText'
 import { ListControls } from './list/ListControls'
 import { ListRow } from './list/ListRow'
 import { SnapshotPager } from './list/SnapshotPager'
@@ -38,6 +38,8 @@ export default function TicketListScreen({ scope }: { scope: ListScope }) {
   useWindowKeyDown((e) => {
     if (!isCommand(e, 'r')) return
     e.preventDefault()
+    // Like the toolbar button, out of reach while a sheet, dialog or the image viewer is up.
+    if (isModalOpen()) return
     if (list && !list.refreshing) void send({ type: 'refresh' })
   })
 
@@ -56,7 +58,7 @@ export default function TicketListScreen({ scope }: { scope: ListScope }) {
 }
 
 function ListPane({ list, send, title }: { list: ListSnapshot; send: Send<'list:mine'>; title: string }) {
-  const [query, setQuery] = useSyncedText(list.query, (q) => send({ type: 'setQuery', query: q }))
+  const [query, setQuery] = useModelText(list.query, (q) => send({ type: 'setQuery', query: q }))
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-app">
       <PaneHeader

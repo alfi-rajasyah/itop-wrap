@@ -8,10 +8,11 @@ use std::sync::Mutex;
 
 /// A Keychain failure, with its `OSStatus`.
 ///
-/// Swift's `KeychainError` isn't a `LocalizedError`, so the app showed a generic system message
-/// for it; this `Display` is new wording, not a ported string.
+/// Swift's `KeychainError` isn't a `LocalizedError`, so the app showed Foundation's generic
+/// description of a bridged Swift struct error (the status isn't in it); this `Display` is that
+/// exact text, as `error.localizedDescription` printed it (AUTH-4, ERR-12).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
-#[error("The Keychain refused the request (OSStatus {status}).")]
+#[error("The operation couldn’t be completed. (ITopKit.KeychainError error 1.)")]
 pub struct KeychainError {
     pub status: i32,
 }

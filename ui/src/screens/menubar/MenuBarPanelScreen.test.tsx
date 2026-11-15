@@ -88,6 +88,22 @@ describe('MenuBarPanelScreen (MB-7…16, KEY-8)', () => {
     expect(sent('menubar', { type: 'openMain' })).toBe(true)
   })
 
+  it('Refresh keeps its icon and is disabled only while reloading; the running row shows the snapshot counter (MB-13, MB-16)', async () => {
+    const { mock } = mountMock()
+    render(<MenuBarApp />)
+    await section('Assigned  2')
+    const refresh = screen.getByRole('button', { name: 'Refresh' })
+    const icon = refresh.innerHTML
+    act(() => void mock.dispatch('menubar', { type: 'refresh' }))
+    await waitFor(() => expect(refresh).toBeDisabled())
+    expect(refresh.innerHTML).toBe(icon)
+    await until(mock, 'menubar', (m) => !m.refreshing)
+    await waitFor(() => expect(refresh).toBeEnabled())
+    await backendDispatch(mock, 'timer', { type: 'start', ticketId: 'UserRequest::412' })
+    const running = await section('Running')
+    expect(await within(running).findByText(/^\d\d:\d\d:\d\d$/)).toBeInTheDocument()
+  })
+
   it('loading and failed states (MB-14)', async () => {
     const user = userEvent.setup()
     mountMock({ listState: 'loading' })

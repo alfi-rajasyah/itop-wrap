@@ -2795,7 +2795,11 @@ async fn mb_8_to_15_panel() {
     let c = &h.snap("menubar")["content"];
     assert_eq!(c["type"], "list");
     assert_eq!(c["running"]["ticketId"], "UserRequest::2", "MB-10");
-    assert_eq!(c["running"]["right"], json!({"type": "running"}));
+    assert_eq!(
+        c["running"]["right"],
+        json!({"type": "running", "counter": "00:00:00"}),
+        "MB-13: the counter rides along"
+    );
     assert_eq!(c["running"]["button"], json!({"type": "stop"}));
     let titles: Vec<&str> = c["sections"]
         .as_array()

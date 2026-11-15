@@ -36,6 +36,7 @@ export {
   EditPencil as NewTicketIcon,
   LogOut as SignOutIcon,
   Calendar as CalendarIcon,
+  SidebarCollapse as SidebarIcon,
 } from "iconoir-react";
 
 /** Filled stop square: the running timer's button (stopwatch ↔ stop). */

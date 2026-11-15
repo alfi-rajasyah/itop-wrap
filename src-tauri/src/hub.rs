@@ -3,6 +3,7 @@
 //! hands it to the sink, which in the app emits the `snapshot` event to every window.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
@@ -40,6 +41,8 @@ impl SnapshotSink for RecordingSink {
 pub struct Hub {
     sink: Arc<dyn SnapshotSink>,
     latest: Arc<Mutex<HashMap<String, Value>>>,
+    /// Set on a session's hub (see [`Hub::gated`]) once that session's workspace stopped.
+    closed: Option<Arc<AtomicBool>>,
 }
 
 impl Hub {
@@ -47,11 +50,38 @@ impl Hub {
         Self {
             sink,
             latest: Arc::default(),
+            closed: None,
         }
     }
 
+    /// The same hub for one signed-in session's models: after [`Hub::close`] its publishes are
+    /// dropped, so a task still running for a stopped workspace can't bring back the previous
+    /// user's snapshots (clearing still works).
+    pub fn gated(&self) -> Hub {
+        Hub {
+            sink: self.sink.clone(),
+            latest: self.latest.clone(),
+            closed: Some(Arc::new(AtomicBool::new(false))),
+        }
+    }
+
+    /// Stops this session's publishes for good.
+    pub fn close(&self) {
+        if let Some(closed) = &self.closed {
+            closed.store(true, Ordering::SeqCst);
+        }
+    }
+
+    /// Whether [`Hub::close`] was called on this session's hub.
+    pub fn is_closed(&self) -> bool {
+        self.closed
+            .as_ref()
+            .is_some_and(|c| c.load(Ordering::SeqCst))
+    }
+
     /// Stores and emits `snapshot` for `model`. An unchanged snapshot is not emitted again, so
-    /// models can publish after every step without flooding the windows.
+    /// models can publish after every step without flooding the windows. Storing and emitting
+    /// happen under one lock, so the windows get snapshots in the order they were stored.
     pub fn publish<T: Serialize>(&self, model: &str, snapshot: &T) {
         let value = match serde_json::to_value(snapshot) {
             Ok(v) => v,
@@ -60,25 +90,18 @@ impl Hub {
                 return;
             }
         };
-        {
-            let mut latest = self.latest.lock().unwrap_or_else(|e| e.into_inner());
-            if latest.get(model) == Some(&value) {
-                return;
-            }
-            latest.insert(model.to_owned(), value.clone());
+        let mut latest = self.latest.lock().unwrap_or_else(|e| e.into_inner());
+        if self.is_closed() || latest.get(model) == Some(&value) {
+            return;
         }
+        latest.insert(model.to_owned(), value.clone());
         self.sink.emit(model, &value);
     }
 
     /// The model stopped existing (sign-out): its snapshot becomes `null`.
     pub fn clear(&self, model: &str) {
-        let had = self
-            .latest
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .remove(model)
-            .is_some();
-        if had {
+        let mut latest = self.latest.lock().unwrap_or_else(|e| e.into_inner());
+        if latest.remove(model).is_some() {
             self.sink.emit(model, &Value::Null);
         }
     }
