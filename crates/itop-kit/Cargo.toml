@@ -17,7 +17,11 @@ async-trait = "0.1"
 url = "2"
 rand = "0.9"
 base64 = "0.22"
+# Only to recognise certificate errors inside reqwest's error chain (same version reqwest uses).
+rustls = { version = "0.23", default-features = false }
 
 [dev-dependencies]
+# A local TLS server with a self-signed certificate, for the untrusted-certificate mapping.
+tokio-rustls = "0.26"
 wiremock = "0.6"
 tokio = { workspace = true, features = ["test-util"] }
