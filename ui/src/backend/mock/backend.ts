@@ -778,10 +778,12 @@ export class MockBackend implements Backend {
         if (this.lists.mine.tickets.some((t) => ticketId(t) === id)) {
           this.setQuery('mine', '')
           this.lists.mine.selection = id
+          this.syncDetails()
           await this.select('myTickets')
         } else if (this.lists.team.tickets.some((t) => ticketId(t) === id)) {
           this.setQuery('team', '')
           this.lists.team.selection = id
+          this.syncDetails()
           await this.select('teamTickets')
         } else {
           this.setQuery('mine', ref)
