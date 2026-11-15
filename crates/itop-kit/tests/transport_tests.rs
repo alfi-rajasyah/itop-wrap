@@ -501,7 +501,22 @@ mod found_count_tests {
         }
     }
 
-    // NOT PORTED here: peopleTotal ("People search reports how many matched in total") needs
-    // OrgService.peoplePage (Organization.swift), which is ported in its own module. Port it with
-    // that module.
+    /// People search reports how many matched in total
+    #[tokio::test]
+    async fn people_total() {
+        let stub = StubServer::new(StubReply::json(
+            r#"{"code":0,"message":"Found: 256","objects":{"Person::1":{"class":"Person","key":"1","fields":{"name":"Rajasyah","first_name":"Alfi"}}}}"#,
+        ));
+        let client = ITopClient::new(
+            ServerAddress::new("itop.example.com").unwrap(),
+            Credentials::new("a", "p"),
+            stub.transport(),
+        );
+        let page = itop_kit::OrgService::new(client)
+            .people_page_matching("alfi")
+            .await
+            .unwrap();
+        assert_eq!(page.people.len(), 1);
+        assert_eq!(page.total, 256);
+    }
 }
