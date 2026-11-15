@@ -17,6 +17,11 @@ async-trait = "0.1"
 url = "2"
 rand = "0.9"
 base64 = "0.22"
+# The HTML-to-text and rich-text rules are regexes in Swift.
+regex = "1"
+# NFD, so the name sort can compare letters without their accents (localizedStandardCompare).
+icu_normalizer = { version = "2", default-features = false, features = ["compiled_data"] }
+percent-encoding = "2"
 # Only to recognise certificate errors inside reqwest's error chain (same version reqwest uses).
 rustls = { version = "0.23", default-features = false }
 

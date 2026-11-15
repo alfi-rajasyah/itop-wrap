@@ -11,11 +11,9 @@ use std::sync::{Arc, Mutex};
 use crate::client::ITopClient;
 use crate::current_user::CurrentUser;
 use crate::error::ITopError;
-use crate::oql;
-use crate::rest_operation::RestOperation;
 use crate::secret_store::{KeychainError, SecretStore};
 use crate::server_address::{Credentials, ServerAddress};
-use crate::ticket::{Ticket, TicketClass};
+use crate::ticket_queries::TicketService;
 use crate::transport::{ReqwestTransport, Transport, TransportError};
 
 /// String settings, like the parts of `UserDefaults` the session uses.
@@ -259,7 +257,8 @@ impl SessionService {
                 // Resolve each ref to its exact object; refs that don't exist stay out of the allowlist.
                 let mut allowed: HashSet<String> = HashSet::new();
                 for r in refs {
-                    if let Ok(Some(t)) = lookup(&client, r).await {
+                    // The allowlist key is `TicketWrites.allowlistKey(for:)`, which is `Ticket::id()`.
+                    if let Ok(Some(t)) = TicketService::new(client.clone()).lookup(r).await {
                         allowed.insert(t.id());
                     }
                 }
@@ -279,43 +278,4 @@ impl fmt::Debug for SessionService {
             .field("write_access", &self.write_access)
             .finish_non_exhaustive()
     }
-}
-
-/// `TicketService(client:).lookup(ref)` from TicketQueries.swift, which is ported in its own
-/// module; kept here, private and identical, so the session doesn't depend on that module.
-/// The allowlist key is `TicketWrites.allowlistKey(for:)`, which is `Ticket::id()`.
-async fn lookup(client: &ITopClient, r: &str) -> Result<Option<Ticket>, ITopError> {
-    let Some((cls, oql)) = ref_lookup(r) else {
-        return Ok(None);
-    };
-    let response = client
-        .send(RestOperation::get(
-            cls.raw_value(),
-            oql,
-            Ticket::LIST_FIELDS,
-        ))
-        .await?;
-    Ok(response.objects().iter().find_map(Ticket::from_object))
-}
-
-/// `TicketQueries.refLookup`: a full ref ("R-000412") and the OQL that finds it.
-fn ref_lookup(text: &str) -> Option<(TicketClass, String)> {
-    let r = text
-        .trim_matches(crate::error::is_swift_whitespace)
-        .to_uppercase();
-    let b = r.as_bytes();
-    let well_formed = b.len() == 8
-        && (b[0] == b'R' || b[0] == b'I')
-        && b[1] == b'-'
-        && b[2..].iter().all(u8::is_ascii_digit);
-    if !well_formed {
-        return None;
-    }
-    let cls = TicketClass::ALL
-        .into_iter()
-        .find(|c| r.starts_with(&format!("{}-", c.ref_prefix())))?;
-    Some((
-        cls,
-        format!("SELECT {} WHERE ref = {}", cls.raw_value(), oql::quote(&r)),
-    ))
 }
