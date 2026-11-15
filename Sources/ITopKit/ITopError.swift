@@ -5,8 +5,11 @@ public enum ITopError: Error, Equatable, Sendable {
     case invalidServerAddress
     /// iTop code 1: wrong username or password.
     case invalidCredentials
-    /// iTop code 1 with a permissions message: the account lacks the "REST Services User" profile.
+    /// iTop code 1 about the REST services: the account lacks the "REST Services User" profile.
     case restNotAllowed
+    /// iTop code 1 refusing this one request (the account can use REST, but not for this), with
+    /// iTop's own message.
+    case notAllowed(message: String)
     /// Any other non-zero iTop `code`, with iTop's own message.
     case server(code: Int, message: String)
     /// The web server answered with an HTTP error status.
@@ -30,6 +33,12 @@ extension ITopError: LocalizedError {
             return "Invalid credentials. Check your username and password."
         case .restNotAllowed:
             return "This account can't use the iTop REST API. Ask your iTop admin to add the \"REST Services User\" profile, then sign in again."
+        case .notAllowed(let message):
+            var reason = message.hasPrefix("Error: ") ? String(message.dropFirst(7)) : message
+            reason = reason.trimmingCharacters(in: .whitespaces)
+            if reason.isEmpty { return "iTop didn't allow it." }
+            if let last = reason.last, !".!?".contains(last) { reason += "." }
+            return "iTop didn't allow it: \(reason)"
         case .server(let code, let message):
             return message.isEmpty ? "iTop returned error \(code)." : "iTop returned error \(code): \(message)"
         case .http(let status):

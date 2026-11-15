@@ -90,7 +90,7 @@ Done 2026-11-10: `swift test` 20/20 passing, no warnings.
 - [x] A wrong password shows "Invalid credentials"; the right one opens the shell (tests; your real sign-in still to confirm)
 - [x] After relaunch you're signed in without re-entering anything (tests; real relaunch still to confirm)
 - [x] Sign out removes the Keychain item (tests, including a real Keychain round trip)
-- [x] An account without REST rights gets its own message (the iTop wording is a guess until seen on a real server)
+- [x] An account without REST rights gets its own message (the iTop wording is a guess until seen on a real server). Since 2026-11-14 only a code 1 about the REST services says so; a code 1 refusing one change shows iTop's own message
 
 **Verification:** `swift test --filter AuthTests` · manual: `swift run ITopWrap` against your server (read-only)
 
