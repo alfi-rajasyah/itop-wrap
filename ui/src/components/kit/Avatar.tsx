@@ -60,12 +60,15 @@ export function UnassignedMark({ size = 18, className }: { size?: number; classN
  */
 export function Assignee({
   name,
+  initials,
   unassigned = false,
   compact = false,
   className,
 }: {
   /** Display name: "You" for yourself, else the agent's name. Ignored when unassigned. */
   name?: string;
+  /** The avatar's initials when they aren't the name's (yours on "You"). */
+  initials?: string;
   unassigned?: boolean;
   compact?: boolean;
   className?: string;
@@ -82,7 +85,7 @@ export function Assignee({
   const display = name ?? "";
   const body = (
     <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)} aria-label={compact ? display : undefined} role={compact ? "img" : undefined}>
-      <InitialsAvatar name={display} size={compact ? 16 : 18} />
+      <InitialsAvatar name={display} initials={initials} size={compact ? 16 : 18} />
       {!compact && <span className="truncate text-[12px] text-ink-2">{display}</span>}
     </span>
   );

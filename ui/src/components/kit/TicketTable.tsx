@@ -23,6 +23,8 @@ export type TicketTableRow = {
   caller?: string;
   /** "You", an agent's name; ignored when unassigned. */
   assigneeName?: string;
+  /** Avatar initials when they aren't the name's (yours on "You"). */
+  assigneeInitials?: string;
   unassigned?: boolean;
 };
 
@@ -111,7 +113,7 @@ export function TicketTable({
                     ) : c === "caller" ? (
                       <span className="truncate text-ink-2">{row.caller}</span>
                     ) : (
-                      <Assignee name={row.assigneeName} unassigned={row.unassigned} />
+                      <Assignee name={row.assigneeName} initials={row.assigneeInitials} unassigned={row.unassigned} />
                     )}
                   </span>
                 ))}

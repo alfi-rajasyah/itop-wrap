@@ -28,18 +28,22 @@ export type TimerButtonProps = {
   busy?: boolean;
   /** Overrides the default tooltip (e.g. "Start timer: stops the one on R-000398 and saves its time (⌘T)"). */
   tooltip?: string;
+  /** The live "HH:MM:SS" to show while running, when the backend ticks it (timer.running.counter). */
+  counter?: string;
+  /** The whole web-stopwatch label ("Web stopwatch since 10:42") when the backend makes it. */
+  label?: string;
   className?: string;
 };
 
-export function TimerButton({ state, startedAt, webSince, onToggle, disabled, busy, tooltip, className }: TimerButtonProps) {
-  const elapsed = useElapsedSeconds(state === "running" ? startedAt ?? Date.now() : null);
+export function TimerButton({ state, startedAt, webSince, onToggle, disabled, busy, tooltip, counter, label, className }: TimerButtonProps) {
+  const elapsed = useElapsedSeconds(state === "running" && counter == null ? startedAt ?? Date.now() : null);
 
   if (state === "web") {
     return (
       <Tooltip content="Your stopwatch in iTop's web UI is running on this ticket, so the app doesn't start its own">
         <span className={cn("inline-flex h-6.5 items-center gap-1.5 rounded-[7px] bg-hover-2 px-2 text-[12px] text-ink-2", className)}>
           <GlobeIcon className="size-3.5 shrink-0" />
-          Web stopwatch since {webSince}
+          {label ?? `Web stopwatch since ${webSince}`}
         </span>
       </Tooltip>
     );
@@ -60,7 +64,7 @@ export function TimerButton({ state, startedAt, webSince, onToggle, disabled, bu
         className={cn("pl-1.5 pr-2", className)}
       >
         <Duration running className="text-[12px]">
-          {formatCounter(elapsed ?? 0)}
+          {counter ?? formatCounter(elapsed ?? 0)}
         </Duration>
       </IconButton>
     );
