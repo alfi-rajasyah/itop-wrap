@@ -130,7 +130,7 @@ export function Dialog({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 pb-8 pt-[10vh]">
+    <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto p-4">
       <div
         aria-hidden
         className="fixed inset-0 bg-[oklch(0.2_0.01_264/0.28)] dark:bg-[oklch(0_0_0/0.5)]"
@@ -144,7 +144,7 @@ export function Dialog({
         aria-describedby={subtitle ? descId : undefined}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={cn("relative flex max-w-full flex-col rounded-[14px] bg-surface text-ink shadow-overlay outline-none", className)}
+        className={cn("relative my-auto flex max-w-full flex-col rounded-[14px] bg-surface text-ink shadow-overlay outline-none", className)}
         style={{ width, animation: "pop-in 180ms cubic-bezier(0.23,1,0.32,1) both", transformOrigin: "top center" }}
       >
         <div className="px-5 pb-1 pt-4">

@@ -563,7 +563,9 @@ impl Shell {
     fn render_tray(&self) {
         let tray = self.state().tray.clone();
         if let (Some(tray), Some(img)) = (tray, self.tray_image())
-            && let Err(e) = tray.set_icon(Some(img))
+            // Not `set_icon`: tray-icon's macOS `set_icon` drops the template flag, leaving a
+            // plain black image that ignores the menu bar's light/dark appearance.
+            && let Err(e) = tray.set_icon_with_as_template(Some(img), true)
         {
             eprintln!("tray icon wasn't updated: {e}");
         }

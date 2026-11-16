@@ -66,7 +66,8 @@ export function MasterDetail({
 
   return (
     <div className={cn("flex h-full min-h-0 min-w-0 flex-1", className)}>
-      <section className="flex min-h-0 shrink-0 flex-col" style={{ width }}>
+      {/* The list gives way before the detail does, so a narrow window never clips the detail. */}
+      <section className="flex min-h-0 min-w-[260px] shrink flex-col" style={{ width }}>
         {list}
       </section>
       <div
