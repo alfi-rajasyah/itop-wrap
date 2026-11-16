@@ -1,0 +1,32 @@
+[package]
+name = "itop-kit"
+description = "iTop REST client and ticket rules for iTop Wrap. No UI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+ts-rs.workspace = true
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "form", "json"] }
+async-trait = "0.1"
+url = "2"
+rand = "0.9"
+base64 = "0.22"
+# The HTML-to-text and rich-text rules are regexes in Swift.
+regex = "1"
+# NFD, so the name sort can compare letters without their accents (localizedStandardCompare).
+icu_normalizer = { version = "2", default-features = false, features = ["compiled_data"] }
+percent-encoding = "2"
+# Only to recognise certificate errors inside reqwest's error chain (same version reqwest uses).
+rustls = { version = "0.23", default-features = false }
+
+[dev-dependencies]
+# A local TLS server with a self-signed certificate, for the untrusted-certificate mapping.
+tokio-rustls = "0.26"
+wiremock = "0.6"
+tokio = { workspace = true, features = ["test-util"] }

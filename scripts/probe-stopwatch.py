@@ -21,7 +21,7 @@ import urllib.parse
 import urllib.request
 
 READ_ONLY_OPS = {"core/get"}
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "ITopKitTests", "Fixtures", "stopwatch-probe.json")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "crates", "itop-kit", "tests", "fixtures", "stopwatch-probe.json")
 REF = re.compile(r"^(R|I)-\d{1,9}$")
 
 

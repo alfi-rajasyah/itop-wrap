@@ -1,0 +1,42 @@
+[package]
+name = "itop-wrap"
+description = "iTop Wrap: a macOS client for iTop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "itop_wrap_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+itop-kit = { path = "../crates/itop-kit" }
+tauri = { version = "2", features = ["tray-icon", "macos-private-api", "image-png"] }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+ts-rs.workspace = true
+async-trait = "0.1"
+base64 = "0.22"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "3"
+security-framework-sys = "2"
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = "0.3"
+objc2-core-foundation = "0.3"
+objc2-core-graphics = "0.3"
+objc2-image-io = "0.3"
+
+[dev-dependencies]
+wiremock = "0.6"
+tokio = { workspace = true, features = ["test-util"] }

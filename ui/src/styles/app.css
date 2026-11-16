@@ -1,0 +1,127 @@
+@import "./tokens.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+/* App-level additions go below. Beautiful UI's tokens stay untouched in tokens.css. */
+
+/* ── fonts ──────────────────────────────────────────────────
+ * tokens.css names "Inter" / "JetBrains Mono", but @fontsource-variable registers
+ * the faces as "Inter Variable" / "JetBrains Mono Variable". Without this the
+ * system fallback renders instead. */
+:root {
+  --font-inter: "Inter Variable", "Inter", "Inter Fallback";
+  --font-mono-face: "JetBrains Mono Variable", "JetBrains Mono", "JetBrains Mono Fallback";
+}
+
+/* ── iTop Wrap meaning tokens (DESIGN.md) ───────────────────
+ * need-*   red: ONLY "this ticket needs you", i.e. Escalated TTR / TTO (row dot,
+ *          Needs-you pill, sidebar count). Red at the owner's request (was teal).
+ * danger-* red: ONLY priority 1, errors, and the one action that closes a ticket for good
+ *          (Resolve and Close). Darker than Beautiful UI's --red so
+ *          small text passes WCAG AA (light 5.7:1 on white, dark 5.0:1 on surface). */
+:root {
+  --need: #c4291c;
+  --need-tint: #fde8e6;
+  --need-ink: #b42318;
+  --on-need: #ffffff;
+  --on-danger: #ffffff;
+  --danger: #c4291c;
+  --danger-tint: color-mix(in srgb, #c4291c 9%, var(--surface));
+  /* Focus ring: Beautiful UI's blue accent, which is never used for meaning here. */
+  --focus: var(--accent);
+  /* App backdrop: the striped body of the Beautiful UI site is a showcase effect. */
+  --app-bg: var(--page);
+  --sidebar-bg: var(--canvas);
+}
+
+.dark {
+  --need: #ff6b5e;
+  --need-tint: #5c1a14;
+  --need-ink: #ffb4ab;
+  --on-need: #1d1d1f;
+  --on-danger: #1d1d1f;
+  --danger: #ff6b5e;
+  --danger-tint: color-mix(in srgb, #ff6b5e 10%, var(--surface));
+  --app-bg: var(--page);
+  --sidebar-bg: oklch(0.19 0.004 264.47);
+}
+
+@theme inline {
+  --color-need: var(--need);
+  --color-need-tint: var(--need-tint);
+  --color-need-ink: var(--need-ink);
+  --color-on-need: var(--on-need);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
+  --color-on-danger: var(--on-danger);
+  --color-app: var(--app-bg);
+  --color-sidebar: var(--sidebar-bg);
+}
+
+/* ── base overrides for a desktop app ─────────────────────── */
+html,
+body {
+  height: 100%;
+}
+
+body {
+  /* drop the site's diagonal stripe; a work tool wants a quiet, flat backdrop */
+  background-color: var(--app-bg);
+  background-image: none;
+  background-attachment: scroll;
+  font-size: 13px;
+  /* the app is a tool, not a document: no rubber-band text selection of chrome */
+  overscroll-behavior: none;
+}
+
+/* Focus: tokens.css sets the ring (and a 4px radius!) as unlayered rules, which beat
+ * every Tailwind utility, so a pill button lost its shape when focused and no component
+ * could opt out. Hand those properties back to the cascade layers, then set the same
+ * ring in @layer base where utilities can override it. */
+:focus-visible {
+  outline: revert-layer;
+  outline-offset: revert-layer;
+  border-radius: revert-layer;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[contenteditable]:focus-visible {
+  outline: revert-layer;
+}
+
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [contenteditable]:focus-visible {
+    outline: none;
+  }
+}
+
+/* Refs and durations: the identity motif. Monospaced, tabular, one weight. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono-figures {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 0;
+  letter-spacing: 0;
+}
+
+/* A thin, quiet scrollbar for panes. */
+.kit-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Tauri overlay title bar: the drag region must not catch clicks meant for controls. */
+[data-tauri-drag-region] {
+  -webkit-user-select: none;
+  user-select: none;
+}

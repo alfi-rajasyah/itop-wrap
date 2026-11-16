@@ -1,0 +1,378 @@
+{
+  "notes": [
+    "UserRequest.public_log with <img>: code 0, 10 returned",
+    "UserRequest.private_log with <img>: code 0, 10 returned",
+    "Incident.public_log with <img>: code 0, 9 returned",
+    "Incident.private_log with <img>: code 0, 10 returned"
+  ],
+  "log_entries_with_images": 44,
+  "entries": [
+    {
+      "entry_keys": [
+        "date",
+        "message",
+        "message_html",
+        "user_id",
+        "user_login"
+      ],
+      "images": 1,
+      "img_attributes": [
+        "data-img-id",
+        "data-img-secret",
+        "height",
+        "src",
+        "style",
+        "width"
+      ],
+      "src_shapes": [
+        "/pages/ajax.document.php?operation=\u2026&id=\u2026&s=\u2026"
+      ],
+      "src_operations": [
+        "download_inlineimage"
+      ],
+      "src_is_absolute": [
+        true
+      ],
+      "has_data_img_id": true,
+      "has_data_img_secret": true,
+      "style_values": [
+        "aspect-ratio:N/N"
+      ],
+      "wrapped_in_p": false,
+      "plain_message_mentions_image": false,
+      "log": "public_log"
+    },
+    {
+      "entry_keys": [
+        "date",
+        "message",
+        "message_html",
+        "user_id",
+        "user_login"
+      ],
+      "images": 1,
+      "img_attributes": [
+        "data-img-id",
+        "data-img-secret",
+        "height",
+        "src",
+        "style",
+        "width"
+      ],
+      "src_shapes": [
+        "/pages/ajax.document.php?operation=\u2026&id=\u2026&s=\u2026"
+      ],
+      "src_operations": [
+        "download_inlineimage"
+      ],
+      "src_is_absolute": [
+        true
+      ],
+      "has_data_img_id": true,
+      "has_data_img_secret": true,
+      "style_values": [
+        "aspect-ratio:N/N"
+      ],
+      "wrapped_in_p": false,
+      "plain_message_mentions_image": false,
+      "log": "public_log"
+    },
+    {
+      "entry_keys": [
+        "date",
+        "message",
+        "message_html",
+        "user_id",
+        "user_login"
+      ],
+      "images": 1,
+      "img_attributes": [
+        "data-img-id",
+        "data-img-secret",
+        "height",
+        "src",
+        "style",
+        "width"
+      ],
+      "src_shapes": [
+        "/pages/ajax.document.php?operation=\u2026&id=\u2026&s=\u2026"
+      ],
+      "src_operations": [
+        "download_inlineimage"
+      ],
+      "src_is_absolute": [
+        true
+      ],
+      "has_data_img_id": true,
+      "has_data_img_secret": true,
+      "style_values": [
+        "aspect-ratio:N/N"
+      ],
+      "wrapped_in_p": false,
+      "plain_message_mentions_image": false,
+      "log": "public_log"
+    },
+    {
+      "entry_keys": [
+        "date",
+        "message",
+        "message_html",
+        "user_id",
+        "user_login"
+      ],
+      "images": 1,
+      "img_attributes": [
+        "data-img-id",
+        "data-img-secret",
+        "height",
+        "src",
+        "style",
+        "width"
+      ],
+      "src_shapes": [
+        "/pages/ajax.document.php?operation=\u2026&id=\u2026&s=\u2026"
+      ],
+      "src_operations": [
+        "download_inlineimage"
+      ],
+      "src_is_absolute": [
+        true
+      ],
+      "has_data_img_id": true,
+      "has_data_img_secret": true,
+      "style_values": [
+        "aspect-ratio:N/N"
+      ],
+      "wrapped_in_p": false,
+      "plain_message_mentions_image": false,
+      "log": "public_log"
+    },
+    {
+      "entry_keys": [
+        "date",
+        "message",
+        "message_html",
+        "user_id",
+        "user_login"
+      ],
+      "images": 1,
+      "img_attributes": [
+        "data-img-id",
+        "data-img-secret",
+        "height",
+        "src",
+        "style",
+        "width"
+      ],
+      "src_shapes": [
+        "/pages/ajax.document.php?operation=\u2026&id=\u2026&s=\u2026"
+      ],
+      "src_operations": [
+        "download_inlineimage"
+      ],
+      "src_is_absolute": [
+        true
+      ],
+      "has_data_img_id": true,
+      "has_data_img_secret": true,
+      "style_values": [
+        "aspect-ratio:N/N"
+      ],
+      "wrapped_in_p": false,
+      "plain_message_mentions_image": false,
+      "log": "public_log"
+    }
+  ],
+  "inline_images": [
+    {
+      "code": 0,
+      "returned": true,
+      "fields": [
+        "contents",
+        "expire",
+        "friendlyname",
+        "item_class",
+        "item_id",
+        "item_org_id",
+        "secret",
+        "temp_id"
+      ],
+      "contents_keys": [
+        "data",
+        "downloads_count",
+        "filename",
+        "mimetype"
+      ],
+      "mimetype": "image/png",
+      "kib": 186,
+      "item_class_is_ticket_class": true,
+      "item_id_is_ticket": true,
+      "item_org_id_is_ticket_org": true,
+      "secret_matches_data_img_secret": true,
+      "secret_matches_src_s": true,
+      "secret_shape": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "temp_id_empty": true,
+      "expire_set": true
+    },
+    {
+      "code": 0,
+      "returned": true,
+      "fields": [
+        "contents",
+        "expire",
+        "friendlyname",
+        "item_class",
+        "item_id",
+        "item_org_id",
+        "secret",
+        "temp_id"
+      ],
+      "contents_keys": [
+        "data",
+        "downloads_count",
+        "filename",
+        "mimetype"
+      ],
+      "mimetype": "image/png",
+      "kib": 49,
+      "item_class_is_ticket_class": true,
+      "item_id_is_ticket": true,
+      "item_org_id_is_ticket_org": true,
+      "secret_matches_data_img_secret": true,
+      "secret_matches_src_s": true,
+      "secret_shape": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "temp_id_empty": true,
+      "expire_set": true
+    },
+    {
+      "code": 0,
+      "returned": true,
+      "fields": [
+        "contents",
+        "expire",
+        "friendlyname",
+        "item_class",
+        "item_id",
+        "item_org_id",
+        "secret",
+        "temp_id"
+      ],
+      "contents_keys": [
+        "data",
+        "downloads_count",
+        "filename",
+        "mimetype"
+      ],
+      "mimetype": "image/png",
+      "kib": 36,
+      "item_class_is_ticket_class": true,
+      "item_id_is_ticket": true,
+      "item_org_id_is_ticket_org": true,
+      "secret_matches_data_img_secret": true,
+      "secret_matches_src_s": true,
+      "secret_shape": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "temp_id_empty": true,
+      "expire_set": true
+    },
+    {
+      "code": 0,
+      "returned": true,
+      "fields": [
+        "contents",
+        "expire",
+        "friendlyname",
+        "item_class",
+        "item_id",
+        "item_org_id",
+        "secret",
+        "temp_id"
+      ],
+      "contents_keys": [
+        "data",
+        "downloads_count",
+        "filename",
+        "mimetype"
+      ],
+      "mimetype": "image/png",
+      "kib": 343,
+      "item_class_is_ticket_class": true,
+      "item_id_is_ticket": true,
+      "item_org_id_is_ticket_org": true,
+      "secret_matches_data_img_secret": true,
+      "secret_matches_src_s": true,
+      "secret_shape": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "temp_id_empty": true,
+      "expire_set": true
+    },
+    {
+      "code": 0,
+      "returned": true,
+      "fields": [
+        "contents",
+        "expire",
+        "friendlyname",
+        "item_class",
+        "item_id",
+        "item_org_id",
+        "secret",
+        "temp_id"
+      ],
+      "contents_keys": [
+        "data",
+        "downloads_count",
+        "filename",
+        "mimetype"
+      ],
+      "mimetype": "image/png",
+      "kib": 200,
+      "item_class_is_ticket_class": true,
+      "item_id_is_ticket": true,
+      "item_org_id_is_ticket_org": true,
+      "secret_matches_data_img_secret": true,
+      "secret_matches_src_s": true,
+      "secret_shape": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+      "temp_id_empty": true,
+      "expire_set": true
+    }
+  ],
+  "attachments": {
+    "code": 0,
+    "message": "Found: N",
+    "returned": 3,
+    "fields": [
+      "contact_id",
+      "creation_date",
+      "expire",
+      "item_class",
+      "item_id",
+      "item_org_id",
+      "temp_id",
+      "user_id"
+    ],
+    "temp_id_empty": [
+      true,
+      true,
+      true
+    ],
+    "expire_set": [
+      true,
+      true,
+      true
+    ]
+  },
+  "profiles": [
+    "Administrator",
+    "Audit Manager",
+    "Change Approver",
+    "Change Implementor",
+    "Change Supervisor",
+    "Portal power user",
+    "Problem Manager",
+    "REST Services User",
+    "Service Desk Agent",
+    "Service Manager",
+    "Support Agent",
+    "Time Tracker",
+    "Time Tracking Manager"
+  ]
+}

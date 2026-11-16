@@ -1,0 +1,436 @@
+//! Port of `SessionModel.selection` + `ShellView`: the sidebar, the account menu and the routing
+//! between sections (SHELL-*, AUTH-27…29).
+
+use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+use super::new_ticket::{NewTicketInstance, NewTicketStart};
+use super::records::{ConfirmText, LinkedCI, ListScope, SidebarItem, TicketLink};
+use super::workspace::{State, Workspace};
+use crate::error::AppError;
+use itop_kit::ConfigItem;
+
+#[derive(Clone, Debug)]
+pub struct ShellState {
+    pub selection: SidebarItem,
+    /// Whether the main window is on screen. Closing it while signed in only hides it
+    /// (SHELL-16); its views disappear like SwiftUI's do when the window closes.
+    pub window_shown: bool,
+    /// The sidebar column's width, 180…260 pt, remembered across launches (SHELL-2).
+    pub sidebar_width: i64,
+    /// View ▸ Hide Sidebar / Show Sidebar (NavigationSplitView's sidebar toggle, ⌃⌘S).
+    pub sidebar_visible: bool,
+}
+
+impl Default for ShellState {
+    /// My tickets at launch and after sign-in (SHELL-6).
+    fn default() -> Self {
+        ShellState {
+            selection: SidebarItem::MyTickets,
+            window_shown: true,
+            sidebar_width: SIDEBAR_DEFAULT,
+            sidebar_visible: true,
+        }
+    }
+}
+
+/// `navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)` (W/ShellView.swift:32).
+pub const SIDEBAR_MIN: i64 = 180;
+pub const SIDEBAR_DEFAULT: i64 = 200;
+pub const SIDEBAR_MAX: i64 = 260;
+/// Where the sidebar width is kept. SwiftUI kept it in its own split-view autosave, which this
+/// app can't read, so this is a new key in the session settings domain.
+pub const SIDEBAR_WIDTH_KEY: &str = "shell.sidebarWidth";
+
+impl ShellState {
+    /// The defaults with the remembered sidebar width.
+    pub fn load(prefs: &dyn super::prefs::Prefs) -> Self {
+        ShellState {
+            sidebar_width: prefs
+                .int(SIDEBAR_WIDTH_KEY)
+                .map_or(SIDEBAR_DEFAULT, |w| w.clamp(SIDEBAR_MIN, SIDEBAR_MAX)),
+            ..ShellState::default()
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../ui/src/bindings/app/")]
+pub struct SidebarRow {
+    pub item: SidebarItem,
+    pub title: String,
+    pub count: Option<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../ui/src/bindings/app/")]
+pub struct ShellAccount {
+    pub initials: String,
+    pub display_name: String,
+    pub host: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../ui/src/bindings/app/")]
+pub struct ShellSnapshot {
+    pub selection: SidebarItem,
+    pub sidebar: Vec<SidebarRow>,
+    pub content_title: String,
+    pub need_count: i64,
+    pub account: ShellAccount,
+    pub sign_out_confirm: ConfirmText,
+    /// The sidebar column's width in pt (180…260, SHELL-2).
+    pub sidebar_width: i64,
+    /// Whether the sidebar shows (View ▸ Hide Sidebar / Show Sidebar).
+    pub sidebar_visible: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "camelCase")]
+#[ts(export, export_to = "../../ui/src/bindings/app/")]
+pub enum ShellIntent {
+    Select {
+        item: SidebarItem,
+    },
+    OpenTicket {
+        ticket: TicketLink,
+    },
+    OpenOrg {
+        #[serde(rename = "orgId")]
+        #[ts(rename = "orgId")]
+        org_id: String,
+        #[serde(rename = "orgName")]
+        #[ts(rename = "orgName")]
+        org_name: String,
+    },
+    #[serde(rename = "openCI")]
+    #[ts(rename = "openCI")]
+    OpenCi {
+        ci: LinkedCI,
+    },
+    OpenOrgPeople {
+        #[serde(rename = "orgId")]
+        #[ts(rename = "orgId")]
+        org_id: String,
+        #[serde(rename = "orgName")]
+        #[ts(rename = "orgName")]
+        org_name: String,
+    },
+    OpenOrgConfigItems {
+        #[serde(rename = "orgId")]
+        #[ts(rename = "orgId")]
+        org_id: String,
+        #[serde(rename = "orgName")]
+        #[ts(rename = "orgName")]
+        org_name: String,
+    },
+    NewTicket,
+    NewTicketForOrg {
+        #[serde(rename = "orgId")]
+        #[ts(rename = "orgId")]
+        org_id: String,
+        #[serde(rename = "orgName")]
+        #[ts(rename = "orgName")]
+        org_name: String,
+    },
+    #[serde(rename = "newTicketForCI")]
+    #[ts(rename = "newTicketForCI")]
+    NewTicketForCi {
+        key: String,
+        name: String,
+        #[serde(rename = "orgName")]
+        #[ts(rename = "orgName")]
+        org_name: String,
+    },
+    /// The sidebar divider was dragged to this width (pt).
+    SetSidebarWidth {
+        width: i64,
+    },
+    /// The sidebar toggle button (or ⌃⌘S in the browser mock).
+    SetSidebarVisible {
+        visible: bool,
+    },
+}
+
+/// The server's host, or "iTop" (W/ShellView.swift:143).
+pub fn account_host(base_host: &str) -> String {
+    if base_host.is_empty() {
+        "iTop".to_owned()
+    } else {
+        base_host.to_owned()
+    }
+}
+
+impl Workspace {
+    pub(crate) fn shell_snapshot(&self, st: &State) -> ShellSnapshot {
+        let me = self.me();
+        let need = st.lists[0].need_count(me);
+        let host = account_host(self.session().client.server.host());
+        ShellSnapshot {
+            selection: st.shell.selection,
+            sidebar: SidebarItem::ALL
+                .iter()
+                .map(|&item| SidebarRow {
+                    item,
+                    title: item.title().to_owned(),
+                    count: (item == SidebarItem::MyTickets && need > 0).then_some(need),
+                })
+                .collect(),
+            content_title: st.shell.selection.title().to_owned(),
+            need_count: need,
+            account: ShellAccount {
+                initials: me.initials(),
+                display_name: me.display_name.clone(),
+                host: host.clone(),
+            },
+            sign_out_confirm: ConfirmText {
+                title: format!("Sign out of {host}?"),
+                message:
+                    "Your password is removed from the Keychain. Your username stays filled in."
+                        .to_owned(),
+            },
+            sidebar_width: st.shell.sidebar_width,
+            sidebar_visible: st.shell.sidebar_visible,
+        }
+    }
+
+    /// The sidebar divider was dragged (the UI clamps while dragging; Rust keeps 180…260).
+    pub(crate) fn shell_set_sidebar_width(&self, width: i64) {
+        let width = width.clamp(SIDEBAR_MIN, SIDEBAR_MAX);
+        self.lock().shell.sidebar_width = width;
+        self.0.prefs.set_int(SIDEBAR_WIDTH_KEY, width);
+        self.publish();
+    }
+
+    /// Hide Sidebar / Show Sidebar: the sidebar column collapses or comes back; the View menu
+    /// item's title follows.
+    pub(crate) fn shell_set_sidebar_visible(&self, visible: bool) {
+        let changed = {
+            let mut st = self.lock();
+            std::mem::replace(&mut st.shell.sidebar_visible, visible) != visible
+        };
+        if changed {
+            self.0.ctx.native.sidebar_changed(visible);
+        }
+        self.publish();
+    }
+
+    /// View ▸ Hide Sidebar / Show Sidebar (⌃⌘S).
+    pub(crate) fn shell_toggle_sidebar(&self) {
+        let visible = self.lock().shell.sidebar_visible;
+        self.shell_set_sidebar_visible(!visible);
+    }
+
+    pub(crate) async fn dispatch_shell(
+        &self,
+        intent: ShellIntent,
+    ) -> Result<serde_json::Value, AppError> {
+        let s = self.standalone().cloned();
+        match intent {
+            ShellIntent::Select { item } => self.shell_select(item).await,
+            ShellIntent::OpenTicket { ticket } => {
+                self.shell_open_ticket(&ticket.ticket_id, &ticket.r#ref)
+                    .await
+            }
+            // SHELL-10: the org first, then the section, so it loads once.
+            ShellIntent::OpenOrg { org_id, .. } => {
+                if let Some(s) = &s {
+                    s.orgs.show_org(&org_id);
+                }
+                self.shell_select(SidebarItem::Organizations).await;
+            }
+            // SHELL-11: the linked CI as the current CI, its org empty.
+            ShellIntent::OpenCi { ci } => {
+                if let Some(s) = &s {
+                    s.cmdb.open(ConfigItem {
+                        key: ci.key,
+                        class_name: ci.class_name,
+                        name: ci.name,
+                        org_name: String::new(),
+                    });
+                }
+                self.shell_select(SidebarItem::ConfigItems).await;
+            }
+            ShellIntent::OpenOrgPeople { org_id, org_name } => {
+                if let Some(s) = &s {
+                    s.people.show_org(&org_id, &org_name);
+                }
+                self.shell_select(SidebarItem::People).await;
+            }
+            ShellIntent::OpenOrgConfigItems { org_id, org_name } => {
+                if let Some(s) = &s {
+                    s.cmdb.show_org(&org_id, &org_name);
+                }
+                self.shell_select(SidebarItem::ConfigItems).await;
+            }
+            ShellIntent::NewTicket => self.request_new_ticket(NewTicketStart::default()).await,
+            ShellIntent::NewTicketForOrg { org_id, org_name } => {
+                self.request_new_ticket(NewTicketStart::for_org(&org_id, &org_name))
+                    .await
+            }
+            ShellIntent::NewTicketForCi {
+                key,
+                name,
+                org_name,
+            } => {
+                self.request_new_ticket(NewTicketStart::for_ci(&key, &name, &org_name))
+                    .await
+            }
+            ShellIntent::SetSidebarWidth { width } => self.shell_set_sidebar_width(width),
+            ShellIntent::SetSidebarVisible { visible } => self.shell_set_sidebar_visible(visible),
+        }
+        Ok(serde_json::Value::Null)
+    }
+
+    /// Swift `Workspace.requestNewTicket(_:)`: New ticket as a sheet in the main window.
+    pub(crate) async fn request_new_ticket(&self, start: NewTicketStart) {
+        if let Some(s) = self.standalone().cloned() {
+            s.new_tickets.request(NewTicketInstance::Sheet, start).await;
+        }
+    }
+
+    /// Sidebar selection (and View ▸ ⌘1…5). The section that leaves disappears and the one that
+    /// comes runs its views' on-appear work; Team tickets stops polling when it leaves.
+    pub(crate) async fn shell_select(&self, item: SidebarItem) {
+        let (old, shown) = {
+            let mut st = self.lock();
+            let old = st.shell.selection;
+            st.shell.selection = item;
+            (old, st.shell.window_shown)
+        };
+        if old == item {
+            self.publish();
+            return;
+        }
+        self.trace(|| format!("sidebar selection applied: {}", item.raw()));
+        // With the window closed no section's views are on screen: the new one appears when the
+        // window comes back (`main_window_shown`).
+        if shown {
+            self.section_disappeared(old);
+            self.section_shown(item);
+        }
+        self.publish();
+    }
+
+    /// The section's views went away: Team tickets stops polling, the list's search task is
+    /// cancelled, and CMDB/Organizations/People cancel theirs.
+    fn section_disappeared(&self, item: SidebarItem) {
+        if let Some(scope) = item.list() {
+            let mut tasks = self.tasks();
+            if scope == ListScope::Team
+                && let Some(h) = tasks.team_poll.take()
+            {
+                h.abort();
+            }
+            if let Some(h) = tasks.lookup[scope.index()].take() {
+                h.abort();
+            }
+        }
+        if let Some(s) = self.standalone() {
+            s.section(item, false);
+        }
+    }
+
+    /// The section's views appeared: their `.task` modifiers run.
+    fn section_shown(&self, item: SidebarItem) {
+        if let Some(s) = self.standalone() {
+            s.section(item, true);
+        }
+        self.section_appeared(item);
+    }
+
+    /// The main window was closed while signed in (it only hides, SHELL-16). Its views disappear
+    /// as SwiftUI's do: Team polling, searches and detail loads stop, the detail and its sheets
+    /// go away. My tickets' 120 s refresh, the timer and the menu bar keep running.
+    pub(crate) fn main_window_hidden(&self) {
+        let selection = {
+            let mut st = self.lock();
+            if !st.shell.window_shown {
+                return;
+            }
+            st.shell.window_shown = false;
+            st.shell.selection
+        };
+        self.trace(|| "main window hidden".to_owned());
+        self.section_disappeared(selection);
+        self.publish();
+    }
+
+    /// The main window is back: the shown section appears again (its list loads if needed, its
+    /// search re-runs, Team tickets polls again), and the selected ticket's detail is made anew,
+    /// loads and re-checks the web stopwatch (POLL-2/3/5, LIST-22, TMR-15).
+    pub(crate) fn main_window_shown(&self) {
+        let selection = {
+            let mut st = self.lock();
+            if st.shell.window_shown {
+                return;
+            }
+            st.shell.window_shown = true;
+            st.shell.selection
+        };
+        self.trace(|| "main window shown".to_owned());
+        self.section_shown(selection);
+        self.publish();
+    }
+
+    /// What a list view does when it appears (`.task` and `.task(id: query)` in TicketListView):
+    /// load if not loaded, Team tickets polls every 120 s, and the search re-runs.
+    pub(crate) fn section_appeared(&self, item: SidebarItem) {
+        let Some(scope) = item.list() else { return };
+        self.restart_search(scope);
+        let ws = self.clone();
+        // Each reload runs as its own task: leaving the section stops the polling, never a reload
+        // half-way (which would leave the list `refreshing` for good).
+        let handle = self.spawn(async move {
+            let loaded = matches!(
+                ws.lock().lists[scope.index()].phase,
+                super::list::Phase::Loaded
+            );
+            if !loaded {
+                let _ = tokio::spawn(ws.list_refresh(scope)).await;
+            }
+            if scope != ListScope::Team {
+                return;
+            }
+            loop {
+                tokio::time::sleep(Duration::from_secs(120)).await;
+                let _ = tokio::spawn(ws.list_refresh(scope)).await;
+            }
+        });
+        if scope == ListScope::Team
+            && let Some(old) = self.tasks().team_poll.replace(handle)
+        {
+            old.abort();
+        }
+    }
+
+    /// `ShellView.openTicket` (SHELL-9): in the list that has it, else as a search in My tickets.
+    pub(crate) async fn shell_open_ticket(&self, ticket_id: &str, r#ref: &str) {
+        let target = {
+            let st = self.lock();
+            if st.lists[0].tickets.iter().any(|t| t.id() == ticket_id) {
+                Some(ListScope::Mine)
+            } else if st.lists[1].tickets.iter().any(|t| t.id() == ticket_id) {
+                Some(ListScope::Team)
+            } else {
+                None
+            }
+        };
+        match target {
+            Some(scope) => {
+                self.set_query(scope, "");
+                self.lock().lists[scope.index()].selection = Some(ticket_id.to_owned());
+                self.shell_select(scope.section()).await;
+            }
+            None => {
+                self.set_query(ListScope::Mine, r#ref);
+                self.shell_select(SidebarItem::MyTickets).await;
+            }
+        }
+    }
+}

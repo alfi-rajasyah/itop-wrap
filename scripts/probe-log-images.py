@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 
 READ_ONLY_OPS = {"core/get"}
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Tests", "ITopKitTests", "Fixtures", "log-images-probe.json")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "crates", "itop-kit", "tests", "fixtures", "log-images-probe.json")
 ATTACHMENT_FIELDS = "item_class,item_id,item_org_id,temp_id,expire,creation_date,user_id,contact_id"
 IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
 ATTR = re.compile(r'\b([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*"([^"]*)"')

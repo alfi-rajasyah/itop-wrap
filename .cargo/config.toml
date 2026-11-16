@@ -1,0 +1,3 @@
+[env]
+# ts-rs: Rust i64 fields are plain numbers in the generated TypeScript (contract.ts uses number).
+TS_RS_LARGE_INT = "number"
