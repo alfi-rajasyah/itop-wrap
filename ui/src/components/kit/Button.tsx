@@ -6,7 +6,7 @@ import { Tooltip } from "./Tooltip";
 
 /* ─────────────────────────────────────────────────────────
  * BUTTON — Beautiful UI's pill Button atom (atoms/Button), plus:
- *  - variant "need": the ONE teal filled action, only for the
+ *  - variant "need": the needs-you filled action (red now; not used by the app), for the
  *    primary action on a ticket that needs you (DESIGN.md).
  *  - size "block": the full-width 36px filled button (sign in,
  *    sheet "Assign to me").

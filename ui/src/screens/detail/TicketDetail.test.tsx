@@ -125,13 +125,13 @@ describe('TicketDetail: header', () => {
     expect(await screen.findByRole('dialog', { name: 'Resolve R-000412' })).toBeInTheDocument()
   })
 
-  it('Assign to me (teal: it needs you) assigns an unassigned ticket directly (DET-14, DET-17)', async () => {
+  it('Assign to me (plain primary; needs-you is the red pill) assigns an unassigned ticket directly (DET-14, DET-17)', async () => {
     const mock = startMock()
     renderDetail()
     await selectTicket(mock, 'mine', 'I-000088')
     const spy = vi.spyOn(mock, 'dispatch')
     const button = await screen.findByRole('button', { name: 'Assign to me' })
-    expect(button.className).toMatch(/bg-need/)
+    expect(button.className).not.toMatch(/bg-need/)
     expect(screen.getByText('Needs you')).toBeInTheDocument()
     const unassigned = screen.getByRole('img', { name: 'Agent: unassigned' })
     // DET-26: no "Agent" tooltip on an unassigned agent.

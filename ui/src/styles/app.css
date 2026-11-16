@@ -13,15 +13,15 @@
 }
 
 /* ── iTop Wrap meaning tokens (DESIGN.md) ───────────────────
- * need-*   teal: ONLY "this ticket needs you" (row dot, Needs-you pill, sidebar
- *          count, the one filled primary action on a needs-you ticket).
+ * need-*   red: ONLY "this ticket needs you", i.e. Escalated TTR / TTO (row dot,
+ *          Needs-you pill, sidebar count). Red at the owner's request (was teal).
  * danger-* red: ONLY priority 1, errors, and the one action that closes a ticket for good
  *          (Resolve and Close). Darker than Beautiful UI's --red so
  *          small text passes WCAG AA (light 5.7:1 on white, dark 5.0:1 on surface). */
 :root {
-  --need: #0f6e56;
-  --need-tint: #e1f5ee;
-  --need-ink: #0f6e56;
+  --need: #c4291c;
+  --need-tint: #fde8e6;
+  --need-ink: #b42318;
   --on-need: #ffffff;
   --on-danger: #ffffff;
   --danger: #c4291c;
@@ -34,9 +34,9 @@
 }
 
 .dark {
-  --need: #5dcaa5;
-  --need-tint: #085041;
-  --need-ink: #9fe1cb;
+  --need: #ff6b5e;
+  --need-tint: #5c1a14;
+  --need-ink: #ffb4ab;
   --on-need: #1d1d1f;
   --on-danger: #1d1d1f;
   --danger: #ff6b5e;

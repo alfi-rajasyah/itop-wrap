@@ -16,7 +16,7 @@ import { Tooltip } from "./Tooltip";
  * animation (not in the app); the paid Central Icons (callers pass
  * iconoir icons).
  * Added: a 52px drag region for the macOS overlay title bar, with
- * 78px kept clear for the traffic lights; count badges (teal only
+ * 78px kept clear for the traffic lights; count badges (red only
  * when it counts "needs you"); keyboard hints (⌘1…); ↑/↓ between
  * items; the signed-in user's initials and menu in the footer.
  * ───────────────────────────────────────────────────────── */
@@ -26,7 +26,7 @@ export type SidebarItem = {
   label: string;
   icon: ReactNode;
   count?: number;
-  /** "need" = the teal Needs-you capsule (My tickets). */
+  /** "need" = the red Needs-you capsule (My tickets). */
   countTone?: "neutral" | "need";
   /** Accessible/tooltip text for the count ("3 need you"). */
   countLabel?: string;

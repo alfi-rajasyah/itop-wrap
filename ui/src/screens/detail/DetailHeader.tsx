@@ -17,7 +17,7 @@ import { useCloseConfirm } from '../sheets/closeConfirmStore'
 /* ─────────────────────────────────────────────────────────
  * DETAIL HEADER (DET-7…24, TMR-19). First line: the ref (a quiet
  * mono button that copies it), the class icon, the status as text
- * and the teal "Needs you" pill. Then the title and the 2-second
+ * and the red "Needs you" pill. Then the title and the 2-second
  * "Copied" chip. Actions: timer, the one primary action, "…".
  * The actions sit right of the title, or on their own row under
  * it when the header is narrower than actions + 12 + 260 (DET-11).
@@ -122,7 +122,9 @@ export function DetailHeader({ scope, view }: { scope: ListScope; view: TicketDe
         ) : null}
         {primary.type === 'action' ? (
           <Button
-            variant={primary.teal ? 'need' : 'primary'}
+            // Plain primary even on a needs-you ticket: needs-you is red now, and a red filled
+            // button reads as Resolve and Close.
+            variant="primary"
             size="sm"
             busy={primary.busy}
             disabled={!primary.enabled}

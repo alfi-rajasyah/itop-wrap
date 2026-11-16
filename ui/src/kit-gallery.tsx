@@ -520,7 +520,7 @@ function Gallery() {
               <StatusPill key={s}>{s}</StatusPill>
             ))}
           </Demo>
-          <Demo label="Needs you (the only teal)">
+          <Demo label="Needs you (red)">
             <NeedsYouPill />
             <NeedsYouDot />
             <NeedsYouDot size={7} />

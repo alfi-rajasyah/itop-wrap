@@ -11,9 +11,9 @@ variants removed. "Hand-built" means no source fits, so it was made in the same 
 
 ## Meaning rules (DESIGN.md) the kit enforces
 
-- **Teal means "this ticket needs you", and nothing else.** Tokens `need`, `need-tint`, `need-ink` and
+- **Red `need-*` means "this ticket needs you" (Escalated TTR / TTO), and nothing else.** (Was teal.) Tokens `need`, `need-tint`, `need-ink` and
   `on-need` are used only by `NeedsYouPill`, `NeedsYouDot`, `CountBadge tone="need"` and
-  `Button variant="need"`, which is for the primary action on a needs-you ticket. Filters, timers,
+  `Button variant="need"` (no longer used by the app). `danger` red is for priority 1, errors and Resolve and Close. Filters, timers,
   checkboxes and selection are neutral. Beautiful UI's blue `accent` is used only for the focus ring.
 - **Status is always text** (`StatusPill`), on a neutral tint.
 - **Red (`danger`) is used only for priority 1 (`PriorityMark`) and for errors** (field errors,
@@ -63,7 +63,7 @@ variants removed. "Hand-built" means no source fits, so it was made in the same 
 | `InfoHint` | Form.tsx | `text` (ⓘ button; tooltip and accessible name) | Hand-built |
 | `Tabs`, `TabPanel` | Tabs.tsx | `id`, `items: {value,label,count?}[]`, `value`, `onChange`, `label` / `tabsId`, `value` | Adapted: Chat header tabs |
 | `StatusPill` | Badges.tsx | `children` | Adapted: Filter Table pill / ValuePill (neutral) |
-| `NeedsYouPill`, `NeedsYouDot` | Badges.tsx | `label?` / `size=8` | Hand-built (teal) |
+| `NeedsYouPill`, `NeedsYouDot` | Badges.tsx | `label?` / `size=8` | Hand-built (red) |
 | `PriorityMark` | Badges.tsx | `priority` (P1 red "!", P2 grey dot, P3/4 nothing) | Hand-built |
 | `CountBadge` | Badges.tsx | `count`, `tone?`, `label?` | Adapted: Sidebar Nav count |
 | `Ref`, `Duration` | Ref.tsx | `children`; Duration `running?` (bold) | Hand-built (the mono motif) |

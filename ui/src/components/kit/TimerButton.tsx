@@ -6,7 +6,7 @@ import { formatCounter, useElapsedSeconds } from "./time";
 import { Tooltip } from "./Tooltip";
 
 /* ─────────────────────────────────────────────────────────
- * TIMER BUTTON (TMR-19). Neutral, never teal: the running state is
+ * TIMER BUTTON (TMR-19). Neutral, never red: the running state is
  * the icon change (stopwatch → stop) plus a live bold HH:MM:SS.
  * Digits change in place with no animation. Same 26px header-control
  * chip as the More button.

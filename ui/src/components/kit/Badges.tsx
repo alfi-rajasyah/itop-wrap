@@ -7,7 +7,7 @@ import { Tooltip } from "./Tooltip";
  * Shape from Filter Table's status pill and the ValuePill atom; the
  * colour rules are iTop Wrap's (DESIGN.md):
  *  - status is always written, on a neutral tint, never colour alone;
- *  - teal only for "needs you";
+ *  - red only for "needs you" (Escalated TTR / TTO);
  *  - red only for priority 1.
  * ───────────────────────────────────────────────────────── */
 
@@ -41,7 +41,7 @@ export function NeedsYouPill({ className, label = "Needs you" }: { className?: s
   );
 }
 
-/** The 8px teal dot on list rows (7px in the menu bar). Named "Needs you" for AT. */
+/** The 8px red dot on list rows (7px in the menu bar). Named "Needs you" for AT. */
 export function NeedsYouDot({ size = 8, className }: { size?: number; className?: string }) {
   return (
     <Tooltip content="Needs you" describe={false}>
@@ -76,7 +76,7 @@ export function PriorityMark({ priority, className }: { priority: number; classN
   return null;
 }
 
-/** Small count, e.g. a sidebar or tab count. `tone="need"` is the teal Needs-you capsule. */
+/** Small count, e.g. a sidebar or tab count. `tone="need"` is the red Needs-you capsule. */
 export function CountBadge({
   count,
   tone = "neutral",

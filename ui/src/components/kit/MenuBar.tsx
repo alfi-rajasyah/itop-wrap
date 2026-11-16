@@ -14,7 +14,7 @@ import { Tooltip } from "./Tooltip";
  * MENU BAR PANEL pieces (MB-7…16), 360px wide. Rows are Task Rows'
  * List rows compressed to one line (ref, title, time, a 26px timer
  * slot) on a GlideMenu hover layer. The running ticket's row is
- * tinted and its time is a bold live HH:MM:SS: no colour, so teal
+ * tinted and its time is a bold live HH:MM:SS: no colour, so red
  * keeps its single meaning (only the Needs-you dots).
  * ───────────────────────────────────────────────────────── */
 
