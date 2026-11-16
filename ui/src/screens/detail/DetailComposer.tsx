@@ -61,8 +61,7 @@ export function DetailComposer({ scope, ticketId, composer }: { scope: ListScope
 
   return (
     <div className="shrink-0 border-t border-line bg-[color-mix(in_srgb,var(--app-bg)_70%,var(--surface))] px-6 pb-4 pt-3">
-      {/* 860 minus the article's px-6 on both sides, so the composer lines up with the content. */}
-      <div className="max-w-[812px]">
+      <div>
         <Composer
           value={draft}
           onChange={setDraft}

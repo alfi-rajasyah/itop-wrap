@@ -56,7 +56,7 @@ function TicketView({ scope, view }: { scope: ListScope; view: TicketDetailView 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="kit-scroll min-h-0 flex-1 overflow-y-auto">
-        <article aria-label={`${view.ticket.ref} ${view.ticket.title}`} className="flex max-w-[860px] flex-col gap-4 px-6 pb-8 pt-5">
+        <article aria-label={`${view.ticket.ref} ${view.ticket.title}`} className="flex flex-col gap-4 px-6 pb-8 pt-5">
           <DetailHeader scope={scope} view={view} />
           <Strip view={view} />
           <Body scope={scope} view={view} body={view.body} />
