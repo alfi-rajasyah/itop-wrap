@@ -2,6 +2,11 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "new-ticket",
   "description": "The New Ticket window sizes its height to the form",
-  "windows": ["new-ticket"],
-  "permissions": ["core:window:allow-set-size"]
+  "windows": [
+    "new-ticket",
+    "resolve"
+  ],
+  "permissions": [
+    "core:window:allow-set-size"
+  ]
 }

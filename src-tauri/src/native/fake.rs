@@ -16,6 +16,8 @@ pub enum Call {
     ShowMainWindow,
     ShowNewTicketWindow,
     CloseNewTicketWindow,
+    ShowResolveWindow,
+    CloseResolveWindow,
     HideMenubarPanel,
     SessionChanged(bool),
     SetTray(String, String),
@@ -99,6 +101,12 @@ impl Native for FakeNative {
     }
     fn close_new_ticket_window(&self) {
         self.record(Call::CloseNewTicketWindow);
+    }
+    fn show_resolve_window(&self) {
+        self.record(Call::ShowResolveWindow);
+    }
+    fn close_resolve_window(&self) {
+        self.record(Call::CloseResolveWindow);
     }
     fn hide_menubar_panel(&self) {
         self.record(Call::HideMenubarPanel);

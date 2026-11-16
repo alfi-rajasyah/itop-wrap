@@ -211,6 +211,47 @@ pub enum ResolveSheetIntent {
     ConfirmAndClose,
 }
 
+/// Which Resolve form: the sheet over a list's detail, or the separate Resolve window the menu
+/// bar opens (iTop Wrap addition). The window works on My tickets but has its own state, so the
+/// main window's selection and detail don't open or close it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResolveAt {
+    Sheet(ListScope),
+    Window,
+}
+
+impl ResolveAt {
+    pub const ALL: [ResolveAt; 3] = [
+        ResolveAt::Sheet(ListScope::Mine),
+        ResolveAt::Sheet(ListScope::Team),
+        ResolveAt::Window,
+    ];
+
+    /// Index into `State::resolve`.
+    pub fn slot(self) -> usize {
+        match self {
+            ResolveAt::Sheet(scope) => scope.index(),
+            ResolveAt::Window => 2,
+        }
+    }
+
+    /// The list whose tickets and changes it uses.
+    pub fn scope(self) -> ListScope {
+        match self {
+            ResolveAt::Sheet(scope) => scope,
+            ResolveAt::Window => ListScope::Mine,
+        }
+    }
+
+    pub fn model_id(self) -> &'static str {
+        match self {
+            ResolveAt::Sheet(ListScope::Mine) => "resolve:mine",
+            ResolveAt::Sheet(ListScope::Team) => "resolve:team",
+            ResolveAt::Window => "resolve:window",
+        }
+    }
+}
+
 fn dropdown(
     items: Vec<PickItem>,
     selected: Option<String>,
@@ -663,10 +704,11 @@ impl Workspace {
     pub(crate) fn resolve_snapshot(
         &self,
         st: &State,
-        scope: ListScope,
+        at: ResolveAt,
         now: DateTime<Utc>,
     ) -> ResolveSheetSnapshot {
-        let r = &st.resolve[scope.index()];
+        let scope = at.scope();
+        let r = &st.resolve[at.slot()];
         let Some(t) = Self::sheet_ticket(st, scope, r.ticket.as_ref()).filter(|_| r.open) else {
             return ResolveSheetSnapshot::Closed;
         };
@@ -735,12 +777,33 @@ impl Workspace {
         }))
     }
 
+    /// The Resolve window follows its form: shown when it opens, closed once it closes
+    /// (Cancel, a done resolve, or its own close button).
     pub(crate) async fn dispatch_resolve(
         &self,
-        scope: ListScope,
+        at: ResolveAt,
         intent: ResolveSheetIntent,
     ) -> Result<serde_json::Value, AppError> {
-        let i = scope.index();
+        let opening = matches!(intent, ResolveSheetIntent::Open { .. });
+        let result = self.dispatch_resolve_form(at, intent).await;
+        if at == ResolveAt::Window {
+            let open = self.lock().resolve[at.slot()].open;
+            if open && opening {
+                self.0.ctx.native.show_resolve_window();
+            } else if !open {
+                self.0.ctx.native.close_resolve_window();
+            }
+        }
+        result
+    }
+
+    async fn dispatch_resolve_form(
+        &self,
+        at: ResolveAt,
+        intent: ResolveSheetIntent,
+    ) -> Result<serde_json::Value, AppError> {
+        let scope = at.scope();
+        let i = at.slot();
         let null = serde_json::Value::Null;
         if let ResolveSheetIntent::Open { ticket_id } = &intent {
             let (t, instance) = self.open_ticket_for_sheet(scope, ticket_id)?;
@@ -756,7 +819,7 @@ impl Workspace {
             };
             self.publish();
             let ws = self.clone();
-            self.spawn(async move { ws.resolve_load_services(scope, instance, t).await });
+            self.spawn(async move { ws.resolve_load_services(at, instance, t).await });
             return Ok(null);
         }
         let (t, instance) = {
@@ -789,7 +852,7 @@ impl Workspace {
                             })?)
                         }
                     };
-                self.resolve_set_service(scope, instance, new);
+                self.resolve_set_service(at, instance, new);
                 Ok(null)
             }
             ResolveSheetIntent::SetSubcategory { subcategory_id } => {
@@ -888,8 +951,8 @@ impl Workspace {
 
     /// `loadServices()`: the org's services, the ticket's own service and subcategory prefilled
     /// even when not offered (LC-14, LC-15).
-    async fn resolve_load_services(&self, scope: ListScope, instance: u64, t: KitTicket) {
-        let i = scope.index();
+    async fn resolve_load_services(&self, at: ResolveAt, instance: u64, t: KitTicket) {
+        let i = at.slot();
         let result = self.0.catalog.services(&t).await;
         let mut all = match result {
             Ok(all) => all,
@@ -906,7 +969,7 @@ impl Workspace {
         };
         let loaded = {
             let st = self.lock();
-            let d = &st.details[i];
+            let d = &st.details[at.scope().index()];
             d.loaded()
                 .filter(|_| d.ticket.as_ref().map(KitTicket::id) == Some(t.id()))
                 .cloned()
@@ -953,16 +1016,16 @@ impl Workspace {
         };
         self.publish();
         if select.is_some() {
-            self.resolve_set_service(scope, instance, select);
+            self.resolve_set_service(at, instance, select);
         }
     }
 
     /// The `service` binding and its `onChange`: after the prefill, a new service clears the
     /// subcategory; its subcategories load (LC-16).
-    fn resolve_set_service(&self, scope: ListScope, instance: u64, service: Option<ServiceRef>) {
+    fn resolve_set_service(&self, at: ResolveAt, instance: u64, service: Option<ServiceRef>) {
         let load = {
             let mut st = self.lock();
-            let r = &mut st.resolve[scope.index()];
+            let r = &mut st.resolve[at.slot()];
             if r.service == service {
                 return;
             }
@@ -978,17 +1041,12 @@ impl Workspace {
         self.publish();
         if let Some(chosen) = load {
             let ws = self.clone();
-            self.spawn(async move { ws.resolve_load_subcategories(scope, instance, chosen).await });
+            self.spawn(async move { ws.resolve_load_subcategories(at, instance, chosen).await });
         }
     }
 
-    async fn resolve_load_subcategories(
-        &self,
-        scope: ListScope,
-        instance: u64,
-        chosen: ServiceRef,
-    ) {
-        let i = scope.index();
+    async fn resolve_load_subcategories(&self, at: ResolveAt, instance: u64, chosen: ServiceRef) {
+        let i = at.slot();
         {
             let mut st = self.lock();
             if st.resolve[i].instance != instance {

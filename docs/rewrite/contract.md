@@ -349,7 +349,13 @@ Intents: `open {ticketId}`, `close`, `setReason {reason}` (null), `confirm` → 
 `list.apply(.pending(reason:), to:)` (W/LifecycleSheets.swift:32-36; W/TicketListModel.swift:267). Rust
 stops and saves the timer first (LC-4).
 
-### 5.8 `resolve:<scope>`
+### 5.8 `resolve:<scope>` and `resolve:window`
+
+`resolve:window` (iTop Wrap addition) has the same snapshot and intents. It is the menu bar's
+Resolve window (`index.html?window=resolve`): it works on My tickets but keeps its own state, so
+the main window's selection and detail never open or close it. Rust shows the window when it
+opens and closes the window when the form closes; the window's close button is Cancel. Intents
+also include `confirmAndClose` (Resolve, then Close; a refused Close goes to the list notice).
 
 | Field | Type | Mirrors | Source |
 |---|---|---|---|

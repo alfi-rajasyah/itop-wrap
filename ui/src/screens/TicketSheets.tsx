@@ -1,10 +1,11 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, type KeyboardEvent } from 'react'
 import { Button, Dialog, Field, StopwatchIcon, TextArea } from '@/components/kit'
 import {
   useModel,
   type AssignSheetOpen,
   type ListScope,
   type PendingSheetOpen,
+  type ResolveSheetIntent,
   type ResolveSheetOpen,
 } from '@/backend'
 import { SnapshotDropdown } from '@/lib/SnapshotDropdown'
@@ -127,10 +128,11 @@ function PendingSheet({ scope, sheet }: { scope: ListScope; sheet: PendingSheetO
 
 // ── Resolve (LC-13…21) ─────────────────────────────────────────────────────────────────────
 
+/** What the Resolve form sends: the same intents for `resolve:<scope>` and `resolve:window`. */
+type ResolveSend = (intent: ResolveSheetIntent) => Promise<unknown>
+
 function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetOpen }) {
   const [, send] = useModel(`resolve:${scope}`)
-  const commit = useCallback((solution: string) => send({ type: 'setSolution', solution }), [send])
-  const [solution, setSolution] = useModelText(sheet.solution, commit, sheet.ticketId)
   return (
     <Dialog
       open
@@ -143,39 +145,90 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
       confirmBusy={sheet.busy}
       error={sheet.error}
       width={500}
-      footer={
-        // Three equal buttons, centred (owner's call): Cancel, Resolve and Close, Resolve ticket.
-        // auto-cols-fr: every button as wide as the widest label, on one line.
-        <div className="flex w-full justify-center">
-          <div className="inline-grid grid-flow-col auto-cols-fr gap-3">
-            <Button variant="secondary" size="sm" className="h-8 w-full whitespace-nowrap px-4" onClick={() => void send({ type: 'close' }).catch(logFailure)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              className="h-8 w-full whitespace-nowrap px-4"
-              disabled={!sheet.confirmEnabled}
-              tooltip="Resolves the ticket, then closes it. A closed ticket can't be reopened from the app."
-              onClick={() => void send({ type: 'confirmAndClose' }).catch(logFailure)}
-            >
-              Resolve and Close
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              className="h-8 w-full whitespace-nowrap px-4"
-              disabled={!sheet.confirmEnabled}
-              busy={sheet.busy}
-              aria-keyshortcuts="Meta+Enter"
-              onClick={() => void send({ type: 'confirm' }).catch(logFailure)}
-            >
-              Resolve ticket
-            </Button>
-          </div>
-        </div>
-      }
+      footer={<ResolveButtons sheet={sheet} send={send} />}
     >
+      <ResolveFields sheet={sheet} send={send} />
+    </Dialog>
+  )
+}
+
+/**
+ * The menu bar's Resolve window (index.html?window=resolve): the same form as the sheet, filling
+ * its own titled window. Esc = Cancel, ⌘↩ = Resolve ticket. Rust closes the window when the
+ * form closes.
+ */
+export function ResolveWindowForm() {
+  const [sheet, send] = useModel('resolve:window')
+  if (sheet?.type !== 'open') return null
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape' && !e.defaultPrevented) {
+      e.preventDefault()
+      void send({ type: 'close' }).catch(logFailure)
+    } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      if (sheet.confirmEnabled && !sheet.busy) void send({ type: 'confirm' }).catch(logFailure)
+    }
+  }
+  return (
+    <div onKeyDown={onKeyDown} className="flex flex-col bg-surface text-ink">
+      <header className="shrink-0 px-5 pb-1 pt-4">
+        <h1 className="text-[15px] font-semibold leading-snug">{sheet.title}</h1>
+        <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-ink-2">{sheet.subtitle}</p>
+      </header>
+      <div className="flex flex-col gap-1.5 px-5 pb-1 pt-3">
+        <ResolveFields sheet={sheet} send={send} />
+      </div>
+      <div className="min-h-[18px] px-5" aria-live="polite">
+        {sheet.error ? <p className="text-[12px] leading-snug text-danger">{sheet.error}</p> : null}
+      </div>
+      <div className="px-5 pb-4 pt-2">
+        <ResolveButtons sheet={sheet} send={send} />
+      </div>
+    </div>
+  )
+}
+
+/** Three equal buttons, centred (owner's call): Cancel, Resolve and Close, Resolve ticket. */
+function ResolveButtons({ sheet, send }: { sheet: ResolveSheetOpen; send: ResolveSend }) {
+  const button = 'h-8 w-full whitespace-nowrap px-4'
+  return (
+    // auto-cols-fr: every button as wide as the widest label, on one line.
+    <div className="flex w-full justify-center">
+      <div className="inline-grid grid-flow-col auto-cols-fr gap-3">
+        <Button variant="secondary" size="sm" className={button} onClick={() => void send({ type: 'close' }).catch(logFailure)}>
+          Cancel
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          className={button}
+          disabled={!sheet.confirmEnabled}
+          tooltip="Resolves the ticket, then closes it. A closed ticket can't be reopened from the app."
+          onClick={() => void send({ type: 'confirmAndClose' }).catch(logFailure)}
+        >
+          Resolve and Close
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          className={button}
+          disabled={!sheet.confirmEnabled}
+          busy={sheet.busy}
+          aria-keyshortcuts="Meta+Enter"
+          onClick={() => void send({ type: 'confirm' }).catch(logFailure)}
+        >
+          Resolve ticket
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ResolveFields({ sheet, send }: { sheet: ResolveSheetOpen; send: ResolveSend }) {
+  const commit = useCallback((solution: string) => send({ type: 'setSolution', solution }), [send])
+  const [solution, setSolution] = useModelText(sheet.solution, commit, sheet.ticketId)
+  return (
+    <>
       <Field label="Service" required requiredError={sheet.serviceRequired.missing} reserveErrorSpace={false}>
         {({ id }) => (
           <SnapshotDropdown
@@ -218,7 +271,7 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
         )}
       </Field>
       <TimerLine text={sheet.timerLine} />
-    </Dialog>
+    </>
   )
 }
 

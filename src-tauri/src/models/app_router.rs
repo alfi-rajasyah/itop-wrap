@@ -299,8 +299,16 @@ pub(crate) async fn route_workspace(
             m if m.starts_with("pending:") => {
                 ws.dispatch_pending(scope_of(m)?, decode(intent)?).await
             }
+            "resolve:window" => {
+                ws.dispatch_resolve(super::sheets::ResolveAt::Window, decode(intent)?)
+                    .await
+            }
             m if m.starts_with("resolve:") => {
-                ws.dispatch_resolve(scope_of(m)?, decode(intent)?).await
+                ws.dispatch_resolve(
+                    super::sheets::ResolveAt::Sheet(scope_of(m)?),
+                    decode(intent)?,
+                )
+                .await
             }
             "newTicket:sheet" | "newTicket:window" | "cmdb" | "orgs" | "people" => {
                 let Some(s) = ws.standalone().cloned() else {
@@ -434,6 +442,16 @@ impl Router for AppRouter {
                 }
             }
             // The New Ticket window's close button: no draft kept (NEW-21).
+            NativeEvent::ResolveWindowClosed => {
+                if let Some(ws) = ws {
+                    let _ = ws
+                        .dispatch_resolve(
+                            super::sheets::ResolveAt::Window,
+                            super::sheets::ResolveSheetIntent::Close,
+                        )
+                        .await;
+                }
+            }
             NativeEvent::NewTicketWindowClosed => {
                 if let Some(s) = ws.as_ref().and_then(|w| w.standalone()).cloned() {
                     let _ = s

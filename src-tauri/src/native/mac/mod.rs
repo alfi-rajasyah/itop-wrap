@@ -43,6 +43,7 @@ fn app_page(url: &tauri::Url) -> bool {
 pub const MAIN: &str = "main";
 pub const MENUBAR: &str = "menubar";
 pub const NEW_TICKET: &str = "new-ticket";
+pub const RESOLVE: &str = "resolve";
 const TRAY_ID: &str = "itop-wrap";
 
 /// The panel's width (MB-6) and its height until the UI sizes it to its content.
@@ -54,6 +55,8 @@ const SHELL_MIN: (f64, f64) = (860.0, 520.0);
 const SHELL_DEFAULT: (f64, f64) = (940.0, 520.0);
 /// New Ticket is 480 pt wide (W/NewTicketView.swift:141); the UI may fit the height to its content.
 const NEW_TICKET_SIZE: (f64, f64) = (480.0, 640.0);
+/// The Resolve window's first size; the page then fits the height to the form.
+const RESOLVE_SIZE: (f64, f64) = (500.0, 480.0);
 /// The sidebar items in order, for View ▸ ⌘1…⌘5 (W/SessionModel.swift:5-31).
 pub const SECTIONS: [&str; 5] = [
     "My tickets",
@@ -268,6 +271,12 @@ impl Shell {
         }
     }
 
+    fn resolve_window_event(&self, event: &WindowEvent) {
+        if let WindowEvent::CloseRequested { .. } = event {
+            self.send(NativeEvent::ResolveWindowClosed);
+        }
+    }
+
     /// The `session` snapshot changed: size the main window for it (call from any thread).
     pub fn session_snapshot(self: &Arc<Self>, snapshot: &Value) {
         let Some(layout) = Layout::for_session(snapshot) else {
@@ -364,6 +373,49 @@ impl Shell {
     fn close_new_ticket(&self) {
         // `destroy` skips CloseRequested, so this doesn't look like the close button.
         if let Some(w) = self.window(NEW_TICKET) {
+            let _ = w.destroy();
+        }
+    }
+
+    /// Like the New Ticket window: its own titled window, no main window (menu bar Resolve).
+    fn show_resolve(self: &Arc<Self>, mtm: MainThreadMarker) {
+        if let Some(w) = self.window(RESOLVE) {
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_focus();
+            appkit::activate(mtm);
+            return;
+        }
+        let built = WebviewWindowBuilder::new(
+            &self.app,
+            RESOLVE,
+            WebviewUrl::App("index.html?window=resolve".into()),
+        )
+        .on_navigation(app_page)
+        .on_new_window(|_, _| NewWindowResponse::Deny)
+        .title("Resolve Ticket")
+        .inner_size(RESOLVE_SIZE.0, RESOLVE_SIZE.1)
+        .resizable(false)
+        .maximizable(false)
+        .disable_drag_drop_handler()
+        .center()
+        .visible(true)
+        .build();
+        match built {
+            Ok(w) => {
+                appkit::exclude_from_windows_menu(mtm, &w);
+                let shell = self.clone();
+                w.on_window_event(move |event| shell.resolve_window_event(event));
+                let _ = w.set_focus();
+                appkit::activate(mtm);
+            }
+            Err(e) => eprintln!("Resolve window wasn't created: {e}"),
+        }
+    }
+
+    fn close_resolve(&self) {
+        // `destroy` skips CloseRequested, so this doesn't look like the close button.
+        if let Some(w) = self.window(RESOLVE) {
             let _ = w.destroy();
         }
     }
@@ -509,6 +561,7 @@ impl Shell {
             }
             self.hide_panel();
             self.close_new_ticket();
+            self.close_resolve();
         }
     }
 
@@ -815,6 +868,16 @@ impl Native for MacNative {
     fn close_new_ticket_window(&self) {
         let shell = self.shell.clone();
         on_main_async(self.app(), move |_| shell.close_new_ticket());
+    }
+
+    fn show_resolve_window(&self) {
+        let shell = self.shell.clone();
+        on_main_async(self.app(), move |mtm| shell.show_resolve(mtm));
+    }
+
+    fn close_resolve_window(&self) {
+        let shell = self.shell.clone();
+        on_main_async(self.app(), move |_| shell.close_resolve());
     }
 
     fn hide_menubar_panel(&self) {

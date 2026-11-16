@@ -250,6 +250,9 @@ interface TimerState {
   web: Record<string, Date>
 }
 
+/** `resolve:<scope>` sheets plus the menu bar's Resolve window. */
+type ResolveSlot = ListScope | 'window'
+
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 const isID = (s: string | null | undefined): s is string => !!s && /^\d+$/.test(s) && s !== '0'
@@ -360,7 +363,8 @@ export class MockBackend implements Backend {
   private readonly detail: Record<ListScope, DetailState | null> = { mine: null, team: null }
   private readonly assign: Record<ListScope, AssignState | null> = { mine: null, team: null }
   private readonly pending: Record<ListScope, PendingState | null> = { mine: null, team: null }
-  private readonly resolve: Record<ListScope, ResolveState | null> = { mine: null, team: null }
+  /** The two list sheets and the menu bar's Resolve window (which works on My tickets). */
+  private readonly resolve: Record<ResolveSlot, ResolveState | null> = { mine: null, team: null, window: null }
   private readonly newTicket: Record<'sheet' | 'window', NewTicketState | null> = { sheet: null, window: null }
   private newTicketDraft: NewTicketDraft | null = null
   private assignToMePref = true
@@ -502,6 +506,7 @@ export class MockBackend implements Backend {
       'pending:team': () => this.ws(() => this.pendingSnapshot('team')),
       'resolve:mine': () => this.ws(() => this.resolveSnapshot('mine')),
       'resolve:team': () => this.ws(() => this.resolveSnapshot('team')),
+      'resolve:window': () => this.ws(() => this.resolveSnapshot('window')),
       'newTicket:sheet': () => this.ws(() => this.newTicketSnapshot('sheet')),
       'newTicket:window': () => this.ws(() => this.newTicketSnapshot('window')),
       timer: () => this.ws(() => this.timerSnapshot()),
@@ -541,6 +546,8 @@ export class MockBackend implements Backend {
       case 'resolve:mine':
       case 'resolve:team':
         return this.resolveIntent(scopeOf(model), intent as IntentOf<'resolve:mine'>)
+      case 'resolve:window':
+        return this.resolveIntent('window', intent as IntentOf<'resolve:mine'>)
       case 'newTicket:sheet':
       case 'newTicket:window':
         return this.newTicketIntent(model === 'newTicket:sheet' ? 'sheet' : 'window', intent as IntentOf<'newTicket:sheet'>)
@@ -1773,8 +1780,9 @@ export class MockBackend implements Backend {
     }
   }
 
-  private resolveSnapshot(scope: ListScope): SnapshotOf<'resolve:mine'> {
-    const s = this.resolve[scope]
+  private resolveSnapshot(slot: ResolveSlot): SnapshotOf<'resolve:mine'> {
+    const scope: ListScope = slot === 'window' ? 'mine' : slot
+    const s = this.resolve[slot]
     if (!s) return { type: 'closed' }
     const t = this.sheetTicket(scope, s.ticketId)
     const list = this.lists[scope]
@@ -1814,14 +1822,15 @@ export class MockBackend implements Backend {
     this.changed()
   }
 
-  private async resolveIntent(scope: ListScope, intent: IntentOf<'resolve:mine'>): Promise<unknown> {
+  private async resolveIntent(slot: ResolveSlot, intent: IntentOf<'resolve:mine'>): Promise<unknown> {
+    const scope: ListScope = slot === 'window' ? 'mine' : slot
     if (intent.type === 'open') {
       const t = this.sheetTicket(scope, intent.ticketId)
       const s: ResolveState = {
         ticketId: intent.ticketId, services: { type: 'loading' }, subcategories: { type: 'idle' }, serviceId: null, subcategoryId: null,
         codeId: RESOLUTION_CODES[0]!, solution: '', tried: false, error: null,
       }
-      this.resolve[scope] = s
+      this.resolve[slot] = s
       this.changed()
       await this.wait(200)
       const all = [...SERVICES]
@@ -1838,11 +1847,11 @@ export class MockBackend implements Backend {
       }
       return null
     }
-    const s = this.resolve[scope]
+    const s = this.resolve[slot]
     if (!s) return intent.type === 'confirm' || intent.type === 'confirmAndClose' ? 'The sheet is closed.' : null
     switch (intent.type) {
       case 'close':
-        this.resolve[scope] = null
+        this.resolve[slot] = null
         return null
       case 'setService':
         s.serviceId = intent.serviceId
@@ -1866,7 +1875,7 @@ export class MockBackend implements Backend {
         const t = this.sheetTicket(scope, s.ticketId)
         const message = await this.apply(scope, t, { action: 'resolve', solution: s.solution })
         if (message) s.error = message
-        else this.resolve[scope] = null
+        else this.resolve[slot] = null
         if (!message && intent.type === 'confirmAndClose') {
           // Resolved; a refused Close leaves it resolved and goes to the list notice.
           const closeMessage = await this.apply(scope, t, { action: 'close' })
@@ -2719,12 +2728,14 @@ export class MockBackend implements Backend {
         this.menuQuery = intent.query
         return null
       case 'openTicket':
-      case 'resolve':
         this.selection = 'myTickets'
         this.setQuery('mine', '')
         this.lists.mine.selection = intent.ticketId
         this.syncDetails()
-        if (intent.type === 'resolve') await this.resolveIntent('mine', { type: 'open', ticketId: intent.ticketId })
+        return null
+      case 'resolve':
+        // Like New ticket: only the Resolve window, the main window untouched.
+        await this.resolveIntent('window', { type: 'open', ticketId: intent.ticketId })
         return null
       case 'openMain':
         return null

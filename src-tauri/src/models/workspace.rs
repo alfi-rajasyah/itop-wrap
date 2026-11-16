@@ -71,7 +71,8 @@ pub(crate) struct State {
     pub details: [DetailState; 2],
     pub assign: [AssignState; 2],
     pub pending: [PendingState; 2],
-    pub resolve: [ResolveState; 2],
+    /// Indexed by `ResolveAt::slot`: the two list sheets, then the Resolve window.
+    pub resolve: [ResolveState; 3],
     pub timer: TimerState,
     pub menubar: MenuState,
     /// Swift `Workspace.clock`: ticks every second while a timer runs, else every 15 s.
@@ -119,7 +120,7 @@ pub(crate) struct Inner {
 pub struct Workspace(pub(crate) Arc<Inner>);
 
 /// The workspace ids the contract lists (all but `session`).
-pub const WORKSPACE_MODEL_IDS: [&str; 19] = [
+pub const WORKSPACE_MODEL_IDS: [&str; 20] = [
     "shell",
     "options",
     "list:mine",
@@ -132,6 +133,7 @@ pub const WORKSPACE_MODEL_IDS: [&str; 19] = [
     "pending:team",
     "resolve:mine",
     "resolve:team",
+    "resolve:window",
     "newTicket:sheet",
     "newTicket:window",
     "timer",
@@ -420,7 +422,8 @@ impl Workspace {
                 details: ListScope::ALL.map(|s| self.detail_snapshot(&st, s)),
                 assign: ListScope::ALL.map(|s| self.assign_snapshot(&st, s)),
                 pending: ListScope::ALL.map(|s| self.pending_snapshot(&st, s, now)),
-                resolve: ListScope::ALL.map(|s| self.resolve_snapshot(&st, s, now)),
+                resolve: super::sheets::ResolveAt::ALL
+                    .map(|at| self.resolve_snapshot(&st, at, now)),
                 timer: self.timer_snapshot(&st, now),
                 menubar: self.menubar_snapshot(&st, now),
             }
@@ -434,7 +437,9 @@ impl Workspace {
             hub.publish(&format!("detail:{}", s.raw()), &snaps.details[i]);
             hub.publish(&format!("assign:{}", s.raw()), &snaps.assign[i]);
             hub.publish(&format!("pending:{}", s.raw()), &snaps.pending[i]);
-            hub.publish(&format!("resolve:{}", s.raw()), &snaps.resolve[i]);
+        }
+        for at in super::sheets::ResolveAt::ALL {
+            hub.publish(at.model_id(), &snaps.resolve[at.slot()]);
         }
         hub.publish("timer", &snaps.timer);
         hub.publish("menubar", &snaps.menubar);
@@ -527,7 +532,7 @@ struct Snaps {
     details: [super::detail::DetailSnapshot; 2],
     assign: [super::sheets::AssignSheetSnapshot; 2],
     pending: [super::sheets::PendingSheetSnapshot; 2],
-    resolve: [super::sheets::ResolveSheetSnapshot; 2],
+    resolve: [super::sheets::ResolveSheetSnapshot; 3],
     timer: super::timer::TimerSnapshot,
     menubar: super::menubar::MenuBarSnapshot,
 }

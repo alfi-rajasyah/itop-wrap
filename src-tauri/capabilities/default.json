@@ -4,7 +4,8 @@
   "description": "The main and New Ticket windows: the three app commands, the snapshot event, title-bar dragging",
   "windows": [
     "main",
-    "new-ticket"
+    "new-ticket",
+    "resolve"
   ],
   "permissions": [
     "core:event:allow-listen",

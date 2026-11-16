@@ -112,6 +112,10 @@ pub trait Native: Send + Sync {
     fn show_new_ticket_window(&self);
     /// Closes the New Ticket window if it is open (NEW-4).
     fn close_new_ticket_window(&self);
+    /// Opens (or brings forward) the separate Resolve window the menu bar uses.
+    fn show_resolve_window(&self);
+    /// Closes the Resolve window if it is open.
+    fn close_resolve_window(&self);
     /// Hides the menu bar panel (after one of its actions, MB-17).
     fn hide_menubar_panel(&self);
     /// The session state changed: resize the main window, rebuild the menus, add or remove the tray.

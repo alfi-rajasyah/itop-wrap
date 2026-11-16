@@ -3339,11 +3339,15 @@ async fn resolve_and_close_sends_resolve_then_close() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn menubar_resolve_opens_the_ticket_and_its_resolve_sheet() {
+async fn menubar_resolve_opens_only_the_resolve_window() {
     let h = Harness::new(FakeITop::with(vec![
         ticket("601", "assigned", "7"),
         ticket("602", "escalated_tto", "0"),
     ]));
+    *h.itop.detail.lock().unwrap_or_else(|e| e.into_inner()) = json!({
+        "description": "", "service_id": "5", "service_id_friendlyname": "VPN service",
+        "servicesubcategory_id": "6", "servicesubcategory_id_friendlyname": "VPN",
+    });
     h.load().await;
     h.settle().await;
     let rows: Vec<(String, bool)> = h.snap("menubar")["content"]["sections"]
@@ -3362,6 +3366,9 @@ async fn menubar_resolve_opens_the_ticket_and_its_resolve_sheet() {
         rows.contains(&("UserRequest::601".to_owned(), true)),
         "{rows:?}"
     );
+    send(&h, "shell", json!({"type": "select", "item": "people"}))
+        .await
+        .expect("ok");
     send(
         &h,
         "menubar",
@@ -3369,9 +3376,36 @@ async fn menubar_resolve_opens_the_ticket_and_its_resolve_sheet() {
     )
     .await
     .expect("ok");
-    assert_eq!(h.snap("list:mine")["selection"], "UserRequest::601");
-    assert_eq!(h.snap("shell")["selection"], "myTickets");
-    let s = h.snap("resolve:mine");
+    let s = h.hub.get("resolve:window");
     assert_eq!(s["type"], "open");
     assert_eq!(s["title"], "Resolve R-000601");
+    assert_eq!(
+        h.hub.get("resolve:mine")["type"],
+        "closed",
+        "the main window's sheet stays shut"
+    );
+    assert_eq!(
+        h.snap("shell")["selection"],
+        "people",
+        "the main window is left as it was"
+    );
+    let calls = h.native.calls();
+    assert!(calls.contains(&Call::ShowResolveWindow));
+    assert!(calls.contains(&Call::HideMenubarPanel));
+    assert!(!calls.contains(&Call::ShowMainWindow));
+
+    send(
+        &h,
+        "resolve:window",
+        json!({"type": "setSolution", "solution": "Restarted"}),
+    )
+    .await
+    .expect("ok");
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    h.settle().await;
+    send(&h, "resolve:window", json!({"type": "confirm"}))
+        .await
+        .expect("ok");
+    assert_eq!(h.hub.get("resolve:window")["type"], "closed");
+    assert!(h.native.calls().contains(&Call::CloseResolveWindow));
 }

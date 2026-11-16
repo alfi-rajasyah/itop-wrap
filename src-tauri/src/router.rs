@@ -8,7 +8,7 @@ use crate::error::AppError;
 
 /// Every model id the contract lists (contract.md §3). `get_snapshot` and `dispatch` reject other
 /// ids with `unknownModel` before the router sees them.
-pub const MODEL_IDS: [&str; 20] = [
+pub const MODEL_IDS: [&str; 21] = [
     "session",
     "shell",
     "options",
@@ -22,6 +22,7 @@ pub const MODEL_IDS: [&str; 20] = [
     "pending:team",
     "resolve:mine",
     "resolve:team",
+    "resolve:window",
     "newTicket:sheet",
     "newTicket:window",
     "timer",
@@ -73,6 +74,8 @@ pub enum NativeEvent {
     /// The New Ticket window's close button (contract: dispatches dismiss without a draft).
     /// Not sent when the shell closes the window itself (`Native::close_new_ticket_window`).
     NewTicketWindowClosed,
+    /// The Resolve window's close button: its form closes like Cancel.
+    ResolveWindowClosed,
 }
 
 #[cfg(test)]
@@ -80,8 +83,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn model_ids_are_the_contracts_twenty() {
-        assert_eq!(MODEL_IDS.len(), 20);
+    fn model_ids_are_the_contracts_twenty_one() {
+        assert_eq!(MODEL_IDS.len(), 21);
         assert!(is_model_id("list:mine"));
         assert!(!is_model_id("list:other"));
     }

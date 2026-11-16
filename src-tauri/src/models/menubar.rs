@@ -110,7 +110,7 @@ pub enum MenuBarIntent {
         #[ts(rename = "ticketId")]
         ticket_id: String,
     },
-    /// Opens the ticket in the main window, as OpenTicket, then its Resolve sheet.
+    /// Opens the ticket's Resolve form in its own window, without the main window (as New ticket).
     Resolve {
         #[serde(rename = "ticketId")]
         #[ts(rename = "ticketId")]
@@ -259,7 +259,6 @@ impl Workspace {
         intent: MenuBarIntent,
     ) -> Result<serde_json::Value, AppError> {
         let native = self.0.ctx.native.clone();
-        let resolve = matches!(intent, MenuBarIntent::Resolve { .. });
         match intent {
             MenuBarIntent::SetQuery { query } => {
                 self.lock().menubar.query = query;
@@ -267,7 +266,16 @@ impl Workspace {
             }
             // `MenuBarPanelHost.openTicket` (MB-12): My tickets, its search cleared, the ticket
             // selected, the main window forward.
-            MenuBarIntent::OpenTicket { ticket_id } | MenuBarIntent::Resolve { ticket_id } => {
+            // Like New ticket: only the Resolve window, the main window untouched.
+            MenuBarIntent::Resolve { ticket_id } => {
+                native.hide_menubar_panel();
+                self.dispatch_resolve(
+                    super::sheets::ResolveAt::Window,
+                    super::sheets::ResolveSheetIntent::Open { ticket_id },
+                )
+                .await?;
+            }
+            MenuBarIntent::OpenTicket { ticket_id } => {
                 let known = self.lock().lists[0]
                     .tickets
                     .iter()
@@ -279,17 +287,10 @@ impl Workspace {
                 }
                 self.shell_select(SidebarItem::MyTickets).await;
                 self.set_query(super::records::ListScope::Mine, "");
-                self.lock().lists[0].selection = Some(ticket_id.clone());
+                self.lock().lists[0].selection = Some(ticket_id);
                 self.publish();
                 native.hide_menubar_panel();
                 native.show_main_window();
-                if resolve {
-                    self.dispatch_resolve(
-                        super::records::ListScope::Mine,
-                        super::sheets::ResolveSheetIntent::Open { ticket_id },
-                    )
-                    .await?;
-                }
             }
             MenuBarIntent::OpenMain => {
                 native.hide_menubar_panel();

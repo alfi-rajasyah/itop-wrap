@@ -1200,7 +1200,7 @@ export type MenuBarIntent =
   | { type: 'setQuery'; query: string }
   /** Main window forward, My tickets, its search cleared, the ticket selected. */
   | { type: 'openTicket'; ticketId: string }
-  /** As openTicket, then the ticket's Resolve sheet in the main window. */
+  /** The ticket's Resolve form in its own window (resolve:window), without the main window. */
   | { type: 'resolve'; ticketId: string }
   /** ⌘O: main window forward, selection unchanged. */
   | { type: 'openMain' }
@@ -1243,6 +1243,8 @@ export interface ModelMap {
   'pending:team': Model<PendingSheetSnapshot, PendingSheetIntent, PendingSheetResults>
   'resolve:mine': Model<ResolveSheetSnapshot, ResolveSheetIntent, ResolveSheetResults>
   'resolve:team': Model<ResolveSheetSnapshot, ResolveSheetIntent, ResolveSheetResults>
+  /** The menu bar's Resolve window (index.html?window=resolve): works on My tickets, own state. */
+  'resolve:window': Model<ResolveSheetSnapshot, ResolveSheetIntent, ResolveSheetResults>
   'newTicket:sheet': Model<NewTicketSnapshot, NewTicketIntent, NewTicketResults>
   'newTicket:window': Model<NewTicketSnapshot, NewTicketIntent, NewTicketResults>
   timer: Model<TimerSnapshot, TimerIntent, TimerResults>
@@ -1274,6 +1276,7 @@ export const MODEL_IDS: readonly ModelId[] = [
   'pending:team',
   'resolve:mine',
   'resolve:team',
+  'resolve:window',
   'newTicket:sheet',
   'newTicket:window',
   'timer',
