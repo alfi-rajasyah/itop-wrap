@@ -110,7 +110,7 @@ export function PaneHeader({
 }) {
   return (
     <header className={cn("shrink-0", className)}>
-      <div data-tauri-drag-region className="flex h-[52px] items-center gap-2 pr-3" style={{ paddingLeft: "var(--titlebar-inset, 12px)" }}>
+      <div data-tauri-drag-region className="flex h-[52px] items-center gap-2 pr-3 transition-[padding] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none" style={{ paddingLeft: "var(--titlebar-inset, 12px)" }}>
         {leading}
         <div data-tauri-drag-region className="min-w-0 flex-1">
           {title ? (

@@ -267,7 +267,17 @@ export function AppShell({
   const inset = { "--titlebar-inset": `${TRAFFIC_LIGHTS_WIDTH + 36}px` } as CSSProperties;
   return (
     <div className={cn("relative flex h-full min-h-0 w-full overflow-hidden bg-app text-ink", className)} style={sidebarVisible ? undefined : inset}>
-      {sidebarVisible ? sidebar : null}
+      {/* Kept mounted so collapsing can slide: the grid column eases between the sidebar's
+          width (1fr of a max-content wrapper) and 0, clipping the sidebar as it goes. */}
+      <div
+        className="grid shrink-0 transition-[grid-template-columns] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+        style={{ gridTemplateColumns: sidebarVisible ? "1fr" : "0fr" }}
+        inert={!sidebarVisible}
+        aria-hidden={!sidebarVisible || undefined}
+        data-sidebar-visible={sidebarVisible}
+      >
+        <div className="flex min-h-0 min-w-0 overflow-hidden">{sidebar}</div>
+      </div>
       {!sidebarVisible && sidebarToggle ? (
         <div className="absolute top-[12px] z-30" style={{ left: TRAFFIC_LIGHTS_WIDTH }}>
           {sidebarToggle}
