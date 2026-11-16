@@ -504,6 +504,26 @@ start {enabled, help} / slot) (MB-12, MB-13; W/MenuBarView.swift:156-206).
 
 Timer start/stop in the panel use the `timer` model; the timer notice in the panel is `timer.notice`.
 
+### 5.15 `update` (iTop Wrap addition)
+
+Notify-only check for a newer GitHub release (`alfi-rajasyah/itop-wrap`), not in the Swift app.
+Rust asks `api.github.com/repos/<repo>/releases/latest`, reads only `tag_name`, accepts only a plain
+`x.y.z`, and builds the release-page link itself; it never opens a URL from the response and never
+downloads or installs. Automatic checks: at most once a day (`update.lastCheck`), release builds
+only, switchable (`update.autoCheck`, default on); a failed automatic check is silent.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `current` | string | this build's version |
+| `checking` | boolean | a check is running |
+| `autoCheck` | boolean | automatic daily checks on |
+| `notice` | `{version, text}` \| null | the sidebar line while a newer release exists and its version isn't `update.dismissed` |
+| `dialog` | `{kind, title, message}` \| null | the answer to Check for Updates…; `kind` is `upToDate`, `available` or `failed` |
+
+Intents: `check` (always ends with a dialog), `closeDialog`, `download` (opens the newer release's
+page), `dismiss` (hides the notice until a newer release), `setAutoCheck {on}`. The app menu's
+**Check for Updates…** (signed in) brings the main window forward and runs `check`.
+
 ## 6. Native side (Rust owns all of it unless marked React)
 
 **Menus** (Tauri `Menu`, built and rebuilt by Rust when the session changes; KEY-1, KEY-2):

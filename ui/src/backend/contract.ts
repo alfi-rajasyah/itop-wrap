@@ -1222,6 +1222,54 @@ export interface MenuBarResults {
 // The model map
 // ---------------------------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------------------------
+// update (iTop Wrap addition: notify-only check for a newer GitHub release)
+// ---------------------------------------------------------------------------------------------
+
+export type UpdateDialogKind = 'upToDate' | 'available' | 'failed'
+
+/** The answer to Check for Updates… (manual checks only). */
+export interface UpdateDialog {
+  kind: UpdateDialogKind
+  title: string
+  message: string
+}
+
+/** The quiet sidebar line while a newer release exists and isn't dismissed. */
+export interface UpdateNotice {
+  version: string
+  /** "iTop Wrap 2.1.0 is available". */
+  text: string
+}
+
+export interface UpdateSnapshot {
+  /** This build's version. */
+  current: string
+  checking: boolean
+  /** Automatic daily checks (never in debug builds). */
+  autoCheck: boolean
+  notice: UpdateNotice | null
+  dialog: UpdateDialog | null
+}
+
+export type UpdateIntent =
+  /** Check for Updates…: always ends with a dialog. */
+  | { type: 'check' }
+  | { type: 'closeDialog' }
+  /** Opens the newer release's page on GitHub; Rust builds the link from the version. */
+  | { type: 'download' }
+  /** Hides the notice until a newer release than this one. */
+  | { type: 'dismiss' }
+  | { type: 'setAutoCheck'; on: boolean }
+
+export interface UpdateResults {
+  check: null
+  closeDialog: null
+  download: null
+  dismiss: null
+  setAutoCheck: null
+}
+
 /** Checks at compile time that every intent has exactly one result entry. */
 type Model<S, I extends { type: string }, R extends { [K in I['type']]: unknown }> = {
   snapshot: S
@@ -1252,6 +1300,7 @@ export interface ModelMap {
   orgs: Model<OrgsSnapshot, OrgsIntent, OrgsResults>
   people: Model<PeopleSnapshot, PeopleIntent, PeopleResultsMap>
   menubar: Model<MenuBarSnapshot, MenuBarIntent, MenuBarResults>
+  update: Model<UpdateSnapshot, UpdateIntent, UpdateResults>
 }
 
 export type ModelId = keyof ModelMap
@@ -1284,6 +1333,7 @@ export const MODEL_IDS: readonly ModelId[] = [
   'orgs',
   'people',
   'menubar',
+  'update',
 ] as const
 
 /** Models that exist only while signed in: their snapshot is null otherwise. */

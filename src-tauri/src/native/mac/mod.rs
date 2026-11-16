@@ -517,6 +517,10 @@ impl Shell {
                 self.send(NativeEvent::MenuOpenMain);
             }
             "toggle-sidebar" => self.send(NativeEvent::ToggleSidebar),
+            "check-updates" => {
+                self.show_main(mtm);
+                self.send(NativeEvent::MenuCheckUpdates);
+            }
             other => {
                 if let Some(n) = other
                     .strip_prefix("view-")
@@ -724,6 +728,19 @@ fn build_menu(
             &PredefinedMenuItem::quit(app, Some("Quit iTop Wrap"))?,
         ],
     )?;
+    if signed_in {
+        // Right under About, as in most Mac apps (iTop Wrap addition: notify-only update check).
+        app_menu.insert(
+            &MenuItem::with_id(
+                app,
+                "check-updates",
+                "Check for Updates…",
+                true,
+                None::<&str>,
+            )?,
+            1,
+        )?;
+    }
 
     let file = Submenu::new(app, "File", true)?;
     if signed_in {

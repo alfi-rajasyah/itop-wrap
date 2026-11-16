@@ -8,7 +8,7 @@ use crate::error::AppError;
 
 /// Every model id the contract lists (contract.md §3). `get_snapshot` and `dispatch` reject other
 /// ids with `unknownModel` before the router sees them.
-pub const MODEL_IDS: [&str; 21] = [
+pub const MODEL_IDS: [&str; 22] = [
     "session",
     "shell",
     "options",
@@ -30,6 +30,7 @@ pub const MODEL_IDS: [&str; 21] = [
     "orgs",
     "people",
     "menubar",
+    "update",
 ];
 
 pub fn is_model_id(id: &str) -> bool {
@@ -76,6 +77,8 @@ pub enum NativeEvent {
     NewTicketWindowClosed,
     /// The Resolve window's close button: its form closes like Cancel.
     ResolveWindowClosed,
+    /// iTop Wrap ▸ Check for Updates… (the main window is already forward).
+    MenuCheckUpdates,
 }
 
 #[cfg(test)]
@@ -83,8 +86,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn model_ids_are_the_contracts_twenty_one() {
-        assert_eq!(MODEL_IDS.len(), 21);
+    fn model_ids_are_the_contracts_twenty_two() {
+        assert_eq!(MODEL_IDS.len(), 22);
         assert!(is_model_id("list:mine"));
         assert!(!is_model_id("list:other"));
     }

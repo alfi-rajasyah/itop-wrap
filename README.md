@@ -2,7 +2,8 @@
 
 A macOS app for working iTop tickets without the web UI: your queue, ticket detail with logs and
 images, the CMDB, organizations and people, plus log entries, assigning, pending and resolving, a time
-tracker and a menu bar item. It talks to iTop through its REST API.
+tracker and a menu bar item. It talks to iTop through its REST API, and to GitHub only to check for a
+newer release.
 
 Not affiliated with Combodo. The app is written in Rust (Tauri) with a React UI built from the
 [Beautiful UI](https://www.beautifului.dev/) components. It was first written in Swift; the rewrite's
@@ -77,6 +78,12 @@ sidebar) removes the password from the Keychain.
   ticket. It keeps working with the window closed; ⌘O brings the window back.
 - **CMDB, Organizations, People:** search CIs and see their relationships and open tickets; an
   organization's tickets from every agent; a person's assigned and reported tickets.
+
+- **Updates:** iTop Wrap ▸ Check for Updates… asks GitHub for the latest release. The app also checks
+  once a day by itself (release builds only; turn it off with **Check automatically** in that dialog)
+  and shows a line above the account button when a newer version exists. It never downloads or
+  installs anything: **Download** opens the release page, and you drag the new app to Applications as
+  usual. Only the version number is read from GitHub's answer.
 
 Release builds can change anything your iTop account may change. Debug builds (`tauri dev`) are
 read-only unless you switch writes on for named test tickets (see Development).

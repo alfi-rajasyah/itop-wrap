@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { isTauri, useModel, type ShellSnapshot, type SidebarItem } from '@/backend'
+import { isTauri, useModel, type ShellSnapshot, type SidebarItem, type UpdateSnapshot, type Send } from '@/backend'
 import {
   AppShell,
   BuildingIcon,
+  Button,
+  Checkbox,
   Dialog,
   IconButton,
   PeopleIcon,
@@ -12,6 +14,7 @@ import {
   Sidebar,
   TeamIcon,
   TrayIcon,
+  XIcon,
   type SidebarSection,
 } from '@/components/kit'
 import { isCommand, useWindowKeyDown } from '@/lib/keys'
@@ -53,6 +56,7 @@ const SHORTCUTS: Record<SidebarItem, string> = {
 export default function ShellScreen() {
   const [shell, send] = useModel('shell')
   const [, sendSession] = useModel('session')
+  const [update, sendUpdate] = useModel('update')
   const [confirmSignOut, setConfirmSignOut] = useState(false)
 
   // ⌘1…5 and ⌘N are native menu items in the app (KEY-1, KEY-2). The browser mock has no
@@ -97,6 +101,7 @@ export default function ShellScreen() {
             header={toggle}
             width={shell.sidebarWidth}
             onWidthChange={(width) => void send({ type: 'setSidebarWidth', width })}
+            notice={update?.notice ? <UpdateNoticeLine update={update} send={sendUpdate} /> : undefined}
             user={{
               name: shell.account.displayName,
               detail: shell.account.host,
@@ -116,6 +121,8 @@ export default function ShellScreen() {
       </AppShell>
 
       <NewTicketForm instance="sheet" />
+
+      {update?.dialog ? <UpdateDialogView update={update} send={sendUpdate} /> : null}
 
       <Dialog
         open={confirmSignOut}
@@ -169,4 +176,67 @@ function sidebarSections(shell: ShellSnapshot): SidebarSection[] {
       ]
     }),
   }))
+}
+
+// ── Update check (iTop Wrap addition: notify only) ─────────────────────────────────────────
+
+/** The sidebar line while a newer release exists: Download opens its GitHub page; × hides it. */
+function UpdateNoticeLine({ update, send }: { update: UpdateSnapshot; send: Send<'update'> }) {
+  const notice = update.notice!
+  return (
+    <div className="flex items-center gap-1.5">
+      <p className="min-w-0 flex-1 text-[12px] leading-snug text-ink-2">
+        {notice.text}.{' '}
+        <button
+          type="button"
+          onClick={() => void send({ type: 'download' })}
+          className="rounded-[4px] font-medium text-ink underline underline-offset-2 hover:decoration-2"
+        >
+          Download
+        </button>
+      </p>
+      <IconButton label={`Hide until the next update after ${notice.version}`} icon={<XIcon />} size="sm" onClick={() => void send({ type: 'dismiss' })} />
+    </div>
+  )
+}
+
+/** The answer to Check for Updates…, with the automatic-check switch. */
+function UpdateDialogView({ update, send }: { update: UpdateSnapshot; send: Send<'update'> }) {
+  const dialog = update.dialog!
+  const close = () => void send({ type: 'closeDialog' })
+  const available = dialog.kind === 'available'
+  return (
+    <Dialog
+      open
+      title={dialog.title}
+      subtitle={dialog.message}
+      width={400}
+      onCancel={close}
+      onConfirm={available ? () => void send({ type: 'download' }) : close}
+      footer={
+        <div className="flex w-full items-center gap-2">
+          <Checkbox
+            className="mr-auto"
+            checked={update.autoCheck}
+            onChange={(on) => void send({ type: 'setAutoCheck', on })}
+            label="Check automatically"
+          />
+          {available ? (
+            <>
+              <Button variant="secondary" size="md" onClick={close}>
+                Later
+              </Button>
+              <Button variant="primary" size="md" aria-keyshortcuts="Meta+Enter" onClick={() => void send({ type: 'download' })}>
+                Download
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" size="md" onClick={close}>
+              OK
+            </Button>
+          )}
+        </div>
+      }
+    />
+  )
 }
