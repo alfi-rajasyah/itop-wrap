@@ -504,6 +504,20 @@ start {enabled, help} / slot) (MB-12, MB-13; W/MenuBarView.swift:156-206).
 
 Timer start/stop in the panel use the `timer` model; the timer notice in the panel is `timer.notice`.
 
+### 5.16 `editTicket` (iTop Wrap addition)
+
+Edit ticket: the New ticket form (§5.9 shapes and intents) prefilled from a ticket, opened by
+`detail:<scope>` `edit` (the "…" menu's **Edit…**, ⌘E; `more.edit` is false for closed tickets).
+Rust reads the ticket's fields fresh (`TicketWrites::editable`), keeps the current org, caller,
+service and subcategory selectable even when the pickers don't offer them, and `create` saves
+only the changed fields in one `core/update` (`TicketWrites::save_edit`), then the lists say
+"<ref> is updated." and reload. No type switch, no Assign to me, no kept draft (Cancel drops the
+changes). A description that is more than paragraphs and line breaks is `descriptionLocked`:
+shown read-only with `webUrl`, never sent.
+
+Extra snapshot field `edit` (null for New ticket): `{title, loading, descriptionLocked,
+descriptionNote, webUrl, changed}`; `confirmEnabled` also needs `changed`.
+
 ### 5.15 `update` (iTop Wrap addition)
 
 Notify-only check for a newer GitHub release (`alfi-rajasyah/itop-wrap`), not in the Swift app.

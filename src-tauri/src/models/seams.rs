@@ -20,6 +20,8 @@ pub trait WorkspaceLink: Send + Sync {
     async fn open_ticket(&self, ticket: Ticket);
     /// Workspace.created(_:assign:): show it in My tickets, and assign if asked.
     async fn ticket_created(&self, ticket: Ticket, assign: bool);
+    /// A ticket's fields were edited: refresh the lists (the detail reloads with them) and say so.
+    async fn ticket_edited(&self, ticket: Ticket);
     /// Switch the sidebar section ("myTickets" | "teamTickets" | "configItems" | "organizations" | "people").
     async fn select_section(&self, section: &str);
 }

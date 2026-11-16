@@ -163,6 +163,8 @@ pub struct MoreMenu {
     pub assign: Option<MoreAssign>,
     pub pending: bool,
     pub reopen: bool,
+    /// Edit… (iTop Wrap addition): every status but closed.
+    pub edit: bool,
     pub enabled: bool,
     pub divider: bool,
     pub web_url: String,
@@ -287,6 +289,8 @@ pub enum DetailIntent {
     AssignToMe,
     Reopen,
     Close,
+    /// Edit… / ⌘E: opens Edit ticket on this ticket (iTop Wrap addition).
+    Edit,
     ToggleTimer,
     SetDraft {
         text: String,
@@ -592,8 +596,9 @@ impl Workspace {
             }),
             pending: actions.contains(&TicketAction::Pending),
             reopen: actions.contains(&TicketAction::Reopen),
+            edit: t.status != "closed",
             enabled: can_write && l.working.is_none(),
-            divider: !actions.is_empty(),
+            divider: !actions.is_empty() || t.status != "closed",
             web_url: web_url.clone(),
         };
 
@@ -890,6 +895,14 @@ impl Workspace {
             DetailIntent::Close => {
                 self.list_apply_from_header(scope, &TicketChange::Close, &ticket)
                     .await
+            }
+            DetailIntent::Edit => {
+                if ticket.status != "closed"
+                    && let Some(s) = self.standalone().cloned()
+                {
+                    let web_url = self.web_url(&ticket);
+                    s.new_tickets.request_edit(ticket.clone(), web_url).await;
+                }
             }
             DetailIntent::ToggleTimer => {
                 let snapshot = {

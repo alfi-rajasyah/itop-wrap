@@ -265,3 +265,179 @@ async fn the_whole_round_against_a_real_itop() {
         Err(e) => println!("time totals (no Time Tracking extension expected): {e}"),
     }
 }
+
+/// Edit ticket against a real iTop: plain edits read back, what an assigned ticket allows, and a
+/// formatted description that must survive a save untouched. Leaves one ticket behind; its ref
+/// is printed so it can be removed.
+#[tokio::test]
+#[ignore = "needs a real iTop test server; it writes"]
+async fn editing_a_ticket_against_a_real_itop() {
+    let server = ServerAddress::new(&env("ITOP_URL")).unwrap();
+    let user = env("ITOP_USER");
+    let transport: Arc<dyn Transport> = Arc::new(ReqwestTransport::new().unwrap());
+    let client = ITopClient::with_writes(
+        server,
+        Credentials::new(user.clone(), env("ITOP_PASSWORD")),
+        transport,
+        true,
+        None,
+        true,
+    );
+    let me = CurrentUser::load(&user, &client).await.unwrap();
+    let picks = PickLists::new(client.clone());
+    let catalog = ServiceCatalog::new(client.clone());
+    let mut found = None;
+    'orgs: for org in picks.organizations().await.unwrap() {
+        let callers = picks.callers(&org.id).await.unwrap();
+        if callers.len() < 2 {
+            continue;
+        }
+        for service in catalog.services_for_org(&org.id).await.unwrap() {
+            let subs = catalog.subcategories(&service.id).await.unwrap();
+            if let Some(sub) = subs.first() {
+                found = Some((org, callers, service, sub.clone()));
+                break 'orgs;
+            }
+        }
+    }
+    let (org, callers, service, sub) =
+        found.expect("no org with two callers and a service with a subcategory");
+    let mut draft = NewTicket::new(TicketClass::UserRequest);
+    draft.org_id = org.id.clone();
+    draft.caller_id = callers[0].id.clone();
+    draft.service_id = service.id.clone();
+    draft.subcategory_id = sub.id.clone();
+    draft.title = "iTop Wrap edit: live test".into();
+    draft.description = "Before the edit.".into();
+    let writes = TicketWrites::new(client.clone());
+    let ticket = writes.create(&draft).await.unwrap();
+    println!(
+        "created {} for {} ({})",
+        ticket.r#ref, org.name, ticket.status
+    );
+
+    // 1. A plain edit of every simple field, in the ticket's first state.
+    let read = writes.editable(&ticket).await.unwrap();
+    assert_eq!(
+        read.description_text.as_deref(),
+        Some("Before the edit."),
+        "plain"
+    );
+    let mut after = read.values.clone();
+    after.title = "iTop Wrap edit: live test (edited)".into();
+    after.urgency = "2".into();
+    after.impact = "2".into();
+    after.caller_id = callers[1].id.clone();
+    after.description = "After the edit.\nSecond line & <angle>.".into();
+    let sent = writes
+        .save_edit(&ticket, &read.values, &after, false)
+        .await
+        .unwrap();
+    println!("status {}: sent {sent:?}", ticket.status);
+    let back = writes.editable(&ticket).await.unwrap();
+    assert_eq!(back.values.title, after.title);
+    assert_eq!(back.values.urgency, "2");
+    assert_eq!(back.values.impact, "2");
+    assert_eq!(back.values.caller_id, callers[1].id);
+    assert_eq!(
+        back.description_text.as_deref(),
+        Some("After the edit.\nSecond line & <angle>.")
+    );
+
+    // 2. Assigned: what stock iTop still lets REST change.
+    // Any team with an agent (the test account itself may be in none).
+    let directory = TeamDirectory::new(client.clone());
+    let mut pick = None;
+    for team in directory.teams().await.unwrap() {
+        if let Some(agent) = directory.agents(&team.id).await.unwrap().into_iter().next() {
+            pick = Some((team, agent));
+            break;
+        }
+    }
+    let (team, agent) = pick.expect("a team with an agent");
+    let _ = &me;
+    let assigned = writes.assign(&ticket, &team.id, &agent.id).await;
+    println!("assign: {:?}", assigned.as_ref().map(|_| "ok"));
+    let tickets = TicketService::new(client.clone());
+    let now = tickets
+        .lookup(&ticket.r#ref)
+        .await
+        .unwrap()
+        .expect("still there");
+    let read = writes.editable(&now).await.unwrap();
+    for (label, change) in [
+        (
+            "title",
+            Box::new(|t: &mut NewTicket| t.title = "iTop Wrap edit: assigned".into())
+                as Box<dyn Fn(&mut NewTicket)>,
+        ),
+        (
+            "caller",
+            Box::new(|t: &mut NewTicket| t.caller_id = callers[0].id.clone()),
+        ),
+        (
+            "urgency",
+            Box::new(|t: &mut NewTicket| t.urgency = "3".into()),
+        ),
+    ] {
+        let before = writes.editable(&now).await.unwrap();
+        let mut after = before.values.clone();
+        change(&mut after);
+        let result = writes
+            .save_edit(&now, &before.values, &after, before.description_locked())
+            .await;
+        println!(
+            "status {}: change {label}: {}",
+            now.status,
+            match &result {
+                Ok(_) => "accepted".to_owned(),
+                Err(e) => format!("refused: {e:?}"),
+            }
+        );
+    }
+    let _ = read;
+
+    // 3. A formatted description is locked and survives a save of another field.
+    let mut fields = json::JsonObject::new();
+    fields.insert(
+        "description".into(),
+        "<p>Has <strong>bold</strong> text</p>".into(),
+    );
+    let r = client
+        .send(RestOperation::Update {
+            class_name: "UserRequest".into(),
+            key: now.key.clone(),
+            fields,
+            comment: "iTop Wrap live test".into(),
+        })
+        .await
+        .unwrap();
+    let object = r.objects().first().cloned().expect("the updated ticket");
+    assert_eq!(object.code, 0, "{}", object.message);
+    let read = writes.editable(&now).await.unwrap();
+    assert!(read.description_locked(), "formatted → locked");
+    let mut after = read.values.clone();
+    after.title = "iTop Wrap edit: formatted description kept".into();
+    let sent = writes
+        .save_edit(&now, &read.values, &after, true)
+        .await
+        .unwrap();
+    assert_eq!(sent, ["title"]);
+    let html = client
+        .send(RestOperation::get(
+            "UserRequest",
+            format!("SELECT UserRequest WHERE id = {}", now.key),
+            &["description"],
+        ))
+        .await
+        .unwrap();
+    let description = html.objects()[0].fields["description"]
+        .string_value()
+        .unwrap_or("")
+        .to_owned();
+    assert!(
+        description.contains("<strong>bold</strong>"),
+        "description untouched: {description}"
+    );
+    println!("done: {} (remove it from the test server)", ticket.r#ref);
+}

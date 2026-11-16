@@ -17,6 +17,7 @@ use crate::native::fake::FakeNative;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinkCall {
+    Edited(String),
     OpenTicket(String),
     Created(String, bool),
     Section(String),
@@ -52,6 +53,12 @@ impl WorkspaceLink for FakeLink {
             .lock()
             .unwrap()
             .push(LinkCall::Created(ticket.r#ref.clone(), assign));
+    }
+    async fn ticket_edited(&self, ticket: Ticket) {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(LinkCall::Edited(ticket.r#ref.clone()));
     }
     async fn select_section(&self, section: &str) {
         self.calls

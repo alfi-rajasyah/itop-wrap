@@ -121,6 +121,7 @@ export default function ShellScreen() {
       </AppShell>
 
       <NewTicketForm instance="sheet" />
+      <NewTicketForm instance="edit" />
 
       {update?.dialog ? <UpdateDialogView update={update} send={sendUpdate} /> : null}
 

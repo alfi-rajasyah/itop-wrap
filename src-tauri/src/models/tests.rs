@@ -1563,7 +1563,7 @@ async fn det_20_to_24_more_menu() {
     let h = detail_harness(ticket("1", "assigned", "7"), true).await;
     assert_eq!(
         h.snap("detail:mine")["more"],
-        json!({"assign": {"label": "Reassign…"}, "pending": true, "reopen": false, "enabled": true, "divider": true,
+        json!({"assign": {"label": "Reassign…"}, "pending": true, "reopen": false, "edit": true, "enabled": true, "divider": true,
             "webUrl": "https://itop.example.com/pages/UI.php?operation=details&class=UserRequest&id=1"})
     );
     let h = detail_harness(ticket("1", "new", "9"), true).await;
@@ -3534,4 +3534,171 @@ async fn menu_check_for_updates_runs_a_manual_check() {
         .expect("ok");
     h.ws.update_check(true).await;
     assert_eq!(h.hub.get("update")["dialog"]["kind"], "upToDate");
+}
+
+// MARK: - Edit ticket (iTop Wrap addition)
+
+async fn edit_harness(status: &str) -> Harness {
+    let h = Harness::new(FakeITop::with(vec![ticket("1", status, "7")]));
+    h.itop.can(
+        "Organization",
+        objects(vec![object(
+            "Organization",
+            "9",
+            json!({"friendlyname": "Other org"}),
+        )]),
+    );
+    h.load().await;
+    select(&h, MINE, Some("UserRequest::1"));
+    h.settle().await;
+    h
+}
+
+async fn open_edit(h: &Harness) {
+    // A closed ticket has no detail in the open list, so the intent may be refused.
+    let _ = send(h, "detail:mine", json!({"type": "edit"})).await;
+    for _ in 0..5 {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        h.settle().await;
+    }
+}
+
+fn updates(h: &Harness) -> Vec<Value> {
+    h.stub
+        .requests()
+        .into_iter()
+        .filter(|r| r.operation().as_deref() == Some("core/update"))
+        .map(|r| r.json_data()["fields"].clone())
+        .collect()
+}
+
+#[tokio::test(start_paused = true)]
+async fn edit_opens_prefilled_and_saves_only_what_changed() {
+    let h = edit_harness("assigned").await;
+    assert_eq!(h.snap("detail:mine")["more"]["edit"], true);
+    open_edit(&h).await;
+    let s = h.hub.get("editTicket");
+    assert_eq!(s["type"], "open");
+    assert_eq!(s["edit"]["title"], "Edit R-000001");
+    assert_eq!(s["edit"]["loading"], false);
+    assert_eq!(s["edit"]["descriptionLocked"], false);
+    assert_eq!(s["description"], "Printer jams");
+    // The current org isn't in the active list: kept and selected anyway.
+    assert_eq!(s["organization"]["selectedId"], "4");
+    assert_eq!(
+        s["organization"]["items"][0],
+        json!({"id": "4", "label": "Org A"})
+    );
+    assert_eq!(s["caller"]["selectedId"], "11");
+    assert_eq!(s["service"]["selectedId"], "5");
+    assert_eq!(s["subcategory"]["selectedId"], "6");
+    assert_eq!(s["impact"]["selectedId"], "2");
+    assert_eq!(s["urgency"]["selectedId"], "3");
+    assert_eq!(s["edit"]["changed"], false);
+    assert_eq!(s["confirmEnabled"], false, "nothing to save yet");
+    assert_eq!(s["showClearForm"], false);
+
+    send(
+        &h,
+        "editTicket",
+        json!({"type": "setTitle", "title": "Printer jams on floor 3"}),
+    )
+    .await
+    .expect("ok");
+    let s = h.hub.get("editTicket");
+    assert_eq!(s["edit"]["changed"], true);
+    assert_eq!(s["confirmEnabled"], true);
+    let r = send(&h, "editTicket", json!({"type": "create"}))
+        .await
+        .expect("ok");
+    assert_eq!(r, Value::Null);
+    assert_eq!(
+        updates(&h),
+        vec![json!({"title": "Printer jams on floor 3"})]
+    );
+    assert_eq!(h.hub.get("editTicket"), json!({"type": "closed"}));
+    assert_eq!(
+        h.ws.lock().lists[0].notice,
+        Some(super::records::Notice::ok("R-000001 is updated."))
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn edit_never_sends_a_formatted_description() {
+    let h = edit_harness("assigned").await;
+    h.itop.edit.lock().unwrap()["description"] =
+        json!(r#"<p>See <img src="data:image/png;base64,AA=="></p>"#);
+    open_edit(&h).await;
+    let s = h.hub.get("editTicket");
+    assert_eq!(s["edit"]["descriptionLocked"], true);
+    assert!(
+        s["edit"]["descriptionNote"]
+            .as_str()
+            .unwrap()
+            .contains("images or formatting")
+    );
+    assert_eq!(s["required"]["description"]["missing"], false);
+    send(&h, "editTicket", json!({"type": "setUrgency", "id": "1"}))
+        .await
+        .expect("ok");
+    send(&h, "editTicket", json!({"type": "create"}))
+        .await
+        .expect("ok");
+    assert_eq!(updates(&h), vec![json!({"urgency": "1"})]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn edit_keeps_the_form_when_itop_refuses() {
+    let h = edit_harness("assigned").await;
+    open_edit(&h).await;
+    *h.itop.refuse_writes.lock().unwrap() = Some((100, "Error: caller_id is read-only".into()));
+    send(
+        &h,
+        "editTicket",
+        json!({"type": "setTitle", "title": "New title"}),
+    )
+    .await
+    .expect("ok");
+    let r = send(&h, "editTicket", json!({"type": "create"}))
+        .await
+        .expect("ok");
+    let text = r.as_str().expect("an error").to_owned();
+    assert!(
+        text.starts_with("iTop didn't save the changes to R-000001."),
+        "{text}"
+    );
+    let s = h.hub.get("editTicket");
+    assert_eq!(s["type"], "open");
+    assert_eq!(s["error"], text);
+    assert_eq!(s["title"], "New title", "edits stay");
+}
+
+#[tokio::test(start_paused = true)]
+async fn edit_cancel_drops_changes_and_closed_tickets_cant_edit() {
+    let h = edit_harness("assigned").await;
+    open_edit(&h).await;
+    send(&h, "editTicket", json!({"type": "setTitle", "title": "x"}))
+        .await
+        .expect("ok");
+    send(&h, "editTicket", json!({"type": "cancel"}))
+        .await
+        .expect("ok");
+    assert_eq!(h.hub.get("editTicket"), json!({"type": "closed"}));
+    assert!(updates(&h).is_empty());
+
+    open_edit(&h).await;
+    assert!(
+        send(
+            &h,
+            "editTicket",
+            json!({"type": "setClass", "ticketClass": "Incident"})
+        )
+        .await
+        .is_err(),
+        "Edit can't change the type"
+    );
+
+    let h = edit_harness("closed").await;
+    open_edit(&h).await;
+    assert_eq!(h.hub.get("editTicket"), json!({"type": "closed"}));
 }

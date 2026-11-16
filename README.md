@@ -63,7 +63,10 @@ sidebar) removes the password from the Keychain.
   next, even when resolved tickets are hidden. Type a full ref in the search field to open a ticket outside your queue.
 - **Changes:** log entries, assign and reassign, set to pending, resolve (service, subcategory,
   resolution code, solution), **Resolve and Close** in one step, reopen, close, and New ticket (⌘N), which assigns the ticket to you
-  unless you untick **Assign to me**. Every change carries the comment
+  unless you untick **Assign to me**. **Edit…** (⌘E, in the ticket's "…" menu) changes the same
+  fields as New ticket on an existing ticket and saves only what you changed; a description with
+  images or formatting stays read-only (change it in iTop on the web), so saving never drops them.
+  Every change carries the comment
   "iTop Wrap" in the ticket's history.
 - **Images in log entries:** paste (⌘V), drop or pick (paperclip) up to 5 PNG, JPEG or GIF images,
   4 MB each, and check the thumbnails before sending. They're stored the way the web UI stores a

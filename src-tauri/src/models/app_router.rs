@@ -311,12 +311,12 @@ pub(crate) async fn route_workspace(
                 )
                 .await
             }
-            "newTicket:sheet" | "newTicket:window" | "cmdb" | "orgs" | "people" => {
+            "newTicket:sheet" | "newTicket:window" | "editTicket" | "cmdb" | "orgs" | "people" => {
                 let Some(s) = ws.standalone().cloned() else {
                     return Err(AppError::internal(format!("{model} doesn't exist.")));
                 };
                 match model {
-                    "newTicket:sheet" | "newTicket:window" => {
+                    "newTicket:sheet" | "newTicket:window" | "editTicket" => {
                         s.new_tickets.dispatch(model, intent).await
                     }
                     "cmdb" => s.cmdb.dispatch(model, intent).await,

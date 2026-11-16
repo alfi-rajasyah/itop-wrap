@@ -114,6 +114,8 @@ pub struct FakeITop {
     pub detail: Mutex<Value>,
     /// `core/create` and `core/update` fail with this iTop error.
     pub refuse_writes: Mutex<Option<(i64, String)>>,
+    /// Edit ticket's fields (merged over the ticket when they're asked for).
+    pub edit: Mutex<Value>,
     /// Passwords that are accepted by check_credentials.
     pub password: Mutex<String>,
 }
@@ -143,6 +145,14 @@ impl Default for FakeITop {
                 "servicesubcategory_id": "0", "servicesubcategory_id_friendlyname": "",
             })),
             refuse_writes: Mutex::default(),
+            edit: Mutex::new(json!({
+                "org_id": "4", "org_id_friendlyname": "Org A",
+                "caller_id": "11", "caller_id_friendlyname": "Caller One",
+                "service_id": "5", "service_id_friendlyname": "Network",
+                "servicesubcategory_id": "6", "servicesubcategory_id_friendlyname": "VPN",
+                "impact": "2", "urgency": "3",
+                "description": "<p>Printer jams</p>",
+            })),
             password: Mutex::new("secret".into()),
         }
     }
@@ -216,11 +226,26 @@ impl FakeITop {
                     ));
                 }
                 if let Some(id) = key.split("WHERE id = ").nth(1) {
+                    let editing = data["output_fields"]
+                        .as_str()
+                        .is_some_and(|f| f.contains("caller_id"));
+                    let extra = lock(&self.edit).clone();
                     return reply(objects(
                         of_class
                             .iter()
                             .filter(|t| t.key == id.trim())
-                            .map(|t| ticket_object(t))
+                            .map(|t| {
+                                let mut o = ticket_object(t);
+                                if editing
+                                    && let (Some(fields), Some(more)) =
+                                        (o.1["fields"].as_object_mut(), extra.as_object())
+                                {
+                                    for (k, v) in more {
+                                        fields.insert(k.clone(), v.clone());
+                                    }
+                                }
+                                o
+                            })
                             .collect(),
                     ));
                 }

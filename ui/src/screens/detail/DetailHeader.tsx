@@ -75,6 +75,7 @@ export function DetailHeader({ scope, view }: { scope: ListScope; view: TicketDe
       ? [{ id: 'pending', label: 'Set to pending…', disabled: !more.enabled, onSelect: () => run(sendPending({ type: 'open', ticketId: ticket.id })) }]
       : []),
     ...(more.reopen ? [{ id: 'reopen', label: 'Reopen ticket', disabled: !more.enabled, onSelect: () => run(send({ type: 'reopen' })) }] : []),
+    ...(more.edit ? [{ id: 'edit', label: 'Edit…', shortcut: '⌘E', disabled: !more.enabled, onSelect: () => run(send({ type: 'edit' })) }] : []),
     ...(more.divider ? [{ kind: 'separator' as const, id: 'sep' }] : []),
     { id: 'copy', label: `Copy ref ${ticket.ref}`, onSelect: () => run(send({ type: 'copyRef' })) },
     { id: 'web', label: 'Open in iTop on the web', onSelect: () => run(openUrl(more.webUrl)) },

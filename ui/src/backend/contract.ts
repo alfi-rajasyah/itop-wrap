@@ -549,7 +549,9 @@ export interface MoreMenu {
   pending: boolean
   /** "Reopen ticket" */
   reopen: boolean
-  /** The three items above are enabled. */
+  /** "Edit…" (⌘E): every status but closed (iTop Wrap addition). */
+  edit: boolean
+  /** The items above are enabled. */
   enabled: boolean
   /** A divider after them (the state has any action). */
   divider: boolean
@@ -655,6 +657,8 @@ export type DetailIntent =
   | { type: 'reopen' }
   /** After the confirmation dialog. */
   | { type: 'close' }
+  /** Edit… / ⌘E: opens Edit ticket (`editTicket`) on this ticket. */
+  | { type: 'edit' }
   /** ⌘T: start/stop the timer on this ticket when the timer button is there. */
   | { type: 'toggleTimer' }
   | { type: 'setDraft'; text: string }
@@ -675,6 +679,7 @@ export interface DetailResults {
   assignToMe: null
   reopen: null
   close: null
+  edit: null
   toggleTimer: null
   setDraft: null
   addImages: null
@@ -846,6 +851,23 @@ export interface NewTicketOpen {
   confirmEnabled: boolean
   /** A kept draft exists: show "Clear form". */
   showClearForm: boolean
+  /** Edit ticket only (`editTicket`); null for New ticket. */
+  edit: NewTicketEdit | null
+}
+
+/** What only Edit ticket shows (iTop Wrap addition). */
+export interface NewTicketEdit {
+  /** "Edit R-000412". */
+  title: string
+  /** The ticket is still being read from iTop. */
+  loading: boolean
+  /** The description has images or formatting: shown read-only, never sent. */
+  descriptionLocked: boolean
+  descriptionNote: string | null
+  /** The ticket in iTop's web UI, to change a locked description there. */
+  webUrl: string
+  /** Something differs from the ticket as read: Save changes is worth pressing. */
+  changed: boolean
 }
 
 export type NewTicketSnapshot = SheetClosed | NewTicketOpen
@@ -1295,6 +1317,8 @@ export interface ModelMap {
   'resolve:window': Model<ResolveSheetSnapshot, ResolveSheetIntent, ResolveSheetResults>
   'newTicket:sheet': Model<NewTicketSnapshot, NewTicketIntent, NewTicketResults>
   'newTicket:window': Model<NewTicketSnapshot, NewTicketIntent, NewTicketResults>
+  /** Edit ticket (iTop Wrap addition): New ticket's intents; `create` saves the changes. */
+  editTicket: Model<NewTicketSnapshot, NewTicketIntent, NewTicketResults>
   timer: Model<TimerSnapshot, TimerIntent, TimerResults>
   cmdb: Model<CMDBSnapshot, CMDBIntent, CMDBResults>
   orgs: Model<OrgsSnapshot, OrgsIntent, OrgsResults>
@@ -1328,6 +1352,7 @@ export const MODEL_IDS: readonly ModelId[] = [
   'resolve:window',
   'newTicket:sheet',
   'newTicket:window',
+  'editTicket',
   'timer',
   'cmdb',
   'orgs',
