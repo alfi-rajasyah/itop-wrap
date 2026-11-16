@@ -107,6 +107,7 @@ export function Sidebar({
   maxWidth = 260,
   onWidthChange,
   label = "Sections",
+  notice,
   className,
 }: {
   sections: SidebarSection[];
@@ -121,6 +122,8 @@ export function Sidebar({
   /** With it, the right edge is a divider; called with the new width when a drag ends. */
   onWidthChange?: (width: number) => void;
   label?: string;
+  /** A quiet line above the account button (e.g. "iTop Wrap 2.1.0 is available"). */
+  notice?: ReactNode;
   className?: string;
 }) {
   const [dragWidth, setDragWidth] = useState<number | null>(null);
@@ -210,6 +213,8 @@ export function Sidebar({
           </div>
         ))}
       </nav>
+
+      {notice ? <div className="border-t border-line px-3 py-2">{notice}</div> : null}
 
       {user ? (
         // AUTH-27: just the 28 pt initials circle (11 pt semibold), left-aligned above a divider.

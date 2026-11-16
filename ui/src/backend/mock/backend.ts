@@ -44,6 +44,7 @@ import type {
   TicketSort,
   TimerButton,
   TimerNotice,
+  UpdateDialog,
 } from '../contract'
 import { BackendError, type Backend } from '../transport'
 import {
@@ -252,6 +253,9 @@ interface TimerState {
 
 /** `resolve:<scope>` sheets plus the menu bar's Resolve window. */
 type ResolveSlot = ListScope | 'window'
+
+const MOCK_CURRENT = '2.0.0'
+const MOCK_LATEST = '2.1.0'
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
@@ -514,6 +518,7 @@ export class MockBackend implements Backend {
       orgs: () => this.ws(() => this.orgsSnapshot()),
       people: () => this.ws(() => this.peopleSnapshot()),
       menubar: () => this.ws(() => this.menuSnapshot()),
+      update: () => this.ws(() => this.updateSnapshot()),
     }
     return builders[model]() as SnapshotOf<K> | null
   }
@@ -561,6 +566,8 @@ export class MockBackend implements Backend {
         return this.peopleIntent(intent as IntentOf<'people'>)
       case 'menubar':
         return this.menuIntent(intent as IntentOf<'menubar'>)
+      case 'update':
+        return this.updateIntent(intent as IntentOf<'update'>)
     }
   }
 
@@ -2744,6 +2751,54 @@ export class MockBackend implements Backend {
         return null
       case 'refresh':
         await this.refresh('mine')
+        return null
+    }
+  }
+
+  // ===========================================================================================
+  // update (made up: the "latest release" is always 2.1.0, nothing is fetched)
+  // ===========================================================================================
+
+  private update = { checking: false, latest: null as string | null, dismissed: null as string | null, autoCheck: true, dialog: null as UpdateDialog | null }
+
+  private updateSnapshot(): SnapshotOf<'update'> {
+    const u = this.update
+    const newer = u.latest !== null && u.latest !== MOCK_CURRENT ? u.latest : null
+    return {
+      current: MOCK_CURRENT,
+      checking: u.checking,
+      autoCheck: u.autoCheck,
+      notice: newer && newer !== u.dismissed ? { version: newer, text: `iTop Wrap ${newer} is available` } : null,
+      dialog: u.dialog,
+    }
+  }
+
+  private async updateIntent(intent: IntentOf<'update'>): Promise<unknown> {
+    const u = this.update
+    switch (intent.type) {
+      case 'check':
+        u.checking = true
+        u.dialog = null
+        this.changed()
+        await this.wait(400)
+        u.checking = false
+        u.latest = MOCK_LATEST
+        u.dialog = {
+          kind: 'available',
+          title: `iTop Wrap ${MOCK_LATEST} is available`,
+          message: `You have ${MOCK_CURRENT}. Download it from GitHub, then drag it to Applications to replace this version.`,
+        }
+        return null
+      case 'closeDialog':
+      case 'download':
+        // The mock opens nothing.
+        u.dialog = null
+        return null
+      case 'dismiss':
+        u.dismissed = u.latest
+        return null
+      case 'setAutoCheck':
+        u.autoCheck = intent.on
         return null
     }
   }

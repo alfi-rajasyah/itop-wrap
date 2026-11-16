@@ -17,3 +17,8 @@ ts-rs = { version = "12", features = ["chrono-impl", "serde-json-impl"] }
 
 [profile.release]
 lto = "thin"
+
+# Proc macros and build scripts: Cargo's default release stripping makes the current macOS linker
+# write proc-macro dylibs that won't load ("mis-aligned LINKEDIT string pool").
+[profile.release.build-override]
+strip = false

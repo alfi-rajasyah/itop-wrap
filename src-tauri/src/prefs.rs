@@ -13,6 +13,9 @@
 //! | `list.includeClosed` | bool | default false | PERS-4 |
 //! | `list.sort` | string | `priority`, `lastUpdate`, `newest`, `oldest`; unknown → priority | PERS-5 |
 //! | `list.pageSize` | integer | 10/20/30/50/100, 0 = All; missing → 20 | PERS-6 |
+//! | `update.autoCheck` | bool | automatic update checks; default true (iTop Wrap addition) | — |
+//! | `update.lastCheck` | integer | Unix seconds of the last completed update check | — |
+//! | `update.dismissed` | string | the release version whose sidebar notice was dismissed | — |
 //! | `timer.running` | data | UTF-8 JSON `{ticketClass, ticketKey, ref, title, orgID, start}`, `start` = seconds since 2001-01-01 UTC; removed when the timer stops. Write it with [`Prefs::set_data`] so the Swift app can read it back | PERS-7 |
 //!
 //! Standard domain only ([`Prefs::standard`], even with the debug switch):

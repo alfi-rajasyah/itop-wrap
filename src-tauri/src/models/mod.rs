@@ -18,6 +18,7 @@ pub mod session;
 pub mod sheets;
 pub mod shell;
 pub mod timer;
+pub mod update;
 pub mod workspace;
 
 pub use app_router::{AppConfig, AppRouter, session_service};

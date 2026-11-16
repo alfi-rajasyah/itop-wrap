@@ -75,6 +75,8 @@ pub(crate) struct State {
     pub resolve: [ResolveState; 3],
     pub timer: TimerState,
     pub menubar: MenuState,
+    /// The update check (iTop Wrap addition).
+    pub update: super::update::UpdateState,
     /// Swift `Workspace.clock`: ticks every second while a timer runs, else every 15 s.
     pub clock: DateTime<Utc>,
     /// What the tray shows now, to only call `set_tray` on a change.
@@ -89,6 +91,7 @@ pub(crate) struct Tasks {
     pub clock_loop: Option<AbortHandle>,
     pub emit_loop: Option<AbortHandle>,
     pub team_poll: Option<AbortHandle>,
+    pub update_loop: Option<AbortHandle>,
     pub lookup: [Option<AbortHandle>; 2],
     pub detail_load: [Option<AbortHandle>; 2],
 }
@@ -113,6 +116,8 @@ pub(crate) struct Inner {
     /// (an older build overwriting a newer one). Taken before `state`, never the other way.
     pub publishing: Mutex<()>,
     pub standalone: OnceLock<Standalone>,
+    /// Where update checks ask for the latest release (GitHub unless a test sets one).
+    pub releases: OnceLock<Arc<dyn super::update::ReleaseFeed>>,
 }
 
 /// One signed-in session's models. Clones share them.
@@ -120,7 +125,7 @@ pub(crate) struct Inner {
 pub struct Workspace(pub(crate) Arc<Inner>);
 
 /// The workspace ids the contract lists (all but `session`).
-pub const WORKSPACE_MODEL_IDS: [&str; 20] = [
+pub const WORKSPACE_MODEL_IDS: [&str; 21] = [
     "shell",
     "options",
     "list:mine",
@@ -141,6 +146,7 @@ pub const WORKSPACE_MODEL_IDS: [&str; 20] = [
     "orgs",
     "people",
     "menubar",
+    "update",
 ];
 
 impl Workspace {
@@ -169,6 +175,7 @@ impl Workspace {
             resolve: Default::default(),
             timer: TimerState::new(timer_store.load()),
             menubar: MenuState::default(),
+            update: Default::default(),
             clock: now,
             tray: None,
             next_instance: 1,
@@ -189,6 +196,7 @@ impl Workspace {
             tasks: Mutex::default(),
             publishing: Mutex::new(()),
             standalone: OnceLock::new(),
+            releases: OnceLock::new(),
             ctx,
         }));
         let link: Arc<dyn WorkspaceLink> = Arc::new(WeakLink(Arc::downgrade(&ws.0)));
@@ -314,11 +322,14 @@ impl Workspace {
         let refresh = self.spawn(async move { ws.refresh_loop().await });
         let ws = self.clone();
         let emit = self.spawn(async move { ws.emit_loop().await });
+        let ws = self.clone();
+        let update = self.spawn(async move { ws.update_loop().await });
         {
             let mut tasks = self.tasks();
             tasks.clock_loop = Some(clock);
             tasks.refresh_loop = Some(refresh);
             tasks.emit_loop = Some(emit);
+            tasks.update_loop = Some(update);
         }
         if let Some(s) = self.standalone() {
             let (sort, page_size) = {
@@ -343,6 +354,7 @@ impl Workspace {
             tasks.clock_loop.take(),
             tasks.emit_loop.take(),
             tasks.team_poll.take(),
+            tasks.update_loop.take(),
             tasks.lookup[0].take(),
             tasks.lookup[1].take(),
             tasks.detail_load[0].take(),
@@ -426,6 +438,7 @@ impl Workspace {
                     .map(|at| self.resolve_snapshot(&st, at, now)),
                 timer: self.timer_snapshot(&st, now),
                 menubar: self.menubar_snapshot(&st, now),
+                update: self.update_snapshot(&st),
             }
         };
         let hub = &self.0.ctx.hub;
@@ -443,6 +456,7 @@ impl Workspace {
         }
         hub.publish("timer", &snaps.timer);
         hub.publish("menubar", &snaps.menubar);
+        hub.publish("update", &snaps.update);
         self.update_tray_locked();
     }
 
@@ -535,6 +549,7 @@ struct Snaps {
     resolve: [super::sheets::ResolveSheetSnapshot; 3],
     timer: super::timer::TimerSnapshot,
     menubar: super::menubar::MenuBarSnapshot,
+    update: super::update::UpdateSnapshot,
 }
 
 /// The workspace as the standalone models see it; weak, so they don't keep it alive.

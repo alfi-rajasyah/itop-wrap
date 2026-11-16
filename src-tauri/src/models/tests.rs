@@ -3409,3 +3409,129 @@ async fn menubar_resolve_opens_only_the_resolve_window() {
     assert_eq!(h.hub.get("resolve:window")["type"], "closed");
     assert!(h.native.calls().contains(&Call::CloseResolveWindow));
 }
+
+// MARK: - Update check (iTop Wrap addition)
+
+struct FakeFeed(Result<String, String>);
+
+#[async_trait::async_trait]
+impl super::update::ReleaseFeed for FakeFeed {
+    async fn latest_tag(&self) -> Result<String, String> {
+        self.0.clone()
+    }
+}
+
+fn update_harness(answer: Result<String, String>) -> Harness {
+    let h = Harness::new(FakeITop::default());
+    h.ws.set_release_feed(Arc::new(FakeFeed(answer)));
+    h
+}
+
+fn next_major() -> String {
+    let current = super::update::Version::current().to_string();
+    let major: u64 = current.split('.').next().unwrap().parse().unwrap();
+    format!("{}.0.0", major + 1)
+}
+
+#[tokio::test(start_paused = true)]
+async fn update_check_finds_a_newer_release() {
+    let newer = next_major();
+    let h = update_harness(Ok(format!("v{newer}")));
+    let s = h.snap("update");
+    assert_eq!(s["current"], super::update::CURRENT);
+    assert_eq!(s["notice"], Value::Null);
+    assert_eq!(s["autoCheck"], true);
+    send(&h, "update", json!({"type": "check"}))
+        .await
+        .expect("ok");
+    let s = h.hub.get("update");
+    assert_eq!(s["checking"], false);
+    assert_eq!(s["dialog"]["kind"], "available");
+    assert_eq!(
+        s["dialog"]["title"],
+        format!("iTop Wrap {newer} is available")
+    );
+    assert_eq!(s["notice"]["version"], newer);
+    assert!(h.prefs.int(super::update::keys::LAST_CHECK).is_some());
+    send(&h, "update", json!({"type": "download"}))
+        .await
+        .expect("ok");
+    assert!(h.native.calls().contains(&Call::OpenUrl(format!(
+        "https://github.com/alfi-rajasyah/itop-wrap/releases/tag/v{newer}"
+    ))));
+    assert_eq!(h.hub.get("update")["dialog"], Value::Null);
+    send(&h, "update", json!({"type": "dismiss"}))
+        .await
+        .expect("ok");
+    assert_eq!(
+        h.hub.get("update")["notice"],
+        Value::Null,
+        "dismissed for this version"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn update_check_up_to_date_and_older() {
+    for tag in [format!("v{}", super::update::CURRENT), "v0.0.1".to_owned()] {
+        let h = update_harness(Ok(tag));
+        send(&h, "update", json!({"type": "check"}))
+            .await
+            .expect("ok");
+        let s = h.hub.get("update");
+        assert_eq!(s["dialog"]["kind"], "upToDate");
+        assert_eq!(s["notice"], Value::Null);
+        send(&h, "update", json!({"type": "download"}))
+            .await
+            .expect("ok");
+        assert!(
+            !h.native
+                .calls()
+                .iter()
+                .any(|c| matches!(c, Call::OpenUrl(_))),
+            "nothing newer to open"
+        );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn update_check_failures_speak_only_when_asked() {
+    for answer in [
+        Err("GitHub couldn't be reached".to_owned()),
+        Ok("latest".to_owned()),
+    ] {
+        let h = update_harness(answer.clone());
+        h.ws.update_check(false).await;
+        assert_eq!(
+            h.hub.get("update")["dialog"],
+            Value::Null,
+            "automatic: silent"
+        );
+        send(&h, "update", json!({"type": "check"}))
+            .await
+            .expect("ok");
+        let s = h.hub.get("update");
+        assert_eq!(s["dialog"]["kind"], "failed", "{answer:?}");
+        assert_eq!(s["notice"], Value::Null);
+        assert!(h.prefs.int(super::update::keys::LAST_CHECK).is_none());
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn update_auto_check_switch_is_remembered() {
+    let h = update_harness(Ok("v0.0.1".to_owned()));
+    send(&h, "update", json!({"type": "setAutoCheck", "on": false}))
+        .await
+        .expect("ok");
+    assert_eq!(h.hub.get("update")["autoCheck"], false);
+    assert_eq!(h.prefs.bool(super::update::keys::AUTO_CHECK), Some(false));
+}
+
+#[tokio::test(start_paused = true)]
+async fn menu_check_for_updates_runs_a_manual_check() {
+    let h = update_harness(Ok(format!("v{}", super::update::CURRENT)));
+    route_workspace(&h.ws, "update", json!({"type": "closeDialog"}))
+        .await
+        .expect("ok");
+    h.ws.update_check(true).await;
+    assert_eq!(h.hub.get("update")["dialog"]["kind"], "upToDate");
+}

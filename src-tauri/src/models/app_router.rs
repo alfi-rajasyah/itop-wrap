@@ -289,6 +289,7 @@ pub(crate) async fn route_workspace(
             "options" => ws.dispatch_options(decode(intent)?).await,
             "timer" => ws.dispatch_timer(decode(intent)?).await,
             "menubar" => ws.dispatch_menubar(decode(intent)?).await,
+            "update" => ws.dispatch_update(decode(intent)?).await,
             m if m.starts_with("list:") => ws.dispatch_list(scope_of(m)?, decode(intent)?).await,
             m if m.starts_with("detail:") => {
                 ws.dispatch_detail(scope_of(m)?, decode(intent)?).await
@@ -441,7 +442,11 @@ impl Router for AppRouter {
                     ws.publish();
                 }
             }
-            // The New Ticket window's close button: no draft kept (NEW-21).
+            NativeEvent::MenuCheckUpdates => {
+                if let Some(ws) = ws {
+                    ws.update_check(true).await;
+                }
+            }
             NativeEvent::ResolveWindowClosed => {
                 if let Some(ws) = ws {
                     let _ = ws
@@ -452,6 +457,7 @@ impl Router for AppRouter {
                         .await;
                 }
             }
+            // The New Ticket window's close button: no draft kept (NEW-21).
             NativeEvent::NewTicketWindowClosed => {
                 if let Some(s) = ws.as_ref().and_then(|w| w.standalone()).cloned() {
                     let _ = s
