@@ -142,34 +142,37 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
       confirmDisabled={!sheet.confirmEnabled}
       confirmBusy={sheet.busy}
       error={sheet.error}
-      width={460}
+      width={500}
       footer={
         // Three equal buttons, centred (owner's call): Cancel, Resolve and Close, Resolve ticket.
-        <div className="grid w-full grid-cols-3 gap-2">
-          <Button variant="secondary" size="md" className="w-full" onClick={() => void send({ type: 'close' }).catch(logFailure)}>
-            Cancel
-          </Button>
-          <Button
-            variant="danger"
-            size="md"
-            className="w-full"
-            disabled={!sheet.confirmEnabled}
-            tooltip="Resolves the ticket, then closes it. A closed ticket can't be reopened from the app."
-            onClick={() => void send({ type: 'confirmAndClose' }).catch(logFailure)}
-          >
-            Resolve and Close
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            className="w-full"
-            disabled={!sheet.confirmEnabled}
-            busy={sheet.busy}
-            aria-keyshortcuts="Meta+Enter"
-            onClick={() => void send({ type: 'confirm' }).catch(logFailure)}
-          >
-            Resolve ticket
-          </Button>
+        // auto-cols-fr: every button as wide as the widest label, on one line.
+        <div className="flex w-full justify-center">
+          <div className="inline-grid grid-flow-col auto-cols-fr gap-3">
+            <Button variant="secondary" size="sm" className="h-8 w-full whitespace-nowrap px-4" onClick={() => void send({ type: 'close' }).catch(logFailure)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              className="h-8 w-full whitespace-nowrap px-4"
+              disabled={!sheet.confirmEnabled}
+              tooltip="Resolves the ticket, then closes it. A closed ticket can't be reopened from the app."
+              onClick={() => void send({ type: 'confirmAndClose' }).catch(logFailure)}
+            >
+              Resolve and Close
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="h-8 w-full whitespace-nowrap px-4"
+              disabled={!sheet.confirmEnabled}
+              busy={sheet.busy}
+              aria-keyshortcuts="Meta+Enter"
+              onClick={() => void send({ type: 'confirm' }).catch(logFailure)}
+            >
+              Resolve ticket
+            </Button>
+          </div>
         </div>
       }
     >
