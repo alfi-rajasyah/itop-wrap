@@ -10,6 +10,7 @@ export {
   Building as BuildingIcon,
   ChatBubbleQuestion as UserRequestIcon,
   Check as CheckIcon,
+  CheckCircle as ResolveIcon,
   Copy as CopyIcon,
   FilterList as ViewIcon,
   Globe as GlobeIcon,

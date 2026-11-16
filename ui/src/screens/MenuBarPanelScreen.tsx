@@ -57,6 +57,7 @@ export default function MenuBarPanelScreen() {
         void (r.button.type === 'stop' ? sendTimer({ type: 'stop' }) : sendTimer({ type: 'start', ticketId: r.ticketId }))
       }
       onOpen={() => void send({ type: 'openTicket', ticketId: r.ticketId })}
+      onResolve={r.canResolve ? () => void send({ type: 'resolve', ticketId: r.ticketId }) : undefined}
     />
   )
 

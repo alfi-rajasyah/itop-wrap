@@ -3,7 +3,7 @@ import GlideMenu from "@/components/primitives/GlideMenu";
 import { cn } from "@/lib/utils";
 import { NeedsYouDot } from "./Badges";
 import { Button } from "./Button";
-import { NewTicketIcon, OpenWindowIcon, RefreshIcon, StopIcon, StopwatchIcon } from "./icons";
+import { NewTicketIcon, OpenWindowIcon, RefreshIcon, ResolveIcon, StopIcon, StopwatchIcon } from "./icons";
 import { IconButton } from "./IconButton";
 import { Duration, Ref } from "./Ref";
 import { SearchField } from "./SearchField";
@@ -77,6 +77,7 @@ export function MenuBarTicketRow({
   timerTooltip,
   timerBusy,
   onOpen,
+  onResolve,
 }: {
   ticketRef: string;
   title: string;
@@ -93,6 +94,8 @@ export function MenuBarTicketRow({
   timerTooltip?: string;
   timerBusy?: boolean;
   onOpen?: () => void;
+  /** Shown when set: opens the ticket's Resolve sheet in the main window. */
+  onResolve?: () => void;
 }) {
   const elapsed = useElapsedSeconds(runningLabel != null ? null : runningSince);
   const counter = runningLabel ?? (elapsed !== undefined ? formatCounter(elapsed) : undefined);
@@ -117,6 +120,15 @@ export function MenuBarTicketRow({
         </Duration>
       ) : total ? (
         <Duration>{total}</Duration>
+      ) : null}
+      {onResolve ? (
+        <IconButton
+          label={`Resolve ${ticketRef}`}
+          tooltip={`Resolve ${ticketRef}…`}
+          icon={<ResolveIcon />}
+          size="sm"
+          onClick={onResolve}
+        />
       ) : null}
       {timer === "stop" ? (
         <IconButton

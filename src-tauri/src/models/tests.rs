@@ -3337,3 +3337,41 @@ async fn resolve_and_close_sends_resolve_then_close() {
         Some(super::records::Notice::ok("R-000001 is closed."))
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn menubar_resolve_opens_the_ticket_and_its_resolve_sheet() {
+    let h = Harness::new(FakeITop::with(vec![
+        ticket("601", "assigned", "7"),
+        ticket("602", "escalated_tto", "0"),
+    ]));
+    h.load().await;
+    h.settle().await;
+    let rows: Vec<(String, bool)> = h.snap("menubar")["content"]["sections"]
+        .as_array()
+        .expect("sections")
+        .iter()
+        .flat_map(|s| s["rows"].as_array().cloned().unwrap_or_default())
+        .map(|r| {
+            (
+                r["ticketId"].as_str().unwrap_or("").to_owned(),
+                r["canResolve"] == true,
+            )
+        })
+        .collect();
+    assert!(
+        rows.contains(&("UserRequest::601".to_owned(), true)),
+        "{rows:?}"
+    );
+    send(
+        &h,
+        "menubar",
+        json!({"type": "resolve", "ticketId": "UserRequest::601"}),
+    )
+    .await
+    .expect("ok");
+    assert_eq!(h.snap("list:mine")["selection"], "UserRequest::601");
+    assert_eq!(h.snap("shell")["selection"], "myTickets");
+    let s = h.snap("resolve:mine");
+    assert_eq!(s["type"], "open");
+    assert_eq!(s["title"], "Resolve R-000601");
+}

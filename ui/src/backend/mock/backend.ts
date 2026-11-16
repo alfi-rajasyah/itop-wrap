@@ -2676,6 +2676,7 @@ export class MockBackend implements Backend {
       const spent = this.timer.totals[id] ?? 0
       return {
         ticketId: id, ref: t.ref, title: t.title, needsYou: this.needsYou(t), isRunning,
+        canResolve: actionsFor(t.status).includes('resolve'),
         right: isRunning ? { type: 'running', counter: counter(elapsed) } : spent > 0 ? { type: 'spent', text: total(spent) } : { type: 'none' },
         button: isRunning
           ? { type: 'stop' }
@@ -2718,10 +2719,12 @@ export class MockBackend implements Backend {
         this.menuQuery = intent.query
         return null
       case 'openTicket':
+      case 'resolve':
         this.selection = 'myTickets'
         this.setQuery('mine', '')
         this.lists.mine.selection = intent.ticketId
         this.syncDetails()
+        if (intent.type === 'resolve') await this.resolveIntent('mine', { type: 'open', ticketId: intent.ticketId })
         return null
       case 'openMain':
         return null

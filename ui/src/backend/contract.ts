@@ -1163,6 +1163,8 @@ export interface MenuRow {
   needsYou: boolean
   /** Tinted row with the live counter from `timer.running.counter`. */
   isRunning: boolean
+  /** Resolve is offered for this status: the row shows a Resolve button. */
+  canResolve: boolean
   right: MenuRowRight
   button: MenuRowButton
 }
@@ -1198,6 +1200,8 @@ export type MenuBarIntent =
   | { type: 'setQuery'; query: string }
   /** Main window forward, My tickets, its search cleared, the ticket selected. */
   | { type: 'openTicket'; ticketId: string }
+  /** As openTicket, then the ticket's Resolve sheet in the main window. */
+  | { type: 'resolve'; ticketId: string }
   /** ⌘O: main window forward, selection unchanged. */
   | { type: 'openMain' }
   /** ⌘N: the separate New Ticket window. */
@@ -1208,6 +1212,7 @@ export type MenuBarIntent =
 export interface MenuBarResults {
   setQuery: null
   openTicket: null
+  resolve: null
   openMain: null
   newTicket: null
   refresh: null
