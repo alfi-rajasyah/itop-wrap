@@ -11,6 +11,31 @@ design, the list of every behaviour it had to keep, and the contract between Rus
 [docs/](docs/). The original spec, plan and design are [SPEC.md](SPEC.md), [PLAN.md](PLAN.md),
 [DESIGN.md](DESIGN.md) and [UX-FLOWS.md](UX-FLOWS.md).
 
+## Screenshots
+
+The tickets and people below are made up.
+
+![My tickets with a ticket open: escalated tickets marked red, the description with a pasted image, and the log composer](docs/screenshots/main-light.png)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/main-dark.png" alt="The same window in dark mode"></td>
+    <td width="50%"><img src="docs/screenshots/edit.png" alt="Edit ticket: the New ticket form prefilled from the ticket, Save changes off until something changes"></td>
+  </tr>
+  <tr>
+    <td>Dark mode</td>
+    <td>Edit ticket (⌘E)</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/resolve.png" alt="The Resolve sheet with Cancel, Resolve and Close in red, and Resolve ticket"></td>
+    <td width="50%" align="center"><img src="docs/screenshots/menubar.png" width="300" alt="The menu bar panel: your tickets grouped by status, each with a Resolve button and a timer button"></td>
+  </tr>
+  <tr>
+    <td>Resolve, or Resolve and Close in one step</td>
+    <td>The menu bar panel</td>
+  </tr>
+</table>
+
 ## Requirements
 
 - macOS 13 or newer, Apple silicon. To build: Rust 1.96+, Node 24+ and the Xcode command line tools.
