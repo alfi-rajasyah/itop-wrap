@@ -11,14 +11,40 @@ import { NewTicketFields, NewTicketMessages } from './newticket/NewTicketFields'
  * whenever a draft exists. The form closes when Rust says so.
  * ───────────────────────────────────────────────────────── */
 
-export default function NewTicketForm({ instance }: { instance: 'sheet' | 'window' }) {
-  const [form, send] = useModel(`newTicket:${instance}`)
+export default function NewTicketForm({ instance }: { instance: 'sheet' | 'window' | 'edit' }) {
+  const [form, send] = useModel(instance === 'edit' ? 'editTicket' : `newTicket:${instance}`)
   const dispatch = useCallback(
     (intent: NewTicketIntent) => send(intent) as Promise<unknown>,
     [send],
   )
   if (form?.type !== 'open') return null
+  if (instance === 'edit') return <EditTicketSheet form={form} send={dispatch} />
   return instance === 'sheet' ? <NewTicketSheet form={form} send={dispatch} /> : <NewTicketWindow form={form} send={dispatch} />
+}
+
+/**
+ * Edit ticket (iTop Wrap addition): New ticket's form, prefilled from the ticket. Save changes
+ * (⌘↩) sends only what changed and is off until something has; Cancel / Esc drops the changes.
+ */
+function EditTicketSheet({ form, send }: Props) {
+  const edit = form.edit!
+  return (
+    <Dialog
+      open
+      width={480}
+      title={edit.title}
+      subtitle={edit.loading ? 'Reading the ticket from iTop…' : undefined}
+      onCancel={() => run(send, { type: 'cancel' })}
+      onConfirm={() => run(send, { type: 'create' })}
+      confirmLabel="Save changes"
+      confirmDisabled={!form.confirmEnabled}
+      confirmBusy={form.creating}
+      error={<NewTicketMessages form={form} />}
+      focusFirstField={false}
+    >
+      <NewTicketFields form={form} send={send} />
+    </Dialog>
+  )
 }
 
 type Props = { form: NewTicketOpen; send: (intent: NewTicketIntent) => Promise<unknown> }

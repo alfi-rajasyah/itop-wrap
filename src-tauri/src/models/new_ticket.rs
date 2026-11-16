@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use itop_kit::ticket_writes::Failure;
 use itop_kit::{
-    ITopError, NewTicket, PickLists, ServiceCatalog, ServiceRef, TicketClass, TicketWrites,
-    WriteError,
+    EditableTicket, ITopError, NewTicket, PickLists, ServiceCatalog, ServiceRef, Ticket,
+    TicketClass, TicketWrites, WriteError,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -28,12 +28,15 @@ mod tests;
 
 pub const SHEET_ID: &str = "newTicket:sheet";
 pub const WINDOW_ID: &str = "newTicket:window";
+/// Edit ticket (iTop Wrap addition): the same form, prefilled from a ticket, saving changes.
+pub const EDIT_ID: &str = "editTicket";
 
-/// Which New ticket: the main window's sheet, or the menu bar's separate window.
+/// Which form: New ticket's sheet, the menu bar's New ticket window, or Edit ticket's sheet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NewTicketInstance {
     Sheet,
     Window,
+    Edit,
 }
 
 impl NewTicketInstance {
@@ -41,6 +44,7 @@ impl NewTicketInstance {
         match self {
             NewTicketInstance::Sheet => SHEET_ID,
             NewTicketInstance::Window => WINDOW_ID,
+            NewTicketInstance::Edit => EDIT_ID,
         }
     }
 
@@ -48,6 +52,7 @@ impl NewTicketInstance {
         match id {
             SHEET_ID => Some(NewTicketInstance::Sheet),
             WINDOW_ID => Some(NewTicketInstance::Window),
+            EDIT_ID => Some(NewTicketInstance::Edit),
             _ => None,
         }
     }
@@ -125,6 +130,27 @@ pub struct NewTicketOpen {
     pub confirm_enabled: bool,
     /// A kept draft exists: show "Clear form".
     pub show_clear_form: bool,
+    /// Set for Edit ticket only.
+    pub edit: Option<NewTicketEdit>,
+}
+
+/// What only Edit ticket shows (iTop Wrap addition).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../ui/src/bindings/app/")]
+pub struct NewTicketEdit {
+    /// "Edit R-000412".
+    pub title: String,
+    /// The ticket is still being read from iTop.
+    pub loading: bool,
+    /// The description has images or formatting: shown read-only, never sent.
+    pub description_locked: bool,
+    /// Said under a locked description.
+    pub description_note: Option<String>,
+    /// The ticket in iTop's web UI (to change a locked description there).
+    pub web_url: String,
+    /// Something differs from the ticket as read: Save changes is worth pressing.
+    pub changed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -211,6 +237,24 @@ struct Form {
     /// Set while restoring a draft or a prefill, so the cascade doesn't clear the children.
     restoring: bool,
     pending: Vec<Spawn>,
+    /// Edit ticket only.
+    edit: Option<EditTarget>,
+}
+
+/// The ticket Edit ticket is changing, and its fields as read (to send only what changed).
+struct EditTarget {
+    ticket: Ticket,
+    web_url: String,
+    /// `None` until the ticket has been read.
+    read: Option<EditableTicket>,
+}
+
+impl EditTarget {
+    fn locked(&self) -> bool {
+        self.read
+            .as_ref()
+            .is_some_and(EditableTicket::description_locked)
+    }
 }
 
 impl Form {
@@ -234,7 +278,32 @@ impl Form {
             error: None,
             restoring: true,
             pending: Vec::new(),
+            edit: None,
         }
+    }
+
+    /// Edit ticket's current value for a picker, as a choice, when the list doesn't offer it
+    /// (an inactive caller, a service outside the org's contracts…): kept, inserted at the top.
+    fn keep_current(
+        &self,
+        list: &mut Vec<ServiceRef>,
+        id: &str,
+        name: impl Fn(&EditableTicket) -> String,
+    ) -> Option<ServiceRef> {
+        if let Some(found) = list.iter().find(|r| r.id == id) {
+            return Some(found.clone());
+        }
+        let read = self.edit.as_ref()?.read.as_ref()?;
+        if !TicketWrites::is_id(id) {
+            return None;
+        }
+        let current = ServiceRef::new(id.to_owned(), name(read));
+        list.insert(0, current.clone());
+        Some(current)
+    }
+
+    fn description_locked(&self) -> bool {
+        self.edit.as_ref().is_some_and(EditTarget::locked)
     }
 
     /// `.whitespacesAndNewlines` (Unicode White_Space, what `trim` uses).
@@ -243,7 +312,20 @@ impl Form {
     }
 
     fn description_empty(&self) -> bool {
-        self.draft.description.trim().is_empty()
+        !self.description_locked() && self.draft.description.trim().is_empty()
+    }
+
+    /// Edit ticket: whether anything differs from the ticket as read.
+    fn changed(&self) -> bool {
+        match self.edit.as_ref().and_then(|e| e.read.as_ref()) {
+            Some(read) => !itop_kit::ticket_edit::edit_changes(
+                &read.values,
+                &self.filled(),
+                read.description_locked(),
+            )
+            .is_empty(),
+            None => false,
+        }
     }
 
     /// `firstMissing` (W/NewTicketView.swift:155-163).
@@ -331,6 +413,7 @@ struct Shared {
     kept: Option<NewTicket>,
     sheet: Option<Form>,
     window: Option<Form>,
+    edit: Option<Form>,
     next_generation: u64,
 }
 
@@ -339,6 +422,7 @@ impl Shared {
         match instance {
             NewTicketInstance::Sheet => &mut self.sheet,
             NewTicketInstance::Window => &mut self.window,
+            NewTicketInstance::Edit => &mut self.edit,
         }
     }
 
@@ -368,6 +452,7 @@ impl NewTickets {
                 kept: None,
                 sheet: None,
                 window: None,
+                edit: None,
                 next_generation: 0,
             }),
         });
@@ -382,7 +467,11 @@ impl NewTickets {
     /// Publishes both instances (the kept draft and "Assign to me" are shared).
     fn publish(&self) {
         let st = self.lock();
-        for instance in [NewTicketInstance::Sheet, NewTicketInstance::Window] {
+        for instance in [
+            NewTicketInstance::Sheet,
+            NewTicketInstance::Window,
+            NewTicketInstance::Edit,
+        ] {
             self.ctx
                 .hub
                 .publish(instance.model_id(), &self.build(&st, instance));
@@ -398,6 +487,7 @@ impl NewTickets {
         let had_window = {
             let mut st = self.lock();
             st.sheet = None;
+            st.edit = None;
             st.window.take().is_some()
         };
         if had_window {
@@ -405,6 +495,7 @@ impl NewTickets {
         }
         self.ctx.hub.clear(SHEET_ID);
         self.ctx.hub.clear(WINDOW_ID);
+        self.ctx.hub.clear(EDIT_ID);
     }
 
     // MARK: Opening
@@ -433,6 +524,58 @@ impl NewTickets {
         self.load(instance, generation).await;
     }
 
+    /// Opens Edit ticket on `ticket`: reads its fields fresh from iTop, then loads the pickers
+    /// with them selected. A request while it shows starts over on the new ticket.
+    pub async fn request_edit(&self, ticket: Ticket, web_url: String) {
+        let generation = {
+            let mut st = self.lock();
+            st.next_generation += 1;
+            let generation = st.next_generation;
+            let mut form = Form::new(generation, NewTicketStart::default());
+            form.draft = NewTicket::new(ticket.ticket_class);
+            form.edit = Some(EditTarget {
+                ticket: ticket.clone(),
+                web_url,
+                read: None,
+            });
+            st.edit = Some(form);
+            generation
+        };
+        self.publish();
+        let host = text::host(&self.ctx.session);
+        let answer = TicketWrites::new(self.ctx.session.client.clone())
+            .editable(&ticket)
+            .await;
+        {
+            let mut st = self.lock();
+            let Some(form) = st.form(NewTicketInstance::Edit, generation) else {
+                return;
+            };
+            match answer {
+                Ok(read) => {
+                    form.draft = read.values.clone();
+                    if let Some(e) = form.edit.as_mut() {
+                        e.read = Some(read);
+                    }
+                }
+                Err(e) => {
+                    form.orgs = Loadable::Failed(describe_write(&e, &host));
+                    form.restoring = false;
+                    form.error = Some(format!(
+                        "Couldn't read {} from iTop. {}",
+                        ticket.r#ref,
+                        trim_whitespaces(&describe_write(&e, &host))
+                    ));
+                    drop(st);
+                    self.publish();
+                    return;
+                }
+            }
+        }
+        self.publish();
+        self.load_orgs(NewTicketInstance::Edit, generation).await;
+    }
+
     /// `load()` (W/NewTicketView.swift:175-194).
     async fn load(&self, instance: NewTicketInstance, generation: u64) {
         {
@@ -450,6 +593,11 @@ impl NewTickets {
             }
         }
         self.publish();
+        self.load_orgs(instance, generation).await;
+    }
+
+    /// The organizations, then the chosen org's lists (the rest of `load()`).
+    async fn load_orgs(&self, instance: NewTicketInstance, generation: u64) {
         let host = text::host(&self.ctx.session);
         let answer = PickLists::new(self.ctx.session.client.clone())
             .organizations()
@@ -460,7 +608,11 @@ impl NewTickets {
                 return;
             };
             match answer {
-                Ok(all) => {
+                Ok(mut all) => {
+                    if form.edit.is_some() {
+                        let id = form.draft.org_id.clone();
+                        form.keep_current(&mut all, &id, |r| r.org_name.clone());
+                    }
                     let wanted = form.start.org_id.clone().or_else(|| {
                         (!form.draft.org_id.is_empty()).then(|| form.draft.org_id.clone())
                     });
@@ -548,13 +700,18 @@ impl NewTickets {
                 return;
             };
             match people {
-                Ok(p) => {
+                Ok(mut p) => {
                     if form.org.as_ref() != Some(&chosen) {
                         offered.abort();
                         return;
                     }
                     if form.restoring {
-                        form.caller = p.iter().find(|c| c.id == form.draft.caller_id).cloned();
+                        let id = form.draft.caller_id.clone();
+                        form.caller = if form.edit.is_some() {
+                            form.keep_current(&mut p, &id, |r| r.caller_name.clone())
+                        } else {
+                            p.iter().find(|c| c.id == id).cloned()
+                        };
                     }
                     form.callers = Loadable::Loaded(p);
                 }
@@ -569,13 +726,18 @@ impl NewTickets {
                 return;
             };
             match offered {
-                Ok(s) => {
+                Ok(mut s) => {
                     if form.org.as_ref() != Some(&chosen) {
                         return;
                     }
-                    let restore = form
-                        .restoring
-                        .then(|| s.iter().find(|x| x.id == form.draft.service_id).cloned());
+                    let id = form.draft.service_id.clone();
+                    let restore = if !form.restoring {
+                        None
+                    } else if form.edit.is_some() {
+                        Some(form.keep_current(&mut s, &id, |r| r.service_name.clone()))
+                    } else {
+                        Some(s.iter().find(|x| x.id == id).cloned())
+                    };
                     form.services = Loadable::Loaded(s);
                     if let Some(service) = restore {
                         let none = service.is_none();
@@ -620,15 +782,17 @@ impl NewTickets {
                 return;
             };
             match found {
-                Ok(found) => {
+                Ok(mut found) => {
                     if form.service.as_ref() != Some(&chosen) {
                         return;
                     }
                     if form.restoring {
-                        form.subcategory = found
-                            .iter()
-                            .find(|x| x.id == form.draft.subcategory_id)
-                            .cloned();
+                        let id = form.draft.subcategory_id.clone();
+                        form.subcategory = if form.edit.is_some() {
+                            form.keep_current(&mut found, &id, |r| r.subcategory_name.clone())
+                        } else {
+                            found.iter().find(|x| x.id == id).cloned()
+                        };
                     }
                     form.subcategories = Loadable::Loaded(found);
                 }
@@ -667,6 +831,11 @@ impl NewTickets {
 
     /// Cancel / Esc: `keepDraft()` then dismiss (NEW-21).
     fn cancel(&self, instance: NewTicketInstance) {
+        if instance == NewTicketInstance::Edit {
+            // Edit keeps no draft: cancelling drops the changes.
+            self.dismiss(instance);
+            return;
+        }
         let close_window = {
             let mut st = self.lock();
             let Some(form) = st.slot(instance).as_ref() else {
@@ -726,6 +895,9 @@ impl NewTickets {
     /// "Create ticket" (⌘↩): `create()` (W/NewTicketView.swift:265-283). Returns the error shown
     /// under the form, or null (created, a field missing, or creation off).
     async fn create(&self, instance: NewTicketInstance) -> Value {
+        if instance == NewTicketInstance::Edit {
+            return self.save_edit().await;
+        }
         let client = self.ctx.session.client.clone();
         let (generation, filled) = {
             let mut st = self.lock();
@@ -784,12 +956,85 @@ impl NewTickets {
         }
     }
 
+    /// Edit ticket's "Save changes" (⌘↩): sends only what changed. Returns the error shown under
+    /// the form, or null (saved, nothing changed, or a field missing).
+    async fn save_edit(&self) -> Value {
+        let instance = NewTicketInstance::Edit;
+        let client = self.ctx.session.client.clone();
+        let (generation, ticket, before, after, locked) = {
+            let mut st = self.lock();
+            let Some(form) = st.slot(instance).as_mut() else {
+                return Value::Null;
+            };
+            let Some((ticket, read)) = form
+                .edit
+                .as_ref()
+                .and_then(|e| e.read.clone().map(|r| (e.ticket.clone(), r)))
+            else {
+                return Value::Null;
+            };
+            if form.creating || !client.can_write(ticket.ticket_class.raw_value(), &ticket.key) {
+                return Value::Null;
+            }
+            form.tried = true;
+            form.error = None;
+            if form.first_missing().is_some() || !form.changed() {
+                drop(st);
+                self.publish();
+                return Value::Null;
+            }
+            form.creating = true;
+            let locked = read.description_locked();
+            (form.generation, ticket, read.values, form.filled(), locked)
+        };
+        self.publish();
+        let host = text::host(&self.ctx.session);
+        match TicketWrites::new(client)
+            .save_edit(&ticket, &before, &after, locked)
+            .await
+        {
+            Ok(_) => {
+                {
+                    let mut st = self.lock();
+                    if st.form(instance, generation).is_some() {
+                        st.edit = None;
+                    }
+                }
+                self.publish();
+                self.link.ticket_edited(ticket).await;
+                Value::Null
+            }
+            Err(e) => {
+                let text = edit_error(&e, &ticket, &host);
+                {
+                    let mut st = self.lock();
+                    if let Some(form) = st.form(instance, generation) {
+                        form.creating = false;
+                        form.error = Some(text.clone());
+                    }
+                }
+                self.publish();
+                Value::String(text)
+            }
+        }
+    }
+
     async fn handle(
         &self,
         instance: NewTicketInstance,
         intent: NewTicketIntent,
     ) -> Result<Value, AppError> {
         use NewTicketIntent as I;
+        if instance == NewTicketInstance::Edit
+            && matches!(
+                intent,
+                I::Open | I::SetClass { .. } | I::SetAssignToMe { .. } | I::ClearForm
+            )
+        {
+            return Err(AppError::invalid_intent(
+                "Edit ticket can't change the type, assign, clear or open on its own.",
+            ));
+        }
         match intent {
             I::Open => {
                 self.request(instance, NewTicketStart::default()).await;
@@ -875,11 +1120,30 @@ impl NewTickets {
         let form = match instance {
             NewTicketInstance::Sheet => st.sheet.as_ref(),
             NewTicketInstance::Window => st.window.as_ref(),
+            NewTicketInstance::Edit => st.edit.as_ref(),
         };
         let Some(f) = form else {
             return NewTicketSnapshot::Closed;
         };
-        let can_create = self.ctx.session.client.can_create_tickets();
+        let can_create = match f.edit.as_ref() {
+            Some(e) => self
+                .ctx
+                .session
+                .client
+                .can_write(e.ticket.ticket_class.raw_value(), &e.ticket.key),
+            None => self.ctx.session.client.can_create_tickets(),
+        };
+        let edit = f.edit.as_ref().map(|e| NewTicketEdit {
+            title: format!("Edit {}", e.ticket.r#ref),
+            loading: e.read.is_none() && f.error.is_none(),
+            description_locked: e.locked(),
+            description_note: e.locked().then(|| {
+                "This description has images or formatting, so it can only be changed in iTop on the web."
+                    .to_owned()
+            }),
+            web_url: e.web_url.clone(),
+            changed: f.changed(),
+        });
         let org_name = f.org.as_ref().map(|o| o.name.as_str());
         let mark = |empty: bool| RequiredMark {
             missing: f.tried && empty,
@@ -999,13 +1263,20 @@ impl NewTickets {
             },
             error: f.error.clone(),
             disabled_text: (!can_create).then(|| {
-                "Creating tickets is switched off in this build, so nothing is sent to iTop."
-                    .to_owned()
+                if f.edit.is_some() {
+                    "Changes to this ticket are switched off in this build, so nothing is sent to iTop."
+                } else {
+                    "Creating tickets is switched off in this build, so nothing is sent to iTop."
+                }
+                .to_owned()
             }),
             creating: f.creating,
-            // `.disabled(creating || !source.canCreate)`.
-            confirm_enabled: !f.creating && can_create,
-            show_clear_form: st.kept.is_some(),
+            // `.disabled(creating || !source.canCreate)`; Edit also needs something changed.
+            confirm_enabled: !f.creating
+                && can_create
+                && edit.as_ref().is_none_or(|e| e.changed && !e.loading),
+            show_clear_form: f.edit.is_none() && st.kept.is_some(),
+            edit,
         }))
     }
 }
@@ -1057,6 +1328,28 @@ fn action_error(error: &WriteError, host: &str) -> String {
                 reason.push('.');
             }
             format!("iTop didn't create the ticket. {reason}")
+        }
+    }
+}
+
+/// Edit ticket's errors, phrased like the other ticket changes (ERR-14).
+fn edit_error(error: &WriteError, ticket: &Ticket, host: &str) -> String {
+    match error {
+        WriteError::Failure(Failure::Missing(field)) => format!("Fill in the {field} first."),
+        WriteError::Failure(Failure::NotAllowed { status }) => {
+            format!("{} tickets can't be edited.", status_label(status))
+        }
+        WriteError::ITop(ITopError::WritesDisabled) => {
+            "Changes to iTop are switched off in this build, so nothing was sent.".to_owned()
+        }
+        other => {
+            let mut reason = trim_whitespaces(&describe_write(other, host)).to_owned();
+            if let Some(last) = reason.chars().last()
+                && !".!?".contains(last)
+            {
+                reason.push('.');
+            }
+            format!("iTop didn't save the changes to {}. {reason}", ticket.r#ref)
         }
     }
 }

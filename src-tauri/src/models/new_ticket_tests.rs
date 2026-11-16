@@ -767,6 +767,7 @@ async fn new_ticket_snapshot_json_shape() {
             "creating",
             "description",
             "disabledText",
+            "edit",
             "error",
             "impact",
             "missingText",

@@ -125,7 +125,7 @@ pub(crate) struct Inner {
 pub struct Workspace(pub(crate) Arc<Inner>);
 
 /// The workspace ids the contract lists (all but `session`).
-pub const WORKSPACE_MODEL_IDS: [&str; 21] = [
+pub const WORKSPACE_MODEL_IDS: [&str; 22] = [
     "shell",
     "options",
     "list:mine",
@@ -141,6 +141,7 @@ pub const WORKSPACE_MODEL_IDS: [&str; 21] = [
     "resolve:window",
     "newTicket:sheet",
     "newTicket:window",
+    "editTicket",
     "timer",
     "cmdb",
     "orgs",
@@ -578,6 +579,12 @@ impl WorkspaceLink for WeakLink {
     async fn ticket_created(&self, ticket: KitTicket, assign: bool) {
         if let Some(ws) = self.ws() {
             ws.created(ticket, assign).await;
+        }
+    }
+
+    async fn ticket_edited(&self, ticket: KitTicket) {
+        if let Some(ws) = self.ws() {
+            ws.ticket_edited(&ticket).await;
         }
     }
 

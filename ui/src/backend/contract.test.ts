@@ -75,9 +75,9 @@ function rows(list: ListSnapshot) {
 describe('contract shape', () => {
   it('lists every model id once, and every workspace model but session', () => {
     expect(new Set(MODEL_IDS).size).toBe(MODEL_IDS.length)
-    expect(MODEL_IDS).toHaveLength(22)
+    expect(MODEL_IDS).toHaveLength(23)
     expect(WORKSPACE_MODEL_IDS).not.toContain('session')
-    expect(WORKSPACE_MODEL_IDS).toHaveLength(21)
+    expect(WORKSPACE_MODEL_IDS).toHaveLength(22)
   })
 
   it('gives serde-shaped snapshots for every model, signed in and signed out', async () => {

@@ -996,6 +996,31 @@ impl Workspace {
         result
     }
 
+    /// After Edit saved (iTop Wrap addition): every list showing the ticket says so and reloads,
+    /// and the detail reloads with it.
+    pub(crate) async fn ticket_edited(&self, t: &KitTicket) {
+        let id = t.id();
+        let scopes: Vec<ListScope> = {
+            let mut st = self.lock();
+            ListScope::ALL
+                .into_iter()
+                .filter(|scope| {
+                    let l = &mut st.lists[scope.index()];
+                    let shown = l.tickets.iter().any(|x| x.id() == id)
+                        || l.selection.as_deref() == Some(id.as_str());
+                    if shown {
+                        l.notice = Some(Notice::ok(format!("{} is updated.", t.r#ref)));
+                    }
+                    shown
+                })
+                .collect()
+        };
+        self.publish();
+        for scope in scopes {
+            self.list_refresh(scope).await;
+        }
+    }
+
     /// `applyFromHeader(_:to:)`: Reopen and Close have no sheet, so errors go to the notice.
     pub(crate) async fn list_apply_from_header(
         &self,

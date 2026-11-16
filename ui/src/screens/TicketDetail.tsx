@@ -26,8 +26,8 @@ import { RichText } from './detail/RichText'
  * selected ticket of one list. Header and strip show at once from
  * the list row; service line, description, attachments, logs and
  * the composer appear once loaded. Everything shown is the
- * `detail:<scope>` snapshot; ⌘T toggles the timer when the
- * snapshot offers it.
+ * `detail:<scope>` snapshot; ⌘T toggles the timer and ⌘E opens
+ * Edit… when the snapshot offers them.
  * ───────────────────────────────────────────────────────── */
 
 export default function TicketDetail({ scope }: { scope: 'mine' | 'team' }) {
@@ -46,6 +46,20 @@ export default function TicketDetail({ scope }: { scope: 'mine' | 'team' }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [timerToggle, send])
+
+  // ⌘E: Edit… (iTop Wrap addition), when the "…" menu offers it, not while a sheet is up.
+  const canEdit = detail?.type === 'ticket' && detail.more.edit && detail.more.enabled
+  useEffect(() => {
+    if (!canEdit) return
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'e') return
+      if (document.querySelector('[aria-modal="true"]')) return
+      e.preventDefault()
+      void send({ type: 'edit' }).catch((error: unknown) => console.error('edit failed', error))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [canEdit, send])
 
   if (!detail) return <div className="flex-1" />
   if (detail.type === 'none') return <DetailPlaceholder text={detail.placeholder} />

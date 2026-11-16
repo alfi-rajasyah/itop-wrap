@@ -5,6 +5,7 @@ import type { TicketDetailView } from '@/backend'
 import { disposeMocks, selectTicket, startMock, staticBackend, until } from '@/lib/testing'
 import TicketDetail from '../TicketDetail'
 import TicketSheets from '../TicketSheets'
+import NewTicketForm from '../NewTicketForm'
 
 afterEach(disposeMocks)
 
@@ -158,7 +159,7 @@ describe('TicketDetail: header', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
     const menu = await screen.findByRole('menu', { name: 'More actions' })
     const items = within(menu).getAllByRole('menuitem').map((i) => i.textContent)
-    expect(items).toEqual(['Reassign…', 'Set to pending…', 'Copy ref R-000412', 'Open in iTop on the web'])
+    expect(items).toEqual(['Reassign…', 'Set to pending…', 'Edit…⌘E', 'Copy ref R-000412', 'Open in iTop on the web'])
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Open in iTop on the web' }))
     expect(open).toHaveBeenCalledWith('https://itop.example.com/pages/UI.php?operation=details&class=UserRequest&id=412')
     await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
@@ -222,6 +223,33 @@ describe('TicketDetail: header', () => {
     expect(screen.getByRole('textbox', { name: 'Public entry' })).toHaveAttribute('readonly')
     expect(screen.getByText('Adding entries is switched off in this build, so nothing is sent to iTop.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add images' })).toBeDisabled()
+  })
+})
+
+describe('TicketDetail: Edit ticket (iTop Wrap addition)', () => {
+  it('Edit… opens the prefilled form; a formatted description is read-only; Save waits for a change', async () => {
+    const mock = startMock()
+    render(
+      <>
+        <TicketDetail scope="mine" />
+        <NewTicketForm instance="edit" />
+      </>,
+    )
+    await selectTicket(mock, 'mine', 'R-000412')
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Edit…/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit R-000412' })
+    await waitFor(() => expect(within(dialog).queryByText('Reading the ticket from iTop…')).toBeNull())
+    expect(within(dialog).getByText(/images or formatting/)).toBeTruthy()
+    expect(within(dialog).queryByRole('radio', { name: 'Incident' })).toBeNull()
+    expect(within(dialog).queryByRole('checkbox', { name: 'Assign to me' })).toBeNull()
+    const save = within(dialog).getByRole('button', { name: 'Save changes' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    const title = within(dialog).getByRole('textbox', { name: /Title/ })
+    await userEvent.type(title, ' now')
+    await waitFor(() => expect(save.disabled).toBe(false))
+    await userEvent.click(save)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Edit R-000412' })).toBeNull())
   })
 })
 

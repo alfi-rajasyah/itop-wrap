@@ -8,7 +8,7 @@ use crate::error::AppError;
 
 /// Every model id the contract lists (contract.md §3). `get_snapshot` and `dispatch` reject other
 /// ids with `unknownModel` before the router sees them.
-pub const MODEL_IDS: [&str; 22] = [
+pub const MODEL_IDS: [&str; 23] = [
     "session",
     "shell",
     "options",
@@ -25,6 +25,7 @@ pub const MODEL_IDS: [&str; 22] = [
     "resolve:window",
     "newTicket:sheet",
     "newTicket:window",
+    "editTicket",
     "timer",
     "cmdb",
     "orgs",
@@ -86,8 +87,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn model_ids_are_the_contracts_twenty_two() {
-        assert_eq!(MODEL_IDS.len(), 22);
+    fn model_ids_are_the_contracts_twenty_three() {
+        assert_eq!(MODEL_IDS.len(), 23);
         assert!(is_model_id("list:mine"));
         assert!(!is_model_id("list:other"));
     }

@@ -369,7 +369,9 @@ export class MockBackend implements Backend {
   private readonly pending: Record<ListScope, PendingState | null> = { mine: null, team: null }
   /** The two list sheets and the menu bar's Resolve window (which works on My tickets). */
   private readonly resolve: Record<ResolveSlot, ResolveState | null> = { mine: null, team: null, window: null }
-  private readonly newTicket: Record<'sheet' | 'window', NewTicketState | null> = { sheet: null, window: null }
+  private readonly newTicket: Record<'sheet' | 'window' | 'edit', NewTicketState | null> = { sheet: null, window: null, edit: null }
+  /** Edit ticket: the ticket and its fields as opened (to tell what changed). */
+  private editTarget: { ticket: MockTicket; original: NewTicketDraft; locked: boolean } | null = null
   private newTicketDraft: NewTicketDraft | null = null
   private assignToMePref = true
   private lastTicketNumber = 600
@@ -513,6 +515,7 @@ export class MockBackend implements Backend {
       'resolve:window': () => this.ws(() => this.resolveSnapshot('window')),
       'newTicket:sheet': () => this.ws(() => this.newTicketSnapshot('sheet')),
       'newTicket:window': () => this.ws(() => this.newTicketSnapshot('window')),
+      editTicket: () => this.ws(() => this.newTicketSnapshot('edit')),
       timer: () => this.ws(() => this.timerSnapshot()),
       cmdb: () => this.ws(() => this.cmdbSnapshot()),
       orgs: () => this.ws(() => this.orgsSnapshot()),
@@ -556,6 +559,8 @@ export class MockBackend implements Backend {
       case 'newTicket:sheet':
       case 'newTicket:window':
         return this.newTicketIntent(model === 'newTicket:sheet' ? 'sheet' : 'window', intent as IntentOf<'newTicket:sheet'>)
+      case 'editTicket':
+        return this.newTicketIntent('edit', intent as IntentOf<'newTicket:sheet'>)
       case 'timer':
         return this.timerIntent(intent as IntentOf<'timer'>)
       case 'cmdb':
@@ -1452,8 +1457,9 @@ export class MockBackend implements Backend {
             : null,
         pending: actions.includes('pending'),
         reopen: actions.includes('reopen'),
+        edit: t.status !== 'closed',
         enabled: !disabled,
-        divider: actions.length > 0,
+        divider: actions.length > 0 || t.status !== 'closed',
         webUrl: url,
       },
       closeConfirm: { title: `Close ${t.ref}?`, message: "A closed ticket can't be reopened from the app." },
@@ -1594,6 +1600,9 @@ export class MockBackend implements Backend {
         return null
       case 'assignToMe':
         await this.assignToMe(scope, t)
+        return null
+      case 'edit':
+        if (t.status !== 'closed') await this.openEdit(t)
         return null
       case 'reopen':
       case 'close': {
@@ -1952,9 +1961,36 @@ export class MockBackend implements Backend {
     return null
   }
 
-  private newTicketSnapshot(which: 'sheet' | 'window'): SnapshotOf<'newTicket:sheet'> {
+  /** Edit ticket on a mock ticket: prefilled; R-000412's description has an image, so it's locked. */
+  private async openEdit(t: MockTicket) {
+    const org = NEW_TICKET_ORGS.find((o) => o.name === t.orgName) ?? NEW_TICKET_ORGS[0]!
+    const locked = t.ref === 'R-000412'
+    const original: NewTicketDraft = {
+      ticketClass: t.ticketClass, orgId: org.id, callerId: (CALLERS[org.id] ?? [])[0]?.id ?? null,
+      serviceId: SERVICES[0]?.id ?? null, subcategoryId: null, impact: '2', urgency: '3', title: t.title,
+      description: locked ? '' : 'The caller reports the problem started this morning.',
+    }
+    original.subcategoryId = (SUBCATEGORIES[original.serviceId ?? ''] ?? [])[0]?.id ?? null
+    const s: NewTicketState = {
+      ...original, start: { orgId: null, orgName: null, ciId: null, ciName: null }, orgs: { type: 'loading' }, callers: { type: 'idle' },
+      services: { type: 'idle' }, subcategories: { type: 'idle' }, tried: false, creating: false, error: null,
+    }
+    this.editTarget = { ticket: t, original, locked }
+    this.newTicket.edit = s
+    this.changed()
+    await this.wait(200)
+    if (this.newTicket.edit !== s) return
+    s.orgs = { type: 'loaded', value: NEW_TICKET_ORGS }
+    s.callers = { type: 'loaded', value: CALLERS[org.id] ?? [] }
+    s.services = { type: 'loaded', value: SERVICES }
+    s.subcategories = { type: 'loaded', value: SUBCATEGORIES[original.serviceId ?? ''] ?? [] }
+  }
+
+  private newTicketSnapshot(which: 'sheet' | 'window' | 'edit'): SnapshotOf<'newTicket:sheet'> {
     const s = this.newTicket[which]
     if (!s) return { type: 'closed' }
+    const target = which === 'edit' ? this.editTarget : null
+    const changed = target !== null && JSON.stringify(this.draftOf(s)) !== JSON.stringify({ ...target.original, impact: target.original.impact ?? '1', urgency: target.original.urgency ?? '4' })
     const orgName = NEW_TICKET_ORGS.find((o) => o.id === s.orgId)?.name ?? null
     const missing = s.tried ? this.firstMissing(s) : null
     const orgs = valueOf(s.orgs)
@@ -1993,35 +2029,70 @@ export class MockBackend implements Backend {
       assignToMe: this.assignToMePref,
       required: {
         organization: mark(!s.orgId), caller: mark(!s.callerId), service: mark(!s.serviceId), subcategory: mark(!s.subcategoryId),
-        title: mark(s.title.trim() === ''), description: mark(s.description.trim() === ''),
+        title: mark(s.title.trim() === ''), description: mark(!target?.locked && s.description.trim() === ''),
       },
       missingText: missing ? `Fill in the ${missing} first.` : null,
       error: s.error,
       disabledText: this.canWrite ? null : 'Creating tickets is switched off in this build, so nothing is sent to iTop.',
       creating: s.creating,
-      confirmEnabled: !s.creating && this.canWrite,
-      showClearForm: this.newTicketDraft !== null,
+      confirmEnabled: !s.creating && this.canWrite && (target === null || changed),
+      showClearForm: target === null && this.newTicketDraft !== null,
+      edit: target && {
+        title: `Edit ${target.ticket.ref}`,
+        loading: valueOf(s.orgs) === null,
+        descriptionLocked: target.locked,
+        descriptionNote: target.locked ? 'This description has images or formatting, so it can only be changed in iTop on the web.' : null,
+        webUrl: `https://${HOST}/pages/UI.php?operation=details&class=${target.ticket.ticketClass}&id=${target.ticket.key}`,
+        changed,
+      },
     }
   }
 
-  private draftOf(s: NewTicketState): NewTicketDraft {
-    return {
-      ticketClass: s.ticketClass, orgId: s.orgId, callerId: s.callerId, serviceId: s.serviceId, subcategoryId: s.subcategoryId,
-      impact: s.impact ?? '1', urgency: s.urgency ?? '4', title: s.title, description: s.description,
-    }
-  }
-
-  private async newTicketIntent(which: 'sheet' | 'window', intent: IntentOf<'newTicket:sheet'>): Promise<unknown> {
-    if (intent.type === 'open') {
-      await this.openNewTicket(which, { orgId: null, orgName: null, ciId: null, ciName: null })
-      return null
-    }
-    const s = this.newTicket[which]
-    if (!s) return null
+  private async editIntent(intent: IntentOf<'newTicket:sheet'>): Promise<unknown> {
+    const s = this.newTicket.edit
+    const target = this.editTarget
+    if (!s || !target) return null
     switch (intent.type) {
+      case 'open':
       case 'setClass':
-        s.ticketClass = intent.ticketClass
+      case 'setAssignToMe':
+      case 'clearForm':
+        throw new BackendError({ type: 'invalidIntent', message: "Edit ticket can't change the type, assign, clear or open on its own." })
+      case 'cancel':
+      case 'dismiss':
+        this.newTicket.edit = null
+        this.editTarget = null
         return null
+      case 'create': {
+        s.tried = true
+        s.error = null
+        if (this.firstMissing(s) && !(target.locked && this.firstMissing(s) === 'description')) return null
+        if (!this.canWrite) return null
+        s.creating = true
+        this.changed()
+        try {
+          await this.wait(400)
+          const row = this.db.get(target.ticket.ref)!
+          Object.assign(row, { title: s.title.trim(), lastUpdate: this.now() })
+          this.newTicket.edit = null
+          this.editTarget = null
+          const list = this.lists.mine
+          list.notice = { text: `${row.ref} is updated.`, isError: false }
+          await this.refresh('mine')
+          return null
+        } finally {
+          s.creating = false
+        }
+      }
+      default:
+        // Field changes behave as in New ticket.
+        return this.fieldChange(s, intent)
+    }
+  }
+
+  /** The field changes New ticket and Edit ticket share (with the org → service cascade). */
+  private async fieldChange(s: NewTicketState, intent: IntentOf<'newTicket:sheet'>): Promise<unknown> {
+    switch (intent.type) {
       case 'setOrganization':
         s.orgId = intent.id
         s.callerId = null
@@ -2055,6 +2126,39 @@ export class MockBackend implements Backend {
       case 'setDescription':
         s.description = intent.description
         return null
+      default:
+        return null
+    }
+  }
+
+  private draftOf(s: NewTicketState): NewTicketDraft {
+    return {
+      ticketClass: s.ticketClass, orgId: s.orgId, callerId: s.callerId, serviceId: s.serviceId, subcategoryId: s.subcategoryId,
+      impact: s.impact ?? '1', urgency: s.urgency ?? '4', title: s.title, description: s.description,
+    }
+  }
+
+  private async newTicketIntent(which: 'sheet' | 'window' | 'edit', intent: IntentOf<'newTicket:sheet'>): Promise<unknown> {
+    if (which === 'edit') return this.editIntent(intent)
+    if (intent.type === 'open') {
+      await this.openNewTicket(which, { orgId: null, orgName: null, ciId: null, ciName: null })
+      return null
+    }
+    const s = this.newTicket[which]
+    if (!s) return null
+    switch (intent.type) {
+      case 'setClass':
+        s.ticketClass = intent.ticketClass
+        return null
+      case 'setOrganization':
+      case 'setCaller':
+      case 'setService':
+      case 'setSubcategory':
+      case 'setImpact':
+      case 'setUrgency':
+      case 'setTitle':
+      case 'setDescription':
+        return this.fieldChange(s, intent)
       case 'setAssignToMe':
         this.assignToMePref = intent.assignToMe
         return null

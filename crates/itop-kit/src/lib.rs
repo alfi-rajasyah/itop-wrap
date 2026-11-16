@@ -22,11 +22,13 @@ pub mod transport;
 // Writes (TicketWrites, TicketLifecycle, NewTicket, LogImage, TimeTracking).
 pub mod log_image;
 pub mod new_ticket;
+pub mod ticket_edit;
 pub mod ticket_lifecycle;
 pub mod ticket_writes;
 pub mod time_tracking;
 pub use log_image::{LogImage, UploadedImage};
 pub use new_ticket::{NewTicket, PickLists};
+pub use ticket_edit::EditableTicket;
 pub use ticket_lifecycle::{
     Resolution, ResolutionCode, ServiceCatalog, ServiceQueries, ServiceRef, TicketAction,
     TicketChange, TicketLifecycle,
