@@ -1,0 +1,8 @@
+version: 2
+secret:
+  # Test code only: made-up credentials ("s3cret", an encoding test password) and recorded,
+  # redacted iTop responses. Real credentials live only in the Keychain and .env.local.
+  ignored_paths:
+    - "crates/itop-kit/tests/**"
+    - "src-tauri/tests/**"
+    - "Tests/**"
