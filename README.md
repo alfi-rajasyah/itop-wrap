@@ -53,7 +53,7 @@ sidebar) removes the password from the Keychain.
 
 ## What it does
 
-- **My tickets / Team tickets:** grouped by status, escalated first. A teal dot marks the only tickets
+- **My tickets / Team tickets:** grouped by status, escalated first. A red dot marks the only tickets
   that need you: escalated TTR assigned to you, or escalated TTO unassigned in one of your teams.
   The View menu sets the date range, resolved and closed tickets, sorting and page size.
 - **Ticket detail:** description with links and pasted images, attachments, public and private logs,
@@ -61,7 +61,7 @@ sidebar) removes the password from the Keychain.
   rest, Reopen included, is in the "…" menu. A ticket you resolve stays open so you can close it
   next, even when resolved tickets are hidden. Type a full ref in the search field to open a ticket outside your queue.
 - **Changes:** log entries, assign and reassign, set to pending, resolve (service, subcategory,
-  resolution code, solution), reopen, close, and New ticket (⌘N), which assigns the ticket to you
+  resolution code, solution), **Resolve and Close** in one step, reopen, close, and New ticket (⌘N), which assigns the ticket to you
   unless you untick **Assign to me**. Every change carries the comment
   "iTop Wrap" in the ticket's history.
 - **Images in log entries:** paste (⌘V), drop or pick (paperclip) up to 5 PNG, JPEG or GIF images,
@@ -73,7 +73,8 @@ sidebar) removes the password from the Keychain.
   keeps running if you quit. If your web stopwatch is already running on a ticket, the app shows it
   instead of starting a second one.
 - **Menu bar:** your Needs you count and the running timer; the panel lists your tickets with start
-  and stop buttons. It keeps working with the window closed; ⌘O brings the window back.
+  and stop buttons, and a Resolve button that opens the Resolve form in its own window, like New
+  ticket. It keeps working with the window closed; ⌘O brings the window back.
 - **CMDB, Organizations, People:** search CIs and see their relationships and open tickets; an
   organization's tickets from every agent; a person's assigned and reported tickets.
 
@@ -126,6 +127,8 @@ Debug builds read these switches (release builds ignore them):
 | `ITOPWRAP_WRITE_TICKETS=R-…,R-…` | Writes on for these tickets only; the client refuses any other write before sending |
 | `ITOPWRAP_WRITE_NEW=1` | Also allow creating tickets, and writes on the ones created |
 | `ITOPWRAP_TRACE=1` | Log REST calls and UI steps to stderr, never passwords or field values |
+| `ITOPWRAP_STDERR=<file>` | Append stderr to a file (for a debug app opened from Finder) |
+| `ITOPWRAP_APPEARANCE=light\|dark` | Force an appearance |
 
 Two tests run against a real iTop and are off by default, because they create and close tickets. Point
 them only at a test server:
