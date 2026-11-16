@@ -28,5 +28,5 @@ item the Swift app saved: choose **Always Allow**.
 10. **Pending tickets.** A stock iTop refuses Resolve and Reassign on a pending ticket (the Swift app
     offers them too). Check both on your own iTop, whose lifecycle is customised.
 
-The Swift sources (`Package.swift`, `Sources/`, `Tests/`, `Resources/`) are still in the repo so the
-two apps can be compared. Remove them once this list passes.
+The Swift sources (`Package.swift`, `Sources/`, `Tests/`, `Resources/`) were removed after the
+rewrite merged; they are in git history at commit `eabd8b0` if the two apps need comparing.

@@ -5,4 +5,3 @@ secret:
   ignored_paths:
     - "crates/itop-kit/tests/**"
     - "src-tauri/tests/**"
-    - "Tests/**"

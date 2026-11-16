@@ -1,6 +1,5 @@
 # SwiftPM and Xcode build output
 .build/
-.swiftpm/
 build/
 DerivedData/
 *.xcodeproj/xcuserdata/

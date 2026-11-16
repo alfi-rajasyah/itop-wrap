@@ -5,6 +5,9 @@ document says where every piece comes from in the Swift app, how long each model
 native side does, and what is still open. Behaviour is defined by `docs/rewrite/parity-checklist.md`
 (item ids like LIST-30 below refer to it). Paths: `W/` = `Sources/ITopWrap/`, `K/` = `Sources/ITopKit/`.
 
+The Swift sources were removed after the rewrite merged. The `W/`, `K/` and `Tests/` paths cited here
+are in git history at commit `eabd8b0` (`git show eabd8b0:Sources/ITopWrap/<file>`).
+
 ## 1. Rules
 
 1. **Rust owns every model.** Each Swift view model becomes a Rust model with a *snapshot* (everything

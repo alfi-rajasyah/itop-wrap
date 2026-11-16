@@ -6,6 +6,9 @@ not SPEC.md / UX-FLOWS.md / DESIGN.md**: several things those documents describe
 (see section 21). Rebuild what the code does, nothing more.
 
 Paths are relative to the repo root. `W/` = `Sources/ITopWrap/`, `K/` = `Sources/ITopKit/`.
+
+The Swift sources were removed after the rewrite merged. The `W/`, `K/` and `Tests/` paths cited here
+are in git history at commit `eabd8b0` (`git show eabd8b0:Sources/ITopWrap/<file>`).
 Strings in quotes are exact user-facing text (curly quotes “ ” and ellipses … are literal
 characters; `<ref>`, `<name>` etc. are placeholders). "Tooltip" means the `.help` text, which is also
 the hover text; "a11y" means the accessibility label.
