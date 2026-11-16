@@ -1839,7 +1839,7 @@ export class MockBackend implements Backend {
       return null
     }
     const s = this.resolve[scope]
-    if (!s) return intent.type === 'confirm' ? 'The sheet is closed.' : null
+    if (!s) return intent.type === 'confirm' || intent.type === 'confirmAndClose' ? 'The sheet is closed.' : null
     switch (intent.type) {
       case 'close':
         this.resolve[scope] = null
@@ -1859,12 +1859,19 @@ export class MockBackend implements Backend {
       case 'setSolution':
         s.solution = intent.solution
         return null
-      case 'confirm': {
+      case 'confirm':
+      case 'confirmAndClose': {
         s.tried = true
         if (!s.serviceId || !s.subcategoryId || !s.codeId || s.solution.trim() === '') return null
-        const message = await this.apply(scope, this.sheetTicket(scope, s.ticketId), { action: 'resolve', solution: s.solution })
+        const t = this.sheetTicket(scope, s.ticketId)
+        const message = await this.apply(scope, t, { action: 'resolve', solution: s.solution })
         if (message) s.error = message
         else this.resolve[scope] = null
+        if (!message && intent.type === 'confirmAndClose') {
+          // Resolved; a refused Close leaves it resolved and goes to the list notice.
+          const closeMessage = await this.apply(scope, t, { action: 'close' })
+          if (closeMessage) this.lists[scope].notice = { text: closeMessage, isError: true }
+        }
         return message
       }
     }

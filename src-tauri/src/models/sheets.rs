@@ -207,6 +207,8 @@ pub enum ResolveSheetIntent {
         solution: String,
     },
     Confirm,
+    /// Resolve, then Close the resolved ticket (iTop Wrap addition, not in the Swift app).
+    ConfirmAndClose,
 }
 
 fn dropdown(
@@ -765,6 +767,7 @@ impl Workspace {
                 None => return Err(AppError::invalid_intent("The Resolve sheet isn't open.")),
             }
         };
+        let and_close = matches!(intent, ResolveSheetIntent::ConfirmAndClose);
         match intent {
             ResolveSheetIntent::Open { .. } => Ok(null),
             ResolveSheetIntent::Close => {
@@ -833,7 +836,7 @@ impl Workspace {
                 self.publish();
                 Ok(null)
             }
-            ResolveSheetIntent::Confirm => {
+            ResolveSheetIntent::Confirm | ResolveSheetIntent::ConfirmAndClose => {
                 let fields = {
                     let mut st = self.lock();
                     let r = &mut st.resolve[i];
@@ -857,6 +860,16 @@ impl Workspace {
                 let message = self
                     .list_apply(scope, &TicketChange::Resolve(resolution), &t)
                     .await;
+                if and_close && message.is_none() {
+                    // The ticket is resolved now; Close needs that state. A refused Close
+                    // leaves it resolved and reports to the list, since the sheet is done.
+                    let resolved = KitTicket {
+                        status: "resolved".to_owned(),
+                        ..t.clone()
+                    };
+                    self.list_apply_from_header(scope, &TicketChange::Close, &resolved)
+                        .await;
+                }
                 {
                     let mut st = self.lock();
                     let r = &mut st.resolve[i];

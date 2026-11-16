@@ -795,6 +795,8 @@ export type ResolveSheetIntent =
   | { type: 'setCode'; codeId: string | null }
   | { type: 'setSolution'; solution: string }
   | { type: 'confirm' }
+  /** Resolve, then Close the resolved ticket. A refused Close leaves it resolved and goes to the list notice. */
+  | { type: 'confirmAndClose' }
 
 export interface ResolveSheetResults {
   open: null
@@ -805,6 +807,8 @@ export interface ResolveSheetResults {
   setSolution: null
   /** As AssignSheetResults.confirm. */
   confirm: string | null
+  /** The Resolve error, as confirm; a Close error goes to the list notice instead. */
+  confirmAndClose: string | null
 }
 
 // ---------------------------------------------------------------------------------------------

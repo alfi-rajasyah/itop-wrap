@@ -15,13 +15,15 @@
 /* ── iTop Wrap meaning tokens (DESIGN.md) ───────────────────
  * need-*   teal: ONLY "this ticket needs you" (row dot, Needs-you pill, sidebar
  *          count, the one filled primary action on a needs-you ticket).
- * danger-* red: ONLY priority 1 and errors. Darker than Beautiful UI's --red so
+ * danger-* red: ONLY priority 1, errors, and the one action that closes a ticket for good
+ *          (Resolve and Close). Darker than Beautiful UI's --red so
  *          small text passes WCAG AA (light 5.7:1 on white, dark 5.0:1 on surface). */
 :root {
   --need: #0f6e56;
   --need-tint: #e1f5ee;
   --need-ink: #0f6e56;
   --on-need: #ffffff;
+  --on-danger: #ffffff;
   --danger: #c4291c;
   --danger-tint: color-mix(in srgb, #c4291c 9%, var(--surface));
   /* Focus ring: Beautiful UI's blue accent, which is never used for meaning here. */
@@ -36,6 +38,7 @@
   --need-tint: #085041;
   --need-ink: #9fe1cb;
   --on-need: #1d1d1f;
+  --on-danger: #1d1d1f;
   --danger: #ff6b5e;
   --danger-tint: color-mix(in srgb, #ff6b5e 10%, var(--surface));
   --app-bg: var(--page);
@@ -49,6 +52,7 @@
   --color-on-need: var(--on-need);
   --color-danger: var(--danger);
   --color-danger-tint: var(--danger-tint);
+  --color-on-danger: var(--on-danger);
   --color-app: var(--app-bg);
   --color-sidebar: var(--sidebar-bg);
 }

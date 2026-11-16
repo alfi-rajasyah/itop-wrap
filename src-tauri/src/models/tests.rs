@@ -3293,3 +3293,47 @@ async fn list_64_intermediate_spinner_states_are_published() {
     );
     assert_eq!(refreshing.last(), Some(&false));
 }
+
+#[tokio::test(start_paused = true)]
+async fn resolve_and_close_sends_resolve_then_close() {
+    let h = Harness::new(FakeITop::with(vec![ticket("1", "assigned", "7")]));
+    *h.itop.detail.lock().unwrap_or_else(|e| e.into_inner()) = json!({
+        "description": "", "service_id": "5", "service_id_friendlyname": "VPN service",
+        "servicesubcategory_id": "6", "servicesubcategory_id_friendlyname": "VPN",
+    });
+    h.load().await;
+    select(&h, MINE, Some("UserRequest::1"));
+    h.settle().await;
+    send(
+        &h,
+        "resolve:mine",
+        json!({"type": "open", "ticketId": "UserRequest::1"}),
+    )
+    .await
+    .expect("ok");
+    send(
+        &h,
+        "resolve:mine",
+        json!({"type": "setSolution", "solution": "Restarted"}),
+    )
+    .await
+    .expect("ok");
+    let r = send(&h, "resolve:mine", json!({"type": "confirmAndClose"}))
+        .await
+        .expect("ok");
+    assert_eq!(r, Value::Null);
+    let stimuli: Vec<String> = h
+        .stub
+        .requests()
+        .into_iter()
+        .filter(|r| r.operation().as_deref() == Some("core/apply_stimulus"))
+        .map(|r| r.json_data()["stimulus"].as_str().unwrap_or("").to_owned())
+        .collect();
+    assert_eq!(stimuli, ["ev_resolve", "ev_close"]);
+    assert_eq!(h.snap("resolve:mine"), json!({"type": "closed"}));
+    // The list is empty now (closed tickets aren't listed), so read the notice itself.
+    assert_eq!(
+        h.ws.lock().lists[0].notice,
+        Some(super::records::Notice::ok("R-000001 is closed."))
+    );
+}

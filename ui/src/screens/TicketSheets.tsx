@@ -97,7 +97,6 @@ function PendingSheet({ scope, sheet }: { scope: ListScope; sheet: PendingSheetO
   return (
     <Dialog
       open
-      width={420}
       title={sheet.title}
       subtitle={sheet.subtitle}
       onCancel={() => void send({ type: 'close' }).catch(logFailure)}
@@ -135,7 +134,6 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
   return (
     <Dialog
       open
-      width={420}
       title={sheet.title}
       subtitle={sheet.subtitle}
       onCancel={() => void send({ type: 'close' }).catch(logFailure)}
@@ -144,6 +142,36 @@ function ResolveSheet({ scope, sheet }: { scope: ListScope; sheet: ResolveSheetO
       confirmDisabled={!sheet.confirmEnabled}
       confirmBusy={sheet.busy}
       error={sheet.error}
+      width={460}
+      footer={
+        // Three equal buttons, centred (owner's call): Cancel, Resolve and Close, Resolve ticket.
+        <div className="grid w-full grid-cols-3 gap-2">
+          <Button variant="secondary" size="md" className="w-full" onClick={() => void send({ type: 'close' }).catch(logFailure)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            size="md"
+            className="w-full"
+            disabled={!sheet.confirmEnabled}
+            tooltip="Resolves the ticket, then closes it. A closed ticket can't be reopened from the app."
+            onClick={() => void send({ type: 'confirmAndClose' }).catch(logFailure)}
+          >
+            Resolve and Close
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            className="w-full"
+            disabled={!sheet.confirmEnabled}
+            busy={sheet.busy}
+            aria-keyshortcuts="Meta+Enter"
+            onClick={() => void send({ type: 'confirm' }).catch(logFailure)}
+          >
+            Resolve ticket
+          </Button>
+        </div>
+      }
     >
       <Field label="Service" required requiredError={sheet.serviceRequired.missing} reserveErrorSpace={false}>
         {({ id }) => (

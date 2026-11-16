@@ -13,12 +13,13 @@ import { Tooltip } from "./Tooltip";
  *  - busy: a mini spinner in place of the icon; the button is
  *    disabled and keeps its width.
  *  - tooltip: shown even while disabled.
- * "accent" and "success" from the atom are not exposed, and there is
- * no red button: blue and green have no meaning here, and red means
- * only priority 1 and errors.
+ *  - variant "danger": red filled, only for an action that can't be
+ *    undone from the app (Resolve and Close).
+ * "accent" and "success" from the atom are not exposed: blue and
+ * green have no meaning here.
  * ───────────────────────────────────────────────────────── */
 
-export type KitButtonVariant = "primary" | "secondary" | "ghost" | "quiet" | "need";
+export type KitButtonVariant = "primary" | "secondary" | "ghost" | "quiet" | "need" | "danger";
 export type KitButtonSize = "xs" | "sm" | "md" | "block";
 
 export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
@@ -33,10 +34,11 @@ export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "childre
 
 const EXTRA: Record<string, string> = {
   need: "bg-need text-on-need hover:opacity-90 dark:bg-need dark:text-on-need shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]",
+  danger: "bg-danger text-on-danger hover:opacity-90 dark:bg-danger dark:text-on-danger shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]",
 };
 
 export function kitButtonClass(variant: KitButtonVariant = "secondary", size: KitButtonSize = "sm", className?: string) {
-  const base = variant === "need" ? "primary" : variant;
+  const base = variant === "need" || variant === "danger" ? "primary" : variant;
   const atomSize = size === "block" ? "md" : size;
   return cn(
     buttonVariants({ variant: base, size: atomSize }),
