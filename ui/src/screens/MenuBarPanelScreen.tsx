@@ -35,6 +35,10 @@ export default function MenuBarPanelScreen() {
     } else if (!isTauri() && isCommand(e, 'o')) {
       e.preventDefault()
       void send({ type: 'openMain' })
+    } else if (e.key === 'Escape' && !e.defaultPrevented && !(e.metaKey || e.ctrlKey || e.altKey || e.shiftKey)) {
+      // Like a standard menu bar panel, Esc closes it (a search with text clears first).
+      e.preventDefault()
+      void send({ type: 'close' })
     }
   })
 

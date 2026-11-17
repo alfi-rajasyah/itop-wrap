@@ -119,6 +119,8 @@ pub enum MenuBarIntent {
     OpenMain,
     NewTicket,
     Refresh,
+    /// Esc in the panel: hides it, like a click outside it.
+    Close,
 }
 
 impl Workspace {
@@ -306,6 +308,7 @@ impl Workspace {
                 }
             }
             MenuBarIntent::Refresh => self.list_refresh(super::records::ListScope::Mine).await,
+            MenuBarIntent::Close => native.hide_menubar_panel(),
         }
         Ok(serde_json::Value::Null)
     }

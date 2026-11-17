@@ -2856,6 +2856,8 @@ export class MockBackend implements Backend {
       case 'refresh':
         await this.refresh('mine')
         return null
+      case 'close':
+        return null
     }
   }
 
