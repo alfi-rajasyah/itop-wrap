@@ -771,7 +771,7 @@ export class MockBackend implements Backend {
       contentTitle: SIDEBAR.find((s) => s.item === this.selection)!.title,
       needCount,
       account: { initials: ME.initials, displayName: ME.displayName, host: HOST },
-      signOutConfirm: { title: `Sign out of ${HOST}?`, message: 'Your password is removed from the Keychain. Your username stays filled in.' },
+      signOutConfirm: { title: `Sign out of ${HOST}?`, message: 'Your username stays filled in.' },
       sidebarWidth: this.sidebarWidth,
       sidebarVisible: this.sidebarVisible,
     }

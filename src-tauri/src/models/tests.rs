@@ -254,6 +254,7 @@ struct App {
     secrets: Arc<MemorySecretStore>,
     prefs: Arc<MemoryPrefs>,
     itop: Arc<FakeITop>,
+    stub: itop_kit::stub::StubServer,
 }
 
 fn app_with(prefs: MemoryPrefs, secrets: MemorySecretStore) -> App {
@@ -286,6 +287,7 @@ fn app_with(prefs: MemoryPrefs, secrets: MemorySecretStore) -> App {
         secrets,
         prefs,
         itop,
+        stub,
     }
 }
 
@@ -556,6 +558,184 @@ async fn auth_30_31_sign_out_keeps_server_user_and_timer() {
     assert!(a.native.calls().contains(&Call::SessionChanged(false)));
 }
 
+/// Signs in through the form, as you would.
+async fn sign_in(a: &App) {
+    a.router.native_event(NativeEvent::Launched).await;
+    for intent in [
+        json!({"type": "setServer", "server": "https://itop.example.com"}),
+        json!({"type": "setUser", "user": "agent"}),
+        json!({"type": "signIn", "password": "secret"}),
+    ] {
+        a.router.dispatch("session", intent).await.expect("ok");
+    }
+    settle().await;
+    assert_eq!(a.hub.get("session")["type"], "signedIn");
+}
+
+/// Moves the wall clock by `minutes` and lets the idle check (every 30 s) run.
+async fn idle_for(a: &App, minutes: i64) {
+    a.native.advance(chrono::Duration::minutes(minutes));
+    tokio::time::advance(std::time::Duration::from_secs(31)).await;
+    settle().await;
+}
+
+const IDLE_NOTICE: &str = "You were signed out after 12 hours without use. Sign in again.";
+
+#[tokio::test(start_paused = true)]
+async fn idle_1_launch_never_finds_a_password() {
+    // The app's real store is in memory: a relaunch starts with it empty.
+    let prefs = MemoryPrefs::new();
+    use itop_kit::SettingsStore;
+    prefs.set_string("server", Some("https://itop.example.com"));
+    prefs.set_string("user", Some("agent"));
+    let a = app_with(prefs, MemorySecretStore::new());
+    a.router.native_event(NativeEvent::Launched).await;
+    let s = a.hub.get("session");
+    assert_eq!(s["type"], "signedOut");
+    assert_eq!(s["form"]["message"], Value::Null);
+    assert_eq!(s["form"]["user"], "agent");
+    assert_eq!(s["form"]["initialFocus"], "password");
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_2_signs_out_after_12_hours_without_use() {
+    let a = app();
+    sign_in(&a).await;
+    idle_for(&a, 12 * 60 - 1).await;
+    assert_eq!(a.hub.get("session")["type"], "signedIn", "11:59");
+    idle_for(&a, 1).await;
+    let s = a.hub.get("session");
+    assert_eq!(s["type"], "signedOut", "12:00");
+    assert_eq!(
+        s["form"]["message"],
+        json!({"type": "notice", "text": IDLE_NOTICE})
+    );
+    assert_eq!(a.secrets.count(), 0, "the password is gone");
+    assert_eq!(s["form"]["user"], "agent");
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_3_use_restarts_the_countdown() {
+    let a = app();
+    sign_in(&a).await;
+    idle_for(&a, 10 * 60).await;
+    a.router
+        .dispatch("list:mine", json!({"type": "refresh"}))
+        .await
+        .expect("ok");
+    idle_for(&a, 12 * 60 - 1).await;
+    assert_eq!(a.hub.get("session")["type"], "signedIn", "21:59");
+    idle_for(&a, 1).await;
+    assert_eq!(a.hub.get("session")["type"], "signedOut", "22:00");
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_4_native_events_count_as_use() {
+    let a = app();
+    sign_in(&a).await;
+    idle_for(&a, 11 * 60).await;
+    a.router.native_event(NativeEvent::PanelShown).await;
+    idle_for(&a, 11 * 60).await;
+    assert_eq!(a.hub.get("session")["type"], "signedIn");
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_5_background_refreshes_dont_count() {
+    let a = app();
+    sign_in(&a).await;
+    // The 2-minute My tickets refresh runs many times over 12 hours without anyone using the app.
+    for _ in 0..(12 * 60 / 2) {
+        a.native.advance(chrono::Duration::minutes(2));
+        tokio::time::advance(std::time::Duration::from_secs(120)).await;
+        settle().await;
+    }
+    assert_eq!(a.hub.get("session")["type"], "signedOut");
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_6_a_running_timer_is_saved_first() {
+    let a = app();
+    a.itop.can(
+        "Activity",
+        objects(vec![object("Activity", "40", json!({"obj_id": "601"}))]),
+    );
+    sign_in(&a).await;
+    a.router
+        .dispatch(
+            "timer",
+            json!({"type": "start", "ticketId": "UserRequest::601"}),
+        )
+        .await
+        .expect("ok");
+    idle_for(&a, 12 * 60).await;
+    let s = a.hub.get("session");
+    assert_eq!(s["type"], "signedOut");
+    let text = s["form"]["message"]["text"].as_str().unwrap_or_default();
+    assert!(text.starts_with(IDLE_NOTICE), "{text}");
+    assert!(text.contains("Saved 4:00 to R-000601."), "{text}");
+    assert!(
+        a.stub
+            .requests()
+            .iter()
+            .any(|r| r.class().as_deref() == Some("TimeSpent")
+                && r.operation().as_deref() == Some("core/create")),
+        "saved to iTop"
+    );
+    use itop_kit::SettingsStore;
+    assert_eq!(a.prefs.string("timer.running"), None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_7_a_timer_that_cant_be_saved_keeps_running() {
+    let a = app();
+    a.itop.can(
+        "Activity",
+        objects(vec![object("Activity", "40", json!({"obj_id": "601"}))]),
+    );
+    sign_in(&a).await;
+    a.router
+        .dispatch(
+            "timer",
+            json!({"type": "start", "ticketId": "UserRequest::601"}),
+        )
+        .await
+        .expect("ok");
+    *a.itop
+        .refuse_writes
+        .lock()
+        .unwrap_or_else(|e| e.into_inner()) = Some((100, "Nope".into()));
+    idle_for(&a, 12 * 60).await;
+    let s = a.hub.get("session");
+    assert_eq!(s["type"], "signedOut");
+    assert_eq!(
+        s["form"]["message"]["text"],
+        format!("{IDLE_NOTICE} Your timer on R-000601 is still running.")
+    );
+    use itop_kit::SettingsStore;
+    assert!(
+        a.prefs.string("timer.running").is_some(),
+        "kept, to save after the next sign-in"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn idle_8_signing_in_again_starts_a_fresh_countdown() {
+    let a = app();
+    sign_in(&a).await;
+    idle_for(&a, 11 * 60).await;
+    a.router
+        .dispatch("session", json!({"type": "signOut"}))
+        .await
+        .expect("ok");
+    a.router
+        .dispatch("session", json!({"type": "signIn", "password": "secret"}))
+        .await
+        .expect("ok");
+    settle().await;
+    idle_for(&a, 11 * 60).await;
+    assert_eq!(a.hub.get("session")["type"], "signedIn");
+}
+
 #[tokio::test(start_paused = true)]
 async fn contract_7_errors() {
     let a = app();
@@ -601,7 +781,7 @@ async fn shell_3_4_sidebar_titles_and_need_count() {
     );
     assert_eq!(
         s["signOutConfirm"],
-        json!({"title": "Sign out of itop.example.com?", "message": "Your password is removed from the Keychain. Your username stays filled in."}),
+        json!({"title": "Sign out of itop.example.com?", "message": "Your username stays filled in."}),
         "AUTH-29"
     );
 }

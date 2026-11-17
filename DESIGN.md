@@ -222,7 +222,7 @@ After the first sign-in, one card at the top of My tickets asks to turn on notif
 
 ## Settings (⌘,)
 
-Three tabs, macOS style: **General** (show in menu bar, open at login, how often to check iTop, which list opens first), **Notifications** (the one switch, the macOS-blocked case with Open System Settings, your teams read-only), **Account** (server, user, Keychain, REST check, Sign out with a confirmation that names the running timer). Switches are neutral (dark track when on), never teal.
+Three tabs, macOS style: **General** (show in menu bar, open at login, how often to check iTop, which list opens first), **Notifications** (the one switch, the macOS-blocked case with Open System Settings, your teams read-only), **Account** (server, user, REST check, Sign out with a confirmation that names the running timer). Switches are neutral (dark track when on), never teal.
 
 ## Config item detail
 

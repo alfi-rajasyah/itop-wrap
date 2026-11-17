@@ -109,7 +109,7 @@ function SignInForm({ form, send }: { form: LoginForm; send: SessionSend }) {
       <form noValidate onSubmit={submit} className="flex flex-1 flex-col gap-3.5 px-12 pb-8 pt-2">
         <div className="flex flex-col gap-1 pb-1.5">
           <h1 className="text-[20px] font-semibold leading-tight">Sign in to iTop</h1>
-          <p className="text-[13px] leading-snug text-ink-2">Use your iTop account. Your password stays in the macOS Keychain.</p>
+          <p className="text-[13px] leading-snug text-ink-2">Use your iTop account. Your password isn't saved: iTop Wrap signs you out after 12 hours without use, and when it quits.</p>
         </div>
 
         <LoginField label="Server URL" id="login-server">

@@ -190,9 +190,7 @@ impl Workspace {
             },
             sign_out_confirm: ConfirmText {
                 title: format!("Sign out of {host}?"),
-                message:
-                    "Your password is removed from the Keychain. Your username stays filled in."
-                        .to_owned(),
+                message: "Your username stays filled in.".to_owned(),
             },
             sidebar_width: st.shell.sidebar_width,
             sidebar_visible: st.shell.sidebar_visible,

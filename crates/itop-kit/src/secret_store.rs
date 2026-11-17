@@ -1,7 +1,7 @@
 //! Port of `KeychainStore.swift`: the `SecretStore` protocol and an in-memory store.
 //!
-//! The real Keychain store (generic passwords under the service "iTop Wrap", label
-//! "iTop Wrap (account)") lives in the app crate, since it needs the macOS Security framework.
+//! The app keeps the password in memory only. The app crate's `keychain` module only deletes the
+//! item older versions saved (generic passwords under the service "iTop Wrap").
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -17,7 +17,8 @@ pub struct KeychainError {
     pub status: i32,
 }
 
-/// Where the password lives. The app uses the Keychain; tests use an in-memory store.
+/// Where the password lives. The app and the tests both use the in-memory store: the password
+/// is never saved to disk (docs/memory-only-password.md).
 pub trait SecretStore: Send + Sync {
     fn password(&self, account: &str) -> Result<Option<String>, KeychainError>;
     fn set_password(&self, password: &str, account: &str) -> Result<(), KeychainError>;

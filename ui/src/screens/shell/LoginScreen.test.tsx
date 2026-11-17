@@ -16,7 +16,7 @@ describe('LoginScreen: sign-in form (AUTH-9…19)', () => {
     mountMock({ signedOut: true })
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Sign in to iTop' })).toBeInTheDocument()
-    expect(screen.getByText('Use your iTop account. Your password stays in the macOS Keychain.')).toBeInTheDocument()
+    expect(screen.getByText("Use your iTop account. Your password isn't saved: iTop Wrap signs you out after 12 hours without use, and when it quits.")).toBeInTheDocument()
     expect(screen.getByLabelText('Server URL')).toHaveValue('https://itop.example.com')
     expect(screen.getByLabelText('Server URL')).toHaveAttribute('placeholder', 'https://itop.example.com')
     expect(screen.getByLabelText('Username')).not.toHaveValue('')

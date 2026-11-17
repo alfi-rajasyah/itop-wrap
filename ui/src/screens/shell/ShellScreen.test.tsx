@@ -130,7 +130,7 @@ describe('ShellScreen: account and sign out (AUTH-27…30)', () => {
     await user.click(await screen.findByRole('button', { name: /^Account:/ }))
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out…' }))
     let dialog = await screen.findByRole('alertdialog', { name: 'Sign out of itop.example.com?' })
-    expect(within(dialog).getByText('Your password is removed from the Keychain. Your username stays filled in.')).toBeInTheDocument()
+    expect(within(dialog).getByText('Your username stays filled in.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
     expect(sent('session', { type: 'signOut' })).toBe(false)

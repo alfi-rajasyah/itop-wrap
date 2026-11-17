@@ -298,6 +298,24 @@ impl Workspace {
         self.timer_save(entry, ticket_for(&timer), &prefix).await;
     }
 
+    /// Before signing out after 12 hours without use (docs/memory-only-password.md): stops and
+    /// saves a running timer while the password is still known. If the save fails, the timer is
+    /// put back, running and remembered, so no time is lost. Returns what to add to the sign-in
+    /// notice, if anything.
+    pub(crate) async fn timer_stop_for_sign_out(&self) -> Option<String> {
+        let timer = self.lock().timer.running.clone()?;
+        self.timer_stop(None).await;
+        let mut st = self.lock();
+        if st.timer.failed.take().is_some() {
+            st.timer.notice = None;
+            st.timer.running = Some(timer.clone());
+            drop(st);
+            self.0.timer_store.save(Some(&timer));
+            return Some(format!("Your timer on {} is still running.", timer.r#ref));
+        }
+        st.timer.notice.take().map(|n| n.text)
+    }
+
     /// `retry()` (TMR-12).
     pub(crate) async fn timer_retry(&self) {
         let failed = self.lock().timer.failed.clone();

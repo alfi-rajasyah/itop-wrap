@@ -17,11 +17,11 @@ Every flow below is a variation of that loop. The rule that runs through all of 
 
 ## F1. First launch and sign in
 
-**Trigger:** the app opens for the first time, or after Sign out.
+**Trigger:** the app opens (the password is never saved, so every launch), after Sign out, or after 12 hours without use.
 
 1. **Sign in:** enter the server URL, username and password. An `http://` URL shows the warning under the field.
 2. **Sign in to iTop:** the app checks the credentials (`core/check_credentials`). While it checks, the button reads "Signing in…" and the fields lock.
-3. **Success:** the app saves the password to the Keychain, loads your user, person and teams, and opens **My tickets**. The menu bar item appears.
+3. **Success:** the app keeps the password in memory only, loads your user, person and teams, and opens **My tickets**. The menu bar item appears.
 4. **Failure:**
    - "Your username or password was rejected."
    - "Can't reach itop.example.com."
