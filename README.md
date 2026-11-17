@@ -65,17 +65,20 @@ This builds the UI and a release of the app, bundles and signs it, and puts it a
 `build/iTop Wrap.app`. `scripts/make-dmg.sh` wraps that into `build/iTop-Wrap-<version>.dmg`.
 
 If you have an Apple Development certificate (free: add your Apple ID in Xcode > Settings >
-Accounts), the app is signed with it, so the Keychain's **Always Allow** lasts across rebuilds.
-Without one it's signed ad hoc, and macOS treats each new build as a new app: the first time a build
-opens it asks for your login keychain password. Choose **Always Allow**. `SIGN=adhoc` forces ad hoc;
+Accounts), the app is signed with it; without one it's signed ad hoc. `SIGN=adhoc` forces ad hoc;
 `make-dmg.sh` always uses it, since a development signature carries your name and Apple ID email.
 
 ## Sign in
 
-Enter your iTop address (for example `https://itop.example.com`), username and password. The password
-is kept only in your macOS Keychain; the address and username are remembered so you don't retype
-them. Relaunching signs you in again without asking. **Sign out** (the initials at the bottom of the
-sidebar) removes the password from the Keychain.
+Enter your iTop address (for example `https://itop.example.com`), username and password. The
+address and username are remembered so you don't retype them. The password is never saved: it stays
+in memory while you're signed in, so each launch asks for it again. After 12 hours without use (no
+clicks, typing or menu commands in the app's windows, menus or menu bar panel), the app signs you
+out; a running ticket timer is saved to iTop first. **Sign out** (the initials at the bottom of the
+sidebar) signs you out sooner. See [docs/memory-only-password.md](docs/memory-only-password.md).
+
+Versions before this saved the password in your login keychain. The first launch of this version
+deletes that item; macOS may ask once to allow it.
 
 ## What it does
 
@@ -149,7 +152,7 @@ ui/node_modules/.bin/tauri dev
 ```
 
 - `crates/itop-kit` holds the REST client and every ticket rule, covered by tests with REST stubbed.
-- `src-tauri` is the app: the models the UI shows, the menu bar item, menus, windows and the Keychain.
+- `src-tauri` is the app: the models the UI shows, the menu bar item, menus and windows, and removing the password older versions kept in the Keychain.
 - `ui` is the React UI. It only renders what Rust sends and sends back what you do
   ([docs/rewrite/contract.md](docs/rewrite/contract.md)). Opened in a plain browser
   (`npm --prefix ui run dev`) it runs on made-up tickets, and nothing is sent to any server.
@@ -158,7 +161,7 @@ Debug builds read these switches (release builds ignore them):
 
 | Switch | Effect |
 |---|---|
-| `ITOPWRAP_SETTINGS=<name>` | Keep the address, username and Keychain item apart from your real ones |
+| `ITOPWRAP_SETTINGS=<name>` | Keep the address and username apart from your real ones |
 | `ITOPWRAP_WRITE_TICKETS=R-…,R-…` | Writes on for these tickets only; the client refuses any other write before sending |
 | `ITOPWRAP_WRITE_NEW=1` | Also allow creating tickets, and writes on the ones created |
 | `ITOPWRAP_TRACE=1` | Log REST calls and UI steps to stderr, never passwords or field values |

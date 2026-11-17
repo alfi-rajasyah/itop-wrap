@@ -2,7 +2,7 @@
 //!
 //! Start-up: [`run`] builds the Tauri app; in `setup` it creates the [`Hub`] (whose sink emits the
 //! `snapshot` event), the native shell ([`native::mac::Shell`] / [`native::mac::MacNative`]), the
-//! Keychain store and the settings, hands them to a router factory as an [`AppContext`], manages
+//! in-memory password store and the settings, hands them to a router factory as an [`AppContext`], manages
 //! [`commands::AppState`], creates the windows and sends [`NativeEvent::Launched`].
 
 pub mod commands;
@@ -40,11 +40,12 @@ pub struct AppContext {
     pub prefs: Prefs,
     /// The standard domain, always (`newTicket.assignToMe`, PERS-8).
     pub standard_prefs: Prefs,
-    /// The Keychain under "iTop Wrap" (or the debug service).
+    /// Where the password lives while you're signed in: memory only, never disk
+    /// (docs/memory-only-password.md).
     pub secrets: Arc<dyn SecretStore>,
 }
 
-/// Runs the app: the models behind [`models::AppRouter`], with the Keychain, the defaults domain,
+/// Runs the app: the models behind [`models::AppRouter`], with the in-memory password, the defaults domain,
 /// the system's TLS and the build's write access (debug switches, checklist section 17).
 pub fn run() {
     run_with(|ctx| {
@@ -105,10 +106,14 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
                 native: native.clone(),
                 prefs: Prefs::session(),
                 standard_prefs: Prefs::standard(),
-                secrets: Arc::new(keychain::BlockingSecrets(Arc::new(
-                    keychain::KeychainStore::new(prefs::keychain_service()),
-                ))),
+                secrets: Arc::new(itop_kit::MemorySecretStore::new()),
             };
+            // Older versions saved the password in the login Keychain; remove it. Off the main
+            // thread: macOS may ask to allow it.
+            let legacy_settings = Prefs::session();
+            std::thread::spawn(move || {
+                keychain::remove_legacy_password(&prefs::keychain_service(), &legacy_settings)
+            });
             let router = match make_router.take() {
                 Some(make) => make(ctx),
                 None => return Err("setup ran twice".into()),

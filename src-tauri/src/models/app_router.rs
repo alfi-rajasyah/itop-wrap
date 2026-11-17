@@ -4,6 +4,10 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
+
+use chrono::{DateTime, Utc};
+use tokio::task::AbortHandle;
 
 use itop_kit::{ITopError, Session, SessionError, SessionService, SettingsStore, TransportError};
 use serde::de::DeserializeOwned;
@@ -21,7 +25,7 @@ use crate::hub::Hub;
 use crate::native::Native;
 use crate::router::{NativeEvent, Router};
 
-/// What the app is built from. `run()` fills it with the real Keychain, defaults store, Tauri
+/// What the app is built from. `run()` fills it with the in-memory password store, defaults store, Tauri
 /// hub sink and native layer; tests with in-memory ones.
 pub struct AppConfig {
     /// Sign-in, restore and sign-out (see [`session_service`]).
@@ -36,7 +40,7 @@ pub struct AppConfig {
     pub trace: bool,
 }
 
-/// The real `SessionService`: the system's TLS through reqwest, the given Keychain and settings,
+/// The real `SessionService`: the system's TLS through reqwest, the given password store and settings,
 /// and the write access the build and its debug switches allow (checklist section 17).
 pub fn session_service(
     secrets: Arc<dyn itop_kit::SecretStore>,
@@ -50,6 +54,11 @@ pub fn session_service(
     )
 }
 
+/// Signed in, the app signs you out after this long without use (docs/memory-only-password.md).
+pub const IDLE_LIMIT_HOURS: i64 = 12;
+/// How often the idle check runs while you're signed in.
+const IDLE_CHECK: Duration = Duration::from_secs(30);
+
 struct RouterInner {
     service: SessionService,
     prefs: Arc<dyn Prefs>,
@@ -59,6 +68,10 @@ struct RouterInner {
     trace: bool,
     session: Mutex<SessionModelState>,
     workspace: Mutex<Option<Workspace>>,
+    /// When you last used the app (wall clock, `Native::now()`), while signed in.
+    last_use: Mutex<Option<DateTime<Utc>>>,
+    /// The idle check, while signed in.
+    idle_check: Mutex<Option<AbortHandle>>,
 }
 
 /// Routes intents to the models, serves the `itop://` assets and handles native events.
@@ -87,6 +100,8 @@ impl AppRouter {
             trace: config.trace,
             session: Mutex::new(session),
             workspace: Mutex::new(None),
+            last_use: Mutex::new(None),
+            idle_check: Mutex::new(None),
         }));
         router.publish_session();
         router
@@ -123,10 +138,77 @@ impl AppRouter {
             (was_in, session.is_some(), session)
         };
         self.update_workspace(session);
+        if now_in && !was_in {
+            self.start_idle_check();
+        } else if !now_in {
+            self.stop_idle_check();
+        }
         self.publish_session();
         if was_in != now_in {
             self.0.native.session_changed(now_in);
         }
+    }
+
+    // MARK: Sign out after 12 hours without use
+
+    fn last_use(&self) -> MutexGuard<'_, Option<DateTime<Utc>>> {
+        self.0.last_use.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn idle_check(&self) -> MutexGuard<'_, Option<AbortHandle>> {
+        self.0.idle_check.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// You did something: the countdown starts again. Signed out, there's nothing to count.
+    fn used(&self) {
+        let mut last = self.last_use();
+        if last.is_some() {
+            *last = Some(self.0.native.now());
+        }
+    }
+
+    fn start_idle_check(&self) {
+        *self.last_use() = Some(self.0.native.now());
+        let router = self.clone();
+        let handle = tokio::spawn(async move { router.idle_loop().await }).abort_handle();
+        if let Some(old) = self.idle_check().replace(handle) {
+            old.abort();
+        }
+    }
+
+    fn stop_idle_check(&self) {
+        *self.last_use() = None;
+        if let Some(handle) = self.idle_check().take() {
+            handle.abort();
+        }
+    }
+
+    async fn idle_loop(&self) {
+        loop {
+            tokio::time::sleep(IDLE_CHECK).await;
+            let Some(last) = *self.last_use() else {
+                return;
+            };
+            if self.0.native.now() - last >= chrono::Duration::hours(IDLE_LIMIT_HOURS) {
+                // This task ends here; signing out mustn't abort it halfway.
+                self.idle_check().take();
+                self.sign_out_idle().await;
+                return;
+            }
+        }
+    }
+
+    /// Saves a running timer while the password is still known, then signs out with a notice.
+    async fn sign_out_idle(&self) {
+        let mut notice = format!(
+            "You were signed out after {IDLE_LIMIT_HOURS} hours without use. Sign in again."
+        );
+        if let Some(ws) = self.workspace()
+            && let Some(timer) = ws.timer_stop_for_sign_out().await
+        {
+            notice = format!("{notice} {timer}");
+        }
+        self.sign_out_with(Some(notice));
     }
 
     /// `updateWorkspace()`: the same user on the same server keeps the workspace (AUTH-32); any
@@ -236,9 +318,12 @@ impl AppRouter {
         }
     }
 
-    /// `signOut()` (AUTH-30, AUTH-31): the Keychain item goes (errors swallowed); the timer stays
-    /// saved.
+    /// `signOut()` (AUTH-30, AUTH-31): the password goes from memory; the timer stays saved.
     fn sign_out(&self) {
+        self.sign_out_with(None);
+    }
+
+    fn sign_out_with(&self, notice: Option<String>) {
         let session = match &self.session().state {
             SessionState::SignedIn(s) => Some(s.clone()),
             _ => None,
@@ -246,7 +331,7 @@ impl AppRouter {
         if let Some(session) = session {
             let _ = self.0.service.sign_out(&session);
         }
-        self.set_state(SessionState::SignedOut { notice: None });
+        self.set_state(SessionState::SignedOut { notice });
     }
 
     async fn dispatch_session(&self, intent: SessionIntent) -> Result<Value, AppError> {
@@ -335,6 +420,8 @@ impl Router for AppRouter {
         if !is_known(model) {
             return Err(AppError::unknown_model(model));
         }
+        // Every intent comes from something you did in a window (the UI has no timers of its own).
+        self.used();
         if model == "session" {
             // serde's message can quote the value it refused, which may be the password.
             let intent = serde_json::from_value(intent)
@@ -376,6 +463,9 @@ impl Router for AppRouter {
     }
 
     async fn native_event(&self, event: NativeEvent) {
+        if event != NativeEvent::Launched {
+            self.used();
+        }
         let ws = self.workspace();
         match event {
             NativeEvent::Launched => {

@@ -1,34 +1,21 @@
-//! Port of `KeychainStore.swift`: generic passwords in the login Keychain under one service name
-//! (PERS-10). The query is the Swift one attribute for attribute (class, service, account; label
-//! "<service> (<account>)" only when adding), so an item the Swift app saved is found and updated
-//! in place, and vice versa.
+//! Removes the password that versions before the memory-only password saved in the login
+//! Keychain (docs/memory-only-password.md). The password now lives only in memory
+//! (`itop_kit::MemorySecretStore`), so nothing here reads or writes one.
+//!
+//! The query is the old store's, attribute for attribute (class, service, account), so it finds
+//! the item that the Swift app or an earlier Rust build saved.
 
 use core_foundation::base::{CFType, TCFType};
-use core_foundation::boolean::CFBoolean;
-use core_foundation::data::CFData;
 use core_foundation::dictionary::CFDictionary;
 use core_foundation::string::CFString;
 use security_framework_sys::base::{errSecItemNotFound, errSecSuccess};
 use security_framework_sys::item::{
-    kSecAttrAccount, kSecAttrLabel, kSecAttrService, kSecClass, kSecClassGenericPassword,
-    kSecReturnData, kSecValueData,
+    kSecAttrAccount, kSecAttrService, kSecClass, kSecClassGenericPassword,
 };
-use security_framework_sys::keychain_item::{
-    SecItemAdd, SecItemCopyMatching, SecItemDelete, SecItemUpdate,
-};
+use security_framework_sys::keychain_item::SecItemDelete;
 
-use itop_kit::secret_store::{KeychainError, SecretStore};
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct KeychainStore {
-    pub service: String,
-}
-
-impl Default for KeychainStore {
-    fn default() -> Self {
-        Self::new(crate::prefs::KEYCHAIN_SERVICE)
-    }
-}
+use itop_kit::secret_store::KeychainError;
+use itop_kit::{ServerAddress, SessionService, SettingsStore};
 
 /// One of the Security framework's `CFString` constants (`kSecClass`, …) as a `CFString`.
 macro_rules! sec {
@@ -39,175 +26,76 @@ macro_rules! sec {
     }};
 }
 
-impl KeychainStore {
-    pub fn new(service: impl Into<String>) -> Self {
-        Self {
-            service: service.into(),
-        }
-    }
-
-    fn query_pairs(&self, account: &str) -> Vec<(CFString, CFType)> {
-        vec![
-            (sec!(kSecClass), sec!(kSecClassGenericPassword).as_CFType()),
-            (
-                sec!(kSecAttrService),
-                CFString::new(&self.service).as_CFType(),
-            ),
-            (sec!(kSecAttrAccount), CFString::new(account).as_CFType()),
-        ]
-    }
-
-    fn dict(pairs: &[(CFString, CFType)]) -> CFDictionary<CFString, CFType> {
-        CFDictionary::from_CFType_pairs(pairs)
+/// Deletes the generic password saved under `service` for `account`. A missing item is not an
+/// error.
+pub fn delete_password(service: &str, account: &str) -> Result<(), KeychainError> {
+    let pairs: Vec<(CFString, CFType)> = vec![
+        (sec!(kSecClass), sec!(kSecClassGenericPassword).as_CFType()),
+        (sec!(kSecAttrService), CFString::new(service).as_CFType()),
+        (sec!(kSecAttrAccount), CFString::new(account).as_CFType()),
+    ];
+    let query = CFDictionary::from_CFType_pairs(&pairs);
+    // SAFETY: `query` is valid for the duration of the call.
+    let status = unsafe { SecItemDelete(query.as_concrete_TypeRef()) };
+    if status == errSecSuccess || status == errSecItemNotFound {
+        Ok(())
+    } else {
+        Err(KeychainError { status })
     }
 }
 
-impl SecretStore for KeychainStore {
-    fn password(&self, account: &str) -> Result<Option<String>, KeychainError> {
-        let mut pairs = self.query_pairs(account);
-        pairs.push((sec!(kSecReturnData), CFBoolean::true_value().as_CFType()));
-        // kSecMatchLimitOne is SecItemCopyMatching's default; the Swift query set it explicitly.
-        let query = Self::dict(&pairs);
-        let mut result: core_foundation_sys::base::CFTypeRef = std::ptr::null();
-        // SAFETY: `query` is a valid dictionary for the duration of the call and `result` a valid
-        // out-pointer; on success it receives an owned (Create rule) CFData.
-        let status = unsafe { SecItemCopyMatching(query.as_concrete_TypeRef(), &mut result) };
-        if status == errSecItemNotFound {
-            return Ok(None);
-        }
-        if status != errSecSuccess || result.is_null() {
-            return Err(KeychainError { status });
-        }
-        // SAFETY: non-null and owned by us (Create rule).
-        let value = unsafe { CFType::wrap_under_create_rule(result) };
-        let data = value.downcast::<CFData>().ok_or(KeychainError { status })?;
-        // Swift: String(decoding: data, as: UTF8.self), which replaces invalid bytes.
-        Ok(Some(String::from_utf8_lossy(data.bytes()).into_owned()))
-    }
-
-    fn set_password(&self, password: &str, account: &str) -> Result<(), KeychainError> {
-        let data = CFData::from_buffer(password.as_bytes());
-        let query = Self::dict(&self.query_pairs(account));
-        let update = Self::dict(&[(sec!(kSecValueData), data.as_CFType())]);
-        // SAFETY: both dictionaries are valid for the duration of the call.
-        let status =
-            unsafe { SecItemUpdate(query.as_concrete_TypeRef(), update.as_concrete_TypeRef()) };
-        if status == errSecSuccess {
-            return Ok(());
-        }
-        if status != errSecItemNotFound {
-            return Err(KeychainError { status });
-        }
-        let mut add = self.query_pairs(account);
-        add.push((sec!(kSecValueData), data.as_CFType()));
-        add.push((
-            sec!(kSecAttrLabel),
-            CFString::new(&format!("{} ({account})", self.service)).as_CFType(),
-        ));
-        let add = Self::dict(&add);
-        // SAFETY: `add` is valid for the call; a null result pointer means "don't return the item".
-        let status = unsafe { SecItemAdd(add.as_concrete_TypeRef(), std::ptr::null_mut()) };
-        if status == errSecSuccess {
-            Ok(())
-        } else {
-            Err(KeychainError { status })
-        }
-    }
-
-    fn delete_password(&self, account: &str) -> Result<(), KeychainError> {
-        let query = Self::dict(&self.query_pairs(account));
-        // SAFETY: `query` is valid for the duration of the call.
-        let status = unsafe { SecItemDelete(query.as_concrete_TypeRef()) };
-        if status == errSecSuccess || status == errSecItemNotFound {
-            Ok(())
-        } else {
-            Err(KeychainError { status })
-        }
-    }
+/// The Keychain account the old versions used for the remembered server and username, if both
+/// are remembered.
+pub fn legacy_account(settings: &dyn SettingsStore) -> Option<String> {
+    let server = settings.string(itop_kit::SessionSettings::SERVER_KEY)?;
+    let user = settings.string(itop_kit::SessionSettings::USER_KEY)?;
+    let address = ServerAddress::new(&server).ok()?;
+    Some(SessionService::account(&user, &address))
 }
 
-/// A `SecretStore` whose calls tell the async runtime they block: Keychain calls can wait on a
-/// macOS access prompt, so on Tauri's multi-threaded runtime they run in `block_in_place` and
-/// the worker's other tasks move on. Elsewhere (no runtime, or a current-thread one) they run
-/// as they are. `SessionService` behaves exactly as with the store itself.
-pub struct BlockingSecrets(pub std::sync::Arc<dyn SecretStore>);
-
-impl BlockingSecrets {
-    fn run<T>(&self, f: impl FnOnce(&dyn SecretStore) -> T) -> T {
-        let multi = tokio::runtime::Handle::try_current()
-            .is_ok_and(|h| h.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread);
-        if multi {
-            tokio::task::block_in_place(|| f(self.0.as_ref()))
-        } else {
-            f(self.0.as_ref())
-        }
-    }
-}
-
-impl SecretStore for BlockingSecrets {
-    fn password(&self, account: &str) -> Result<Option<String>, KeychainError> {
-        self.run(|s| s.password(account))
-    }
-
-    fn set_password(&self, password: &str, account: &str) -> Result<(), KeychainError> {
-        self.run(|s| s.set_password(password, account))
-    }
-
-    fn delete_password(&self, account: &str) -> Result<(), KeychainError> {
-        self.run(|s| s.delete_password(account))
+/// Deletes the old versions' saved password for the remembered account, if there is one. macOS
+/// may ask to allow it once; until it's gone this runs at every launch, and once it's gone the
+/// delete finds nothing and asks nothing.
+pub fn remove_legacy_password(service: &str, settings: &dyn SettingsStore) {
+    if let Some(account) = legacy_account(settings)
+        && let Err(e) = delete_password(service, &account)
+    {
+        eprintln!(
+            "iTop Wrap couldn't remove the old saved password from the Keychain (OSStatus {}).",
+            e.status
+        );
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use itop_kit::MemorySettingsStore;
 
     #[test]
-    fn blocking_secrets_pass_through() {
-        let inner = std::sync::Arc::new(itop_kit::MemorySecretStore::new());
-        let store = BlockingSecrets(inner.clone());
-        store.set_password("pw", "a@b").expect("set");
-        assert_eq!(store.password("a@b"), Ok(Some("pw".to_owned())));
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .build()
-            .expect("runtime");
-        let read = rt.block_on(async move {
-            tokio::spawn(async move { store.password("a@b") })
-                .await
-                .expect("task")
-        });
-        assert_eq!(read, Ok(Some("pw".to_owned())));
-        assert_eq!(inner.count(), 1);
+    fn legacy_account_is_the_old_stores() {
+        let settings = MemorySettingsStore::new();
+        assert_eq!(legacy_account(&settings), None, "nothing remembered");
+        settings.set_string("server", Some("https://itop.example.com"));
+        assert_eq!(legacy_account(&settings), None, "no username");
+        settings.set_string("user", Some("agent"));
+        assert_eq!(
+            legacy_account(&settings).as_deref(),
+            Some("agent@https://itop.example.com")
+        );
     }
 
     #[test]
-    fn swift_defaults() {
-        assert_eq!(KeychainStore::default().service, "iTop Wrap");
+    fn swift_service_name() {
+        assert_eq!(crate::prefs::KEYCHAIN_SERVICE, "iTop Wrap");
     }
 
-    /// Port of the Swift `KeychainTests.roundTrip`, against the real login Keychain with a
-    /// throwaway service and account. Ignored by default: it touches the Keychain and may prompt.
-    /// Run with `cargo test -p itop-wrap -- --ignored keychain`.
+    /// Against the real login Keychain with a throwaway service. Ignored by default: it touches
+    /// the Keychain and may prompt. Run with `cargo test -p itop-wrap -- --ignored keychain`.
     #[test]
     #[ignore = "uses the real login Keychain"]
-    fn keychain_round_trip() {
-        let store = KeychainStore::new("iTop Wrap tests");
-        let account = format!("roundtrip-{}@https://itop.invalid", std::process::id());
-        let _ = store.delete_password(&account);
-        assert_eq!(store.password(&account), Ok(None));
-        store.set_password("first", &account).expect("add");
-        store
-            .set_password("second", &account)
-            .expect("update in place");
-        let read = store.password(&account);
-        store.delete_password(&account).expect("delete");
-        assert_eq!(read, Ok(Some("second".to_owned())));
-        assert_eq!(store.password(&account), Ok(None));
-        assert_eq!(
-            store.delete_password(&account),
-            Ok(()),
-            "a missing item is not an error"
-        );
+    fn keychain_delete_of_a_missing_item_is_ok() {
+        let account = format!("missing-{}@https://itop.invalid", std::process::id());
+        assert_eq!(delete_password("iTop Wrap tests", &account), Ok(()));
     }
 }

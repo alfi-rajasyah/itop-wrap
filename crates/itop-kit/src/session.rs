@@ -178,7 +178,7 @@ impl SessionService {
         self
     }
 
-    /// The Keychain account for a user on a server.
+    /// The secret store's account for a user on a server (also the old Keychain item's).
     pub fn account(user: &str, server: &ServerAddress) -> String {
         format!("{user}@{}", server.base_url())
     }
@@ -191,7 +191,7 @@ impl SessionService {
         self.settings.user()
     }
 
-    /// Checks the credentials, loads who you are, then saves the password to the Keychain.
+    /// Checks the credentials, loads who you are, then keeps the password in the secret store.
     /// Nothing is saved if any step fails.
     pub async fn sign_in(
         &self,
@@ -228,7 +228,7 @@ impl SessionService {
         ))
     }
 
-    /// Removes the password from the Keychain. The server and username stay filled in.
+    /// Removes the password from the secret store. The server and username stay filled in.
     pub fn sign_out(&self, session: &Session) -> Result<(), SessionError> {
         self.secrets.delete_password(&Self::account(
             &session.client.credentials.user,

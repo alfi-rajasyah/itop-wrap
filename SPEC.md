@@ -10,7 +10,7 @@ It talks to my existing iTop server through the REST/JSON API (`/webservices/res
 **User:** me, an iTop user with a local username/password account and REST access.
 
 **V1 user stories**
-1. **Sign in** — I enter the server URL, username and password once; the app checks them (`core/check_credentials`) and remembers them (password in the macOS Keychain).
+1. **Sign in** — I enter the server URL, username and password once; the app checks them (`core/check_credentials`) and remembers the URL and username. The password is never saved: it stays in memory, and the app signs me out after 12 hours without use and when it quits (docs/memory-only-password.md).
 2. **My tickets** — I see a list of open `UserRequest` and `Incident` tickets assigned to me, with ref, title, status, priority, caller and last update. I can switch to "my team's tickets", search by ref or title, and refresh. If I type a full ref that isn't in my list (for example a colleague's ticket), the app fetches it from iTop and offers to open it in the app, as far as my iTop rights allow. Every ticket also has "Open in iTop on the web" for anything the app doesn't cover.
 3. **Ticket detail** — I open a ticket to see its description (shown in full under the details row), public and private logs, caller, organization, team/agent and linked CIs.
 4. **Create ticket** — I create a `UserRequest` or `Incident` with organization, caller, service and service subcategory (both required), title, description, impact and urgency (pick lists loaded from iTop; services are the ones the organization's contract covers, and subcategories are filtered by the chosen service).
@@ -95,7 +95,7 @@ Conventions: one type per file in `ITopKit`; views own no networking — they ca
 
 ## Boundaries
 
-- **Always:** run `swift test` before each commit; keep the password only in the Keychain; use HTTPS URLs (warn on `http://`); send write operations with a `comment` so changes are traceable in iTop history.
+- **Always:** run `swift test` before each commit; never save the password (memory only); use HTTPS URLs (warn on `http://`); send write operations with a `comment` so changes are traceable in iTop history.
 - **Ask first:** adding any dependency; changing the minimum macOS version.
 - **Read-only against the real server (until you say otherwise):** during development the app only reads (`core/get`, `core/check_credentials`, `list_operations`). Every write (create, update, stimulus, TimeSpent) is built and tested against a recorded mock transport. Real writes are switched on only when you say so. **Switched on 2026-11-11 by you for release builds** (every ticket your account may edit); debug builds stay read-only unless a test switch names tickets (`ITOPWRAP_WRITE_TICKETS`, `ITOPWRAP_WRITE_NEW`).
 - **Never:** commit credentials, server URLs or real ticket data to the repo or fixtures; disable TLS validation; delete objects in iTop (`core/delete` is not used at all).
