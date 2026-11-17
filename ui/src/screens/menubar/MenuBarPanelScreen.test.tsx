@@ -63,6 +63,21 @@ describe('MenuBarPanelScreen (MB-7…16, KEY-8)', () => {
     expect(await screen.findByText('No tickets of yours match “zebra”.')).toBeInTheDocument()
   })
 
+  it('Esc closes the panel, but first clears a search that has text', async () => {
+    const user = userEvent.setup()
+    const { sent, dispatch } = mountMock()
+    render(<MenuBarApp />)
+    await section('Assigned  2')
+    const search = screen.getByRole('searchbox', { name: 'Search my tickets' })
+    await user.type(search, 'vpn')
+    dispatch.mockClear()
+    await user.keyboard('{Escape}')
+    expect(search).toHaveValue('')
+    expect(sent('menubar', { type: 'close' })).toBe(false)
+    await user.keyboard('{Escape}')
+    expect(sent('menubar', { type: 'close' })).toBe(true)
+  })
+
   it('New ticket, Refresh, Open iTop Wrap and ⌘R/⌘N/⌘O send the panel intents', async () => {
     const user = userEvent.setup()
     const { sent, dispatch, mock } = mountMock()

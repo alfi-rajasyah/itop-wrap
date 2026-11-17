@@ -204,10 +204,21 @@ pub fn make_menubar_panel<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWin
         return;
     };
     let ptr: *const NSWindow = &*w;
+    // AppKit and WebKit key-value observe the window, so its runtime class is KVO's subclass of
+    // TaoWindow (`NSKVONotifying_TaoWindow`), whose setter overrides send the change
+    // notifications. WebKit's observers go with its view: take the content view out so WebKit
+    // drops them, swap the class, then observe the overridden setters' keys again so KVO builds
+    // the same overrides on a subclass of MenuBarPanel, and put the view back (WebKit observes
+    // again). AppKit's remaining observer (`_windowLayerContext`) is notified by hand, not
+    // through a setter, so it keeps working across the swap.
+    let content = w.contentView();
+    w.setContentView(None);
     if !panel_swap_is_sound(w.class()) {
+        w.setContentView(content.as_deref());
         eprintln!("menu bar panel: the window's class can't be swapped safely; left as it is");
         return;
     }
+    let setter_keys = kvo_setter_keys(w.class());
     // SAFETY: checked by `panel_swap_is_sound`: the live object is tao's `TaoWindow`, an NSWindow
     // subclass whose only ivar (`WindowState { focusable: AtomicBool }`, no Drop side effects)
     // sits after NSWindow's ivars, and NSPanel adds no ivars of its own, so NSPanel's methods never
@@ -223,6 +234,8 @@ pub fn make_menubar_panel<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWin
             MenuBarPanel::class() as *const AnyClass,
         );
     }
+    observe_keys(&w, &setter_keys);
+    w.setContentView(content.as_deref());
     w.setStyleMask(w.styleMask() | NSWindowStyleMask::NonactivatingPanel);
     w.setLevel(NSStatusWindowLevel);
     w.setCollectionBehavior(
@@ -243,15 +256,98 @@ pub fn make_menubar_panel<R: Runtime>(mtm: MainThreadMarker, window: &WebviewWin
     }
 }
 
+/// The class a KVO subclass (`NSKVONotifying_X`, which Foundation makes when something observes
+/// an instance of `X`) stands in for, or `class` itself when it isn't one.
+fn unobserved_class(class: &AnyClass) -> &AnyClass {
+    let name = class.name().to_str().unwrap_or_default();
+    match (name.strip_prefix("NSKVONotifying_"), class.superclass()) {
+        (Some(base), Some(sup)) if sup.name().to_str() == Ok(base) => sup,
+        _ => class,
+    }
+}
+
+/// The key a KVO setter override is for: `setContentView:` → `contentView`,
+/// `set_windowLayerContext:` → `_windowLayerContext`; `None` for anything that isn't a setter.
+fn setter_key(selector: &str) -> Option<String> {
+    let rest = selector.strip_prefix("set")?.strip_suffix(':')?;
+    let mut chars = rest.chars();
+    let first = chars.next()?;
+    if rest.contains(':') || first.is_lowercase() {
+        return None;
+    }
+    Some(first.to_lowercase().chain(chars).collect())
+}
+
+/// The keys whose setters a KVO subclass overrides (none when `class` isn't KVO's).
+fn kvo_setter_keys(class: &AnyClass) -> Vec<String> {
+    if std::ptr::eq(unobserved_class(class), class) {
+        return Vec::new();
+    }
+    class
+        .instance_methods()
+        .iter()
+        .filter_map(|m| setter_key(&m.name().to_string()))
+        .collect()
+}
+
+define_class!(
+    // SAFETY: NSObject has no subclassing requirements; no ivars, no Drop.
+    #[unsafe(super(NSObject))]
+    #[name = "ITopWrapKeyValueKeeper"]
+    struct KeyValueKeeper;
+
+    unsafe impl NSObjectProtocol for KeyValueKeeper {}
+
+    impl KeyValueKeeper {
+        /// Observes only so KVO keeps a key's setter override; the change itself isn't needed.
+        #[unsafe(method(observeValueForKeyPath:ofObject:change:context:))]
+        fn observe_value(
+            &self,
+            _key_path: Option<&NSString>,
+            _object: Option<&AnyObject>,
+            _change: Option<&AnyObject>,
+            _context: *mut std::ffi::c_void,
+        ) {
+        }
+    }
+);
+
+/// Observes `keys` on `object` for the rest of the app's life, so KVO overrides their setters on
+/// the object's (new) class and its other observers hear about changes made through them.
+fn observe_keys(object: &NSObject, keys: &[String]) {
+    if keys.is_empty() {
+        return;
+    }
+    // SAFETY: `new` on a plain NSObject subclass.
+    let keeper: Retained<KeyValueKeeper> = unsafe { objc2::msg_send![KeyValueKeeper::class(), new] };
+    for key in keys {
+        let key = NSString::from_str(key);
+        // SAFETY: NSObject's public `addObserver:forKeyPath:options:context:`; options 0, no
+        // context. KVO doesn't retain the observer, so it's leaked below and outlives the window.
+        unsafe {
+            let _: () = objc2::msg_send![
+                object,
+                addObserver: &*keeper,
+                forKeyPath: &*key,
+                options: 0usize,
+                context: std::ptr::null_mut::<std::ffi::c_void>(),
+            ];
+        }
+    }
+    std::mem::forget(keeper);
+}
+
 /// Whether swapping `original` (the window's runtime class) for `MenuBarPanel` keeps the object
-/// valid: `original` is tao's `TaoWindow` directly under NSWindow, NSPanel and MenuBarPanel add no
-/// ivars to NSWindow's, and the allocation (TaoWindow's size) is at least as big as the new class.
+/// valid: `original` is tao's `TaoWindow` directly under NSWindow, or KVO's subclass of it (which
+/// adds no ivars; [`make_menubar_panel`] rebuilds its setter overrides), NSPanel and MenuBarPanel
+/// add no ivars to NSWindow's, and the allocation (TaoWindow's size) is at least as big as the
+/// new class.
 fn panel_swap_is_sound(original: &AnyClass) -> bool {
     let window = NSWindow::class();
-    let is_tao = original.name().to_str() == Ok("TaoWindow")
-        && original
-            .superclass()
-            .is_some_and(|s| std::ptr::eq(s, window));
+    let tao = unobserved_class(original);
+    let is_tao = tao.name().to_str() == Ok("TaoWindow")
+        && tao.superclass().is_some_and(|s| std::ptr::eq(s, window))
+        && original.instance_size() == tao.instance_size();
     is_tao
         && NSPanel::class().instance_size() == window.instance_size()
         && MenuBarPanel::class().instance_size() == window.instance_size()
@@ -351,6 +447,46 @@ mod tests {
         assert_eq!(NSPanel::class().instance_size(), window);
         assert_eq!(MenuBarPanel::class().instance_size(), window);
         assert!(!panel_swap_is_sound(NSWindow::class()), "only tao's window");
+    }
+
+    #[test]
+    fn kvo_setter_keys_from_selectors() {
+        assert_eq!(setter_key("setContentView:").as_deref(), Some("contentView"));
+        assert_eq!(
+            setter_key("set_windowLayerContext:").as_deref(),
+            Some("_windowLayerContext")
+        );
+        assert_eq!(setter_key("setFrame:display:"), None);
+        assert_eq!(setter_key("setup:"), None);
+        assert_eq!(setter_key("set:"), None);
+        assert_eq!(setter_key("class"), None);
+        assert_eq!(setter_key("_isKVOA"), None);
+    }
+
+    /// The window's class is KVO's subclass of TaoWindow on macOS 27: the swap must see through it.
+    #[test]
+    fn kvo_subclass_is_seen_through() {
+        let object = NSObject::new();
+        let observed = NSString::from_str("description");
+        let keeper: Retained<KeyValueKeeper> =
+            unsafe { objc2::msg_send![KeyValueKeeper::class(), new] };
+        unsafe {
+            let _: () = objc2::msg_send![
+                &*object,
+                addObserver: &*keeper,
+                forKeyPath: &*observed,
+                options: 0usize,
+                context: std::ptr::null_mut::<std::ffi::c_void>(),
+            ];
+        }
+        let kvo = object.class();
+        assert_eq!(kvo.name().to_str(), Ok("NSKVONotifying_NSObject"));
+        assert!(std::ptr::eq(unobserved_class(kvo), NSObject::class()));
+        assert!(std::ptr::eq(unobserved_class(NSObject::class()), NSObject::class()));
+        assert!(kvo_setter_keys(NSObject::class()).is_empty(), "not a KVO class");
+        unsafe {
+            let _: () = objc2::msg_send![&*object, removeObserver: &*keeper, forKeyPath: &*observed];
+        }
     }
 
     #[test]

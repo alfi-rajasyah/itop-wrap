@@ -3519,6 +3519,19 @@ async fn resolve_and_close_sends_resolve_then_close() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn menubar_close_hides_only_the_panel() {
+    let h = Harness::new(FakeITop::with(vec![ticket("601", "assigned", "7")]));
+    h.load().await;
+    h.settle().await;
+    send(&h, "menubar", json!({"type": "close"}))
+        .await
+        .expect("ok");
+    let calls = h.native.calls();
+    assert!(calls.contains(&Call::HideMenubarPanel));
+    assert!(!calls.contains(&Call::ShowMainWindow));
+}
+
+#[tokio::test(start_paused = true)]
 async fn menubar_resolve_opens_only_the_resolve_window() {
     let h = Harness::new(FakeITop::with(vec![
         ticket("601", "assigned", "7"),

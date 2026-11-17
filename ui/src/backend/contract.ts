@@ -1230,6 +1230,8 @@ export type MenuBarIntent =
   | { type: 'newTicket' }
   /** ⌘R: reload My tickets. */
   | { type: 'refresh' }
+  /** Esc: hide the panel, like a click outside it. */
+  | { type: 'close' }
 
 export interface MenuBarResults {
   setQuery: null
@@ -1238,6 +1240,7 @@ export interface MenuBarResults {
   openMain: null
   newTicket: null
   refresh: null
+  close: null
 }
 
 // ---------------------------------------------------------------------------------------------
