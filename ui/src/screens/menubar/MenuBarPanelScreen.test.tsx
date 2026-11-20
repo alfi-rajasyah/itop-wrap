@@ -28,6 +28,14 @@ describe('MenuBarPanelScreen (MB-7…16, KEY-8)', () => {
     expect(screen.getByRole('button', { name: 'Open iTop Wrap' })).toBeEnabled()
   })
 
+  it('never scrolls the window itself: only the ticket list scrolls', async () => {
+    mountMock()
+    const { unmount } = render(<MenuBarApp />)
+    for (const el of [document.documentElement, document.body]) expect(el.style.overflow).toBe('hidden')
+    unmount()
+    for (const el of [document.documentElement, document.body]) expect(el.style.overflow).toBe('')
+  })
+
   it('opens a ticket in the main window', async () => {
     const user = userEvent.setup()
     const { sent } = mountMock()

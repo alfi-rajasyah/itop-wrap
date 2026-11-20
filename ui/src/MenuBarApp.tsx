@@ -11,10 +11,20 @@ export default function MenuBarApp() {
   usePreventReload()
   const root = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    // The window itself is transparent; only the panel paints.
+    // The window itself is transparent; only the panel paints. It never scrolls either: the
+    // ticket list scrolls inside the panel. While the content outgrows the window (the resize
+    // below is async), a page scrollbar would eat 15px of the 360px width (with "always show
+    // scroll bars"), overflow the width too, and the two scrollbars would keep each other.
     const targets = [document.documentElement, document.body]
-    targets.forEach((el) => el.style.setProperty('background', 'transparent'))
-    return () => targets.forEach((el) => el.style.removeProperty('background'))
+    targets.forEach((el) => {
+      el.style.setProperty('background', 'transparent')
+      el.style.setProperty('overflow', 'hidden')
+    })
+    return () =>
+      targets.forEach((el) => {
+        el.style.removeProperty('background')
+        el.style.removeProperty('overflow')
+      })
   }, [])
   useEffect(() => {
     // The panel's height follows its content (MB-15); the window keeps its top edge.
