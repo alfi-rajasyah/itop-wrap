@@ -75,8 +75,9 @@ function rows(list: ListSnapshot) {
 describe('contract shape', () => {
   it('lists every model id once, and every workspace model but session', () => {
     expect(new Set(MODEL_IDS).size).toBe(MODEL_IDS.length)
-    expect(MODEL_IDS).toHaveLength(23)
+    expect(MODEL_IDS).toHaveLength(24)
     expect(WORKSPACE_MODEL_IDS).not.toContain('session')
+    expect(WORKSPACE_MODEL_IDS).not.toContain('settings')
     expect(WORKSPACE_MODEL_IDS).toHaveLength(22)
   })
 
@@ -90,6 +91,7 @@ describe('contract shape', () => {
     }
     const out = makeMock({ signedOut: true })
     expectSerdeShape(await out.getSnapshot('session'), 'session')
+    expectSerdeShape(await out.getSnapshot('settings'), 'settings')
     for (const id of WORKSPACE_MODEL_IDS) expect(await out.getSnapshot(id), `${id} is null signed out`).toBeNull()
   })
 

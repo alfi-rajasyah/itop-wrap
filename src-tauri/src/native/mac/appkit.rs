@@ -8,9 +8,10 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject};
 use objc2::{ClassType, MainThreadMarker, MainThreadOnly, define_class};
 use objc2_app_kit::{
-    NSAccessibility, NSApplication, NSEvent, NSEventMask, NSEventModifierFlags, NSModalResponseOK,
-    NSPanel, NSPasteboard, NSPasteboardTypeString, NSResponder, NSSavePanel, NSStatusItem,
-    NSStatusWindowLevel, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
+    NSAccessibility, NSApplication, NSApplicationActivationPolicy, NSEvent, NSEventMask,
+    NSEventModifierFlags, NSModalResponseOK, NSPanel, NSPasteboard, NSPasteboardTypeString,
+    NSResponder, NSSavePanel, NSStatusItem, NSStatusWindowLevel, NSWindow,
+    NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
 };
 use objc2_foundation::{NSObject, NSObjectProtocol, NSString, NSURL};
 use tauri::{AppHandle, Runtime, WebviewWindow};
@@ -127,6 +128,20 @@ pub fn activate(mtm: MainThreadMarker) {
     // `activate()` is macOS 14+; the app supports macOS 13.
     #[allow(deprecated)]
     app.activateIgnoringOtherApps(true);
+}
+
+/// Shows (regular) or hides (accessory) the Dock icon. Accessory apps have no visible menu bar,
+/// but the main menu's key equivalents still work.
+pub fn set_dock_icon(mtm: MainThreadMarker, shown: bool) {
+    let app = NSApplication::sharedApplication(mtm);
+    let policy = if shown {
+        NSApplicationActivationPolicy::Regular
+    } else {
+        NSApplicationActivationPolicy::Accessory
+    };
+    if app.activationPolicy() != policy {
+        app.setActivationPolicy(policy);
+    }
 }
 
 /// The `NSWindow` behind a Tauri window.
@@ -319,7 +334,8 @@ fn observe_keys(object: &NSObject, keys: &[String]) {
         return;
     }
     // SAFETY: `new` on a plain NSObject subclass.
-    let keeper: Retained<KeyValueKeeper> = unsafe { objc2::msg_send![KeyValueKeeper::class(), new] };
+    let keeper: Retained<KeyValueKeeper> =
+        unsafe { objc2::msg_send![KeyValueKeeper::class(), new] };
     for key in keys {
         let key = NSString::from_str(key);
         // SAFETY: NSObject's public `addObserver:forKeyPath:options:context:`; options 0, no
@@ -451,7 +467,10 @@ mod tests {
 
     #[test]
     fn kvo_setter_keys_from_selectors() {
-        assert_eq!(setter_key("setContentView:").as_deref(), Some("contentView"));
+        assert_eq!(
+            setter_key("setContentView:").as_deref(),
+            Some("contentView")
+        );
         assert_eq!(
             setter_key("set_windowLayerContext:").as_deref(),
             Some("_windowLayerContext")
@@ -482,10 +501,17 @@ mod tests {
         let kvo = object.class();
         assert_eq!(kvo.name().to_str(), Ok("NSKVONotifying_NSObject"));
         assert!(std::ptr::eq(unobserved_class(kvo), NSObject::class()));
-        assert!(std::ptr::eq(unobserved_class(NSObject::class()), NSObject::class()));
-        assert!(kvo_setter_keys(NSObject::class()).is_empty(), "not a KVO class");
+        assert!(std::ptr::eq(
+            unobserved_class(NSObject::class()),
+            NSObject::class()
+        ));
+        assert!(
+            kvo_setter_keys(NSObject::class()).is_empty(),
+            "not a KVO class"
+        );
         unsafe {
-            let _: () = objc2::msg_send![&*object, removeObserver: &*keeper, forKeyPath: &*observed];
+            let _: () =
+                objc2::msg_send![&*object, removeObserver: &*keeper, forKeyPath: &*observed];
         }
     }
 

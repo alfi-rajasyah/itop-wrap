@@ -5,26 +5,28 @@ import { usePreventReload } from '@/lib/keys'
 import LoginScreen from '@/screens/LoginScreen'
 import NewTicketForm from '@/screens/NewTicketForm'
 import ShellScreen from '@/screens/ShellScreen'
+import SettingsScreen from '@/screens/SettingsScreen'
 import { ResolveWindowForm } from '@/screens/TicketSheets'
 
-type WindowKind = 'main' | 'new-ticket' | 'resolve'
+type WindowKind = 'main' | 'new-ticket' | 'resolve' | 'settings'
 
 /**
  * The `new-ticket` window loads index.html?window=new-ticket (contract §6, Windows), the menu
- * bar's Resolve window index.html?window=resolve.
+ * bar's Resolve window index.html?window=resolve, Settings index.html?window=settings.
  */
 function windowKind(): WindowKind {
   if (typeof window === 'undefined') return 'main'
   const kind = new URLSearchParams(window.location.search).get('window')
-  return kind === 'new-ticket' || kind === 'resolve' ? kind : 'main'
+  return kind === 'new-ticket' || kind === 'resolve' || kind === 'settings' ? kind : 'main'
 }
 
-/** Root of the main window (W/App.swift RootView), the New Ticket window and the Resolve window. */
+/** Root of the main window (W/App.swift RootView), the New Ticket, Resolve and Settings windows. */
 export default function App({ kind = windowKind() }: { kind?: WindowKind }) {
   useSystemTheme()
   usePreventReload()
   if (kind === 'new-ticket') return <NewTicketWindow />
   if (kind === 'resolve') return <ResolveWindow />
+  if (kind === 'settings') return <SettingsWindow />
   return <MainWindow />
 }
 
@@ -96,6 +98,18 @@ function ResolveWindow() {
   return (
     <div ref={root} className="bg-surface text-ink" style={{ width: RESOLVE_WIDTH }}>
       <ResolveWindowForm />
+    </div>
+  )
+}
+
+/** Settings is 440 pt wide; its height follows the content. */
+const SETTINGS_WIDTH = 440
+
+function SettingsWindow() {
+  const root = useFitWindowHeight(SETTINGS_WIDTH)
+  return (
+    <div ref={root} className="bg-surface text-ink" style={{ width: SETTINGS_WIDTH }}>
+      <SettingsScreen />
     </div>
   )
 }

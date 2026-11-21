@@ -3,7 +3,7 @@ import GlideMenu from "@/components/primitives/GlideMenu";
 import { cn } from "@/lib/utils";
 import { NeedsYouDot } from "./Badges";
 import { Button } from "./Button";
-import { NewTicketIcon, OpenWindowIcon, RefreshIcon, ResolveIcon, StopIcon, StopwatchIcon } from "./icons";
+import { NewTicketIcon, OpenWindowIcon, RefreshIcon, ResolveIcon, SettingsIcon, StopIcon, StopwatchIcon } from "./icons";
 import { IconButton } from "./IconButton";
 import { Duration, Ref } from "./Ref";
 import { SearchField } from "./SearchField";
@@ -163,12 +163,15 @@ export function MenuBarFooter({
   refreshing = false,
   updatedLabel,
   onOpenApp,
+  onOpenSettings,
 }: {
   onRefresh: () => void;
   refreshing?: boolean;
   /** "Updated 2 minutes ago". */
   updatedLabel?: string;
   onOpenApp: () => void;
+  /** The gear: Settings is the way back to the Dock icon while it's hidden. */
+  onOpenSettings?: () => void;
 }) {
   return (
     <div className="flex h-10 items-center gap-1 border-t border-line px-1.5">
@@ -182,6 +185,9 @@ export function MenuBarFooter({
         aria-keyshortcuts="Meta+R"
       />
       <span className="min-w-0 flex-1 truncate text-center text-[11.5px] text-ink-2">{updatedLabel}</span>
+      {onOpenSettings ? (
+        <IconButton label="Settings" tooltip="Settings (⌘,)" icon={<SettingsIcon />} size="md" onClick={onOpenSettings} aria-keyshortcuts="Meta+Comma" />
+      ) : null}
       <IconButton label="Open iTop Wrap" tooltip="Open iTop Wrap (⌘O)" icon={<OpenWindowIcon />} size="md" onClick={onOpenApp} aria-keyshortcuts="Meta+O" />
     </div>
   );

@@ -95,6 +95,36 @@ pub enum ConvertTo {
     Jpeg,
 }
 
+/// Which app icons to show (Settings, iTop Wrap addition). Both default to on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AppIcons {
+    /// The Dock icon (`NSApplication` activation policy regular vs accessory).
+    pub dock: bool,
+    /// The menu bar item and its panel.
+    pub menu_bar: bool,
+}
+
+impl Default for AppIcons {
+    fn default() -> Self {
+        Self {
+            dock: true,
+            menu_bar: true,
+        }
+    }
+}
+
+impl AppIcons {
+    /// Never both off: the app would have no icon left to bring it back. Defaults edited by hand
+    /// to both off read as the Dock icon on.
+    pub fn normalized(self) -> Self {
+        if self.dock || self.menu_bar {
+            self
+        } else {
+            Self { dock: true, ..self }
+        }
+    }
+}
+
 pub trait Native: Send + Sync {
     /// "Now", so tests can hold the clock still.
     fn now(&self) -> DateTime<Utc>;
@@ -129,6 +159,12 @@ pub trait Native: Send + Sync {
     fn new_ticket_assign_to_me(&self) -> bool;
     /// Remembers "Assign to me" at once (NEW-12, PERS-8).
     fn set_new_ticket_assign_to_me(&self, on: bool);
+    /// Settings: which app icons show (`app.showInDock`, `app.showMenuBarIcon` in the standard domain).
+    fn app_icons(&self) -> AppIcons;
+    /// Remembers the choice and applies it at once (Dock icon, menu bar item).
+    fn set_app_icons(&self, icons: AppIcons);
+    /// Opens (or brings forward) the Settings window.
+    fn show_settings_window(&self);
 
     // Locale-dependent text: Foundation's formatters with the Mac's current locale and time zone,
     // exactly as each Swift call site uses them (contract.md open point 5).

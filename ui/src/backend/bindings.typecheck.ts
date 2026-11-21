@@ -36,6 +36,8 @@ import type { MenuBarSnapshot } from '../bindings/app/MenuBarSnapshot'
 import type { MenuBarIntent } from '../bindings/app/MenuBarIntent'
 import type { UpdateSnapshot } from '../bindings/app/UpdateSnapshot'
 import type { UpdateIntent } from '../bindings/app/UpdateIntent'
+import type { SettingsSnapshot } from '../bindings/app/SettingsSnapshot'
+import type { SettingsIntent } from '../bindings/app/SettingsIntent'
 import type { AppError } from '../bindings/AppError'
 
 /** True when each type is assignable to the other. */
@@ -75,5 +77,7 @@ export type Conformance = [
   Assert<Mutual<MenuBarIntent, C.MenuBarIntent>>,
   Assert<Mutual<UpdateSnapshot, C.UpdateSnapshot>>,
   Assert<Mutual<UpdateIntent, C.UpdateIntent>>,
+  Assert<Mutual<SettingsSnapshot, C.SettingsSnapshot>>,
+  Assert<Mutual<SettingsIntent, C.SettingsIntent>>,
   Assert<Mutual<AppError, C.AppError>>,
 ]

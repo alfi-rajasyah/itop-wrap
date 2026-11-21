@@ -15,6 +15,7 @@ pub mod prefs;
 pub mod records;
 pub mod seams;
 pub mod session;
+pub mod settings;
 pub mod sheets;
 pub mod shell;
 pub mod timer;

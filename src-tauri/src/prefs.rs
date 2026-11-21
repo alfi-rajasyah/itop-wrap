@@ -56,6 +56,9 @@ pub mod keys {
     pub const LIST_PAGE_SIZE: &str = "list.pageSize";
     pub const TIMER_RUNNING: &str = "timer.running";
     pub const NEW_TICKET_ASSIGN_TO_ME: &str = "newTicket.assignToMe";
+    /// Settings (iTop Wrap addition): default true.
+    pub const SHOW_IN_DOCK: &str = "app.showInDock";
+    pub const SHOW_MENU_BAR_ICON: &str = "app.showMenuBarIcon";
     /// Written and read by AppKit (`NSWindow.setFrameAutosaveName("main")`), never by hand.
     pub const MAIN_WINDOW_FRAME: &str = "NSWindow Frame main";
 }

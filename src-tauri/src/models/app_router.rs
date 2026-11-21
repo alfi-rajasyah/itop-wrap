@@ -19,6 +19,7 @@ use super::prefs::Prefs;
 use super::records::{ListScope, SidebarItem};
 use super::seams::{Model, ModelContext};
 use super::session::{FocusField, SessionIntent, SessionModelState, SessionState, SignInResult};
+use super::settings::Settings;
 use super::workspace::{WORKSPACE_MODEL_IDS, Workspace};
 use crate::error::AppError;
 use crate::hub::Hub;
@@ -67,6 +68,8 @@ struct RouterInner {
     fmt: Fmt,
     trace: bool,
     session: Mutex<SessionModelState>,
+    /// Settings: there signed in and signed out.
+    settings: Settings,
     workspace: Mutex<Option<Workspace>>,
     /// When you last used the app (wall clock, `Native::now()`), while signed in.
     last_use: Mutex<Option<DateTime<Utc>>>,
@@ -83,7 +86,7 @@ fn decode<T: DeserializeOwned>(intent: Value) -> Result<T, AppError> {
 }
 
 fn is_known(model: &str) -> bool {
-    model == "session" || WORKSPACE_MODEL_IDS.contains(&model)
+    model == "session" || model == super::settings::MODEL_ID || WORKSPACE_MODEL_IDS.contains(&model)
 }
 
 impl AppRouter {
@@ -91,6 +94,7 @@ impl AppRouter {
     pub fn new(config: AppConfig) -> AppRouter {
         let session =
             SessionModelState::new(config.service.saved_server(), config.service.saved_user());
+        let settings = Settings::new(config.hub.clone(), config.native.clone());
         let router = AppRouter(Arc::new(RouterInner {
             service: config.service,
             prefs: config.prefs,
@@ -98,6 +102,7 @@ impl AppRouter {
             native: config.native,
             fmt: config.fmt,
             trace: config.trace,
+            settings,
             session: Mutex::new(session),
             workspace: Mutex::new(None),
             last_use: Mutex::new(None),
@@ -427,6 +432,10 @@ impl Router for AppRouter {
             let intent = serde_json::from_value(intent)
                 .map_err(|_| AppError::invalid_intent("That isn't a session intent."))?;
             return self.dispatch_session(intent).await;
+        }
+        if model == super::settings::MODEL_ID {
+            self.0.settings.dispatch(decode(intent)?);
+            return Ok(Value::Null);
         }
         let Some(ws) = self.workspace() else {
             return Err(AppError::not_signed_in());

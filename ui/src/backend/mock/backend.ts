@@ -473,7 +473,7 @@ export class MockBackend implements Backend {
   }
 
   async dispatch<K extends ModelId, I extends IntentOf<K>>(model: K, intent: I): Promise<ResultOf<K, I['type']>> {
-    if (model !== 'session' && this.phase !== 'signedIn') {
+    if (model !== 'session' && model !== 'settings' && this.phase !== 'signedIn') {
       throw new BackendError({ type: 'notSignedIn', message: `${model} needs a signed-in session` } satisfies AppError)
     }
     try {
@@ -522,6 +522,7 @@ export class MockBackend implements Backend {
       people: () => this.ws(() => this.peopleSnapshot()),
       menubar: () => this.ws(() => this.menuSnapshot()),
       update: () => this.ws(() => this.updateSnapshot()),
+      settings: () => this.settingsSnapshot(),
     }
     return builders[model]() as SnapshotOf<K> | null
   }
@@ -573,6 +574,8 @@ export class MockBackend implements Backend {
         return this.menuIntent(intent as IntentOf<'menubar'>)
       case 'update':
         return this.updateIntent(intent as IntentOf<'update'>)
+      case 'settings':
+        return this.settingsIntent(intent as IntentOf<'settings'>)
     }
   }
 
@@ -2907,5 +2910,33 @@ export class MockBackend implements Backend {
         u.autoCheck = intent.on
         return null
     }
+  }
+
+  // ===========================================================================================
+  // settings (the mock has no Dock or menu bar: it only keeps the choice)
+  // ===========================================================================================
+
+  private icons = { dock: true, menuBar: true }
+
+  private settingsSnapshot(): SnapshotOf<'settings'> {
+    const { dock, menuBar } = this.icons
+    return { showInDock: dock, showMenuBarIcon: menuBar, canHideDock: !dock || menuBar, canHideMenuBarIcon: !menuBar || dock }
+  }
+
+  private async settingsIntent(intent: IntentOf<'settings'>): Promise<unknown> {
+    const next = { ...this.icons }
+    switch (intent.type) {
+      case 'open':
+        return null
+      case 'setShowInDock':
+        next.dock = intent.on
+        break
+      case 'setShowMenuBarIcon':
+        next.menuBar = intent.on
+        break
+    }
+    // Both off would leave no way back to the app.
+    if (next.dock || next.menuBar) this.icons = next
+    return null
   }
 }

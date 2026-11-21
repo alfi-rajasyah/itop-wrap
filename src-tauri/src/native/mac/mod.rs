@@ -26,7 +26,7 @@ use tauri::{
     WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry,
 };
 
-use crate::native::{ConvertTo, ConvertedImage, Native, PastedImage};
+use crate::native::{AppIcons, ConvertTo, ConvertedImage, Native, PastedImage};
 use crate::router::{NativeEvent, Router};
 use appkit::{PanelKey, on_main, on_main_async};
 use tray_draw::Slide;
@@ -44,6 +44,7 @@ pub const MAIN: &str = "main";
 pub const MENUBAR: &str = "menubar";
 pub const NEW_TICKET: &str = "new-ticket";
 pub const RESOLVE: &str = "resolve";
+pub const SETTINGS: &str = "settings";
 const TRAY_ID: &str = "itop-wrap";
 
 /// The panel's width (MB-6) and its height until the UI sizes it to its content.
@@ -57,6 +58,8 @@ const SHELL_DEFAULT: (f64, f64) = (940.0, 520.0);
 const NEW_TICKET_SIZE: (f64, f64) = (480.0, 640.0);
 /// The Resolve window's first size; the page then fits the height to the form.
 const RESOLVE_SIZE: (f64, f64) = (500.0, 480.0);
+/// The Settings window's first size; the page then fits the height to its content.
+const SETTINGS_SIZE: (f64, f64) = (440.0, 220.0);
 /// The sidebar items in order, for View ▸ ⌘1…⌘5 (W/SessionModel.swift:5-31).
 pub const SECTIONS: [&str; 5] = [
     "My tickets",
@@ -124,6 +127,8 @@ struct State {
     main_hidden: bool,
     /// The shell's sidebar is collapsed: View shows "Show Sidebar".
     sidebar_hidden: bool,
+    /// Settings: which app icons the user wants (see [`Shell::apply_icons`]).
+    icons: AppIcons,
 }
 
 /// The native shell: windows, menus, tray, panel.
@@ -144,6 +149,11 @@ impl Shell {
 
     fn state(&self) -> MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// The remembered icon choice, before the windows exist (the Dock icon follows once signed in).
+    pub fn set_initial_icons(&self, icons: AppIcons) {
+        self.state().icons = icons.normalized();
     }
 
     /// Connects the router; native events before this are dropped.
@@ -420,6 +430,73 @@ impl Shell {
         }
     }
 
+    /// Settings (⌘,): its own titled window, like the Resolve window.
+    fn show_settings(self: &Arc<Self>, mtm: MainThreadMarker) {
+        if let Some(w) = self.window(SETTINGS) {
+            let _ = w.unminimize();
+            let _ = w.show();
+            let _ = w.set_focus();
+            appkit::activate(mtm);
+            return;
+        }
+        let built = WebviewWindowBuilder::new(
+            &self.app,
+            SETTINGS,
+            WebviewUrl::App("index.html?window=settings".into()),
+        )
+        .on_navigation(app_page)
+        .on_new_window(|_, _| NewWindowResponse::Deny)
+        .title("Settings")
+        .inner_size(SETTINGS_SIZE.0, SETTINGS_SIZE.1)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .disable_drag_drop_handler()
+        .center()
+        .visible(true)
+        .build();
+        match built {
+            Ok(w) => {
+                appkit::exclude_from_windows_menu(mtm, &w);
+                let _ = w.set_focus();
+                appkit::activate(mtm);
+            }
+            Err(e) => eprintln!("Settings window wasn't created: {e}"),
+        }
+    }
+
+    /// Shows or hides the menu bar item and the Dock icon for the user's choice. The Dock icon
+    /// only hides while the menu bar item is there (signed in): otherwise it would be the only
+    /// way back to the app. Main thread.
+    fn apply_icons(self: &Arc<Self>, mtm: MainThreadMarker) {
+        let (icons, signed_in) = {
+            let s = self.state();
+            (s.icons, s.signed_in)
+        };
+        let tray_shown = signed_in && icons.menu_bar;
+        if tray_shown {
+            self.ensure_tray();
+        } else {
+            let tray = self.state().tray.take();
+            if tray.is_some() {
+                let _ = self.app.remove_tray_by_id(TRAY_ID);
+            }
+            self.hide_panel();
+        }
+        let dock_shown = icons.dock || !tray_shown;
+        appkit::set_dock_icon(mtm, dock_shown);
+        if !dock_shown {
+            // Going accessory can drop the app out of the front; keep an open window in front.
+            let visible = [MAIN, SETTINGS, NEW_TICKET, RESOLVE]
+                .iter()
+                .filter_map(|l| self.window(l))
+                .any(|w| w.is_visible().unwrap_or(false));
+            if visible {
+                appkit::activate(mtm);
+            }
+        }
+    }
+
     // MARK: panel
 
     fn panel_is_key(&self) -> bool {
@@ -517,6 +594,7 @@ impl Shell {
                 self.send(NativeEvent::MenuOpenMain);
             }
             "toggle-sidebar" => self.send(NativeEvent::ToggleSidebar),
+            "settings" => self.show_settings(mtm),
             "check-updates" => {
                 self.show_main(mtm);
                 self.send(NativeEvent::MenuCheckUpdates);
@@ -556,14 +634,10 @@ impl Shell {
         if was != signed_in {
             self.rebuild_menu();
         }
-        if signed_in {
-            self.ensure_tray();
-        } else {
-            let tray = self.state().tray.take();
-            if tray.is_some() {
-                let _ = self.app.remove_tray_by_id(TRAY_ID);
-            }
-            self.hide_panel();
+        if let Some(mtm) = MainThreadMarker::new() {
+            self.apply_icons(mtm);
+        }
+        if !signed_in {
             self.close_new_ticket();
             self.close_resolve();
         }
@@ -718,6 +792,8 @@ fn build_menu(
         true,
         &[
             &PredefinedMenuItem::about(app, Some("About iTop Wrap"), None)?,
+            &sep()?,
+            &MenuItem::with_id(app, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?,
             &sep()?,
             &PredefinedMenuItem::services(app, None)?,
             &sep()?,
@@ -930,6 +1006,33 @@ impl Native for MacNative {
     fn set_new_ticket_assign_to_me(&self, on: bool) {
         self.standard
             .set_bool(crate::prefs::keys::NEW_TICKET_ASSIGN_TO_ME, on);
+    }
+
+    fn app_icons(&self) -> AppIcons {
+        use crate::prefs::keys;
+        AppIcons {
+            dock: self.standard.bool(keys::SHOW_IN_DOCK).unwrap_or(true),
+            menu_bar: self.standard.bool(keys::SHOW_MENU_BAR_ICON).unwrap_or(true),
+        }
+        .normalized()
+    }
+
+    fn set_app_icons(&self, icons: AppIcons) {
+        use crate::prefs::keys;
+        let icons = icons.normalized();
+        self.standard.set_bool(keys::SHOW_IN_DOCK, icons.dock);
+        self.standard
+            .set_bool(keys::SHOW_MENU_BAR_ICON, icons.menu_bar);
+        let shell = self.shell.clone();
+        on_main_async(self.app(), move |mtm| {
+            shell.state().icons = icons;
+            shell.apply_icons(mtm);
+        });
+    }
+
+    fn show_settings_window(&self) {
+        let shell = self.shell.clone();
+        on_main_async(self.app(), move |mtm| shell.show_settings(mtm));
     }
 
     fn format_date_template(&self, date: DateTime<Utc>, template: &str) -> String {
