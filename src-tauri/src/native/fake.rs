@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 
-use super::{ConvertTo, ConvertedImage, Native, PastedImage};
+use super::{AppIcons, ConvertTo, ConvertedImage, Native, PastedImage};
 use crate::models::format::en_us;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +23,8 @@ pub enum Call {
     SetTray(String, String),
     ReadPasteboard,
     SidebarChanged(bool),
+    SetAppIcons(AppIcons),
+    ShowSettingsWindow,
 }
 
 pub struct FakeNative {
@@ -34,6 +36,8 @@ pub struct FakeNative {
     pub converted: Mutex<Option<ConvertedImage>>,
     /// The remembered `newTicket.assignToMe` (default true).
     pub assign_to_me: Mutex<bool>,
+    /// The remembered app icons (default both on).
+    pub icons: Mutex<AppIcons>,
     /// What `pasteboard_images` answers (`None`: no images, paste text normally).
     pub pasteboard: Mutex<Option<Vec<PastedImage>>>,
     /// When set, `write_file` fails with this text.
@@ -48,6 +52,7 @@ impl FakeNative {
             save_to: Mutex::default(),
             converted: Mutex::default(),
             assign_to_me: Mutex::new(true),
+            icons: Mutex::default(),
             pasteboard: Mutex::default(),
             write_failure: Mutex::default(),
         }
@@ -128,6 +133,16 @@ impl Native for FakeNative {
     }
     fn set_new_ticket_assign_to_me(&self, on: bool) {
         *self.assign_to_me.lock().unwrap_or_else(|e| e.into_inner()) = on;
+    }
+    fn app_icons(&self) -> AppIcons {
+        *self.icons.lock().unwrap_or_else(|e| e.into_inner())
+    }
+    fn set_app_icons(&self, icons: AppIcons) {
+        *self.icons.lock().unwrap_or_else(|e| e.into_inner()) = icons;
+        self.record(Call::SetAppIcons(icons));
+    }
+    fn show_settings_window(&self) {
+        self.record(Call::ShowSettingsWindow);
     }
     fn format_date_template(&self, date: DateTime<Utc>, template: &str) -> String {
         en_us::date_template(date, template)

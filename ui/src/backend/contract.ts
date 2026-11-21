@@ -1295,6 +1295,31 @@ export interface UpdateResults {
   setAutoCheck: null
 }
 
+/**
+ * Settings (iTop Wrap addition): the Dock icon and the menu bar item. There signed in and signed
+ * out. At least one stays on; the Dock icon only hides while the menu bar item is there.
+ */
+export interface SettingsSnapshot {
+  showInDock: boolean
+  showMenuBarIcon: boolean
+  /** False while the menu bar item is off: the Dock icon is then the only way back. */
+  canHideDock: boolean
+  /** False while the Dock icon is off. */
+  canHideMenuBarIcon: boolean
+}
+
+export type SettingsIntent =
+  /** Opens the Settings window (and closes the menu bar panel). */
+  | { type: 'open' }
+  | { type: 'setShowInDock'; on: boolean }
+  | { type: 'setShowMenuBarIcon'; on: boolean }
+
+export interface SettingsResults {
+  open: null
+  setShowInDock: null
+  setShowMenuBarIcon: null
+}
+
 /** Checks at compile time that every intent has exactly one result entry. */
 type Model<S, I extends { type: string }, R extends { [K in I['type']]: unknown }> = {
   snapshot: S
@@ -1328,6 +1353,8 @@ export interface ModelMap {
   people: Model<PeopleSnapshot, PeopleIntent, PeopleResultsMap>
   menubar: Model<MenuBarSnapshot, MenuBarIntent, MenuBarResults>
   update: Model<UpdateSnapshot, UpdateIntent, UpdateResults>
+  /** Settings window (index.html?window=settings). Not a workspace model: never null. */
+  settings: Model<SettingsSnapshot, SettingsIntent, SettingsResults>
 }
 
 export type ModelId = keyof ModelMap
@@ -1362,10 +1389,11 @@ export const MODEL_IDS: readonly ModelId[] = [
   'people',
   'menubar',
   'update',
+  'settings',
 ] as const
 
 /** Models that exist only while signed in: their snapshot is null otherwise. */
-export const WORKSPACE_MODEL_IDS: readonly ModelId[] = MODEL_IDS.filter((id) => id !== 'session')
+export const WORKSPACE_MODEL_IDS: readonly ModelId[] = MODEL_IDS.filter((id) => id !== 'session' && id !== 'settings')
 
 // ---------------------------------------------------------------------------------------------
 // Transport payloads and errors

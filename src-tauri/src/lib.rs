@@ -100,6 +100,7 @@ pub fn run_with(make_router: impl FnOnce(AppContext) -> Arc<dyn Router> + Send +
             })));
             let native: Arc<dyn Native> =
                 Arc::new(MacNative::new(shell.clone(), Prefs::standard()));
+            shell.set_initial_icons(native.app_icons());
             let ctx = AppContext {
                 app: handle.clone(),
                 hub: hub.clone(),

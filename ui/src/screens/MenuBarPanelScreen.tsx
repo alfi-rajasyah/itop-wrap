@@ -15,12 +15,13 @@ import { TimerNotice } from './list/TimerNotice'
 /*
  * The menu bar panel (W/MenuBarView.swift MenuBarPanel, MB-7…16): search and New ticket, the
  * timer notice, My tickets that want attention grouped by status with the running one on top,
- * and the footer with Refresh, "Updated …" and Open iTop Wrap. 360 pt wide, in a borderless
+ * and the footer with Refresh, "Updated …", Settings and Open iTop Wrap. 360 pt wide, in a borderless
  * transparent window, so the panel draws its own rounded edge.
  */
 export default function MenuBarPanelScreen() {
   const [menu, send] = useModel('menubar')
   const [timer, sendTimer] = useModel('timer')
+  const [, sendSettings] = useModel('settings')
 
   useWindowKeyDown((e) => {
     if (!menu) return
@@ -98,6 +99,7 @@ export default function MenuBarPanelScreen() {
           refreshing={menu.refreshing}
           updatedLabel={menu.updatedText ?? undefined}
           onOpenApp={() => void send({ type: 'openMain' })}
+          onOpenSettings={() => void sendSettings({ type: 'open' })}
         />
       </MenuBarPanel>
     </div>

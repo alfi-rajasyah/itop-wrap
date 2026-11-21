@@ -38,6 +38,7 @@ export {
   LogOut as SignOutIcon,
   Calendar as CalendarIcon,
   SidebarCollapse as SidebarIcon,
+  Settings as SettingsIcon,
 } from "iconoir-react";
 
 /** Filled stop square: the running timer's button (stopwatch ↔ stop). */
